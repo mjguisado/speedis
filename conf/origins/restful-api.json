@@ -1,7 +1,7 @@
 {
+    "id": "restful-api",
     "prefix": "/restful-api",
     "logLevel": "info",
-    "name": "restful-api",
     "origin": {
         "http2": false,
         "httpxoptions": {

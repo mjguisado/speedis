@@ -1,10 +1,8 @@
-import { createClient } from 'redis'
-
+import os from 'os'
 import http from 'http'
 import https from 'https'
 // import http2 from 'http2'
-import os from 'os'
-
+import { createClient } from 'redis'
 import tlch from '../transformers/toLowerCaseHeaders.js'
 import aorh from '../transformers/addOrReplaceHeaders.js'
 import * as utils from '../util/utils.js'
@@ -13,13 +11,13 @@ export default async function (server, opts) {
   // https://nodejs.org/api/http.html#httprequestoptions-callback
   // https://nodejs.org/api/http.html#new-agentoptions
   // https://github.com/redis/node-redis/blob/master/docs/client-configuration.md
-  const { name, origin, agentOpts, redisOpts } = opts
-  server.decorate('name', name)
+  const { id, origin, agentOpts, redisOpts } = opts
+  server.decorate('id', id)
 
   // Initially, we are only going to support GET requests.
   // The default method is GET
   if (origin.httpxoptions.method && origin.httpxoptions.method !== 'GET') {
-    throw new Error(`Origin: ${name}. Unsupported HTTP method: ${origin.httpxoptions.method}. Only GET is supported.`)
+    throw new Error(`Origin: ${id}. Unsupported HTTP method: ${origin.httpxoptions.method}. Only GET is supported.`)
   }
   // Ensuring the header array exists
   if (!Object.prototype.hasOwnProperty.call(origin.httpxoptions, 'headers')) {
@@ -45,7 +43,7 @@ export default async function (server, opts) {
   // Connecting to Redis
   const client = await createClient(redisOpts)
     .on('error', err => {
-      throw new Error(`Origin: ${name}. Error connecting to Redis.`, { cause: err })
+      throw new Error(`Origin: ${id}. Error connecting to Redis.`, { cause: err })
     })
     .connect()
   server.decorate('redis', client)
@@ -153,7 +151,7 @@ export default async function (server, opts) {
       responseTime = Date.now() / 1000 | 0
     } catch (err) {
       server.log.error(err,
-        `Error while requesting to the origin ${server.name} with this options: ` +
+        `Error while requesting to the origin ${server.id} with this options: ` +
         JSON.stringify(options)
       )
 
@@ -165,7 +163,7 @@ export default async function (server, opts) {
       * https://developer.mozilla.org/es/docs/Web/HTTP/Headers/Cache-Control
       */
       if (cachedResponse != null) {
-        server.log.warn(err, `Serving stale content. Origin: ${server.name}. Key: ${path}.`)
+        server.log.warn(err, `Serving stale content. Origin: ${server.id}. Key: ${path}.`)
         server.log.debug('Failed cache entry: ' + JSON.stringify(cachedResponse))
         aorh(cachedResponse, {
           warning: '111 ' + os.hostname() + ' "Revalidation Failed" "' + (new Date()).toUTCString() + '"',
@@ -196,7 +194,7 @@ export default async function (server, opts) {
       try {
         await multi.exec()
       } catch (err) {
-        server.log.error(err, `Error while storing in the cache. Origin: ${server.name}. Key: ${path}`)
+        server.log.error(err, `Error while storing in the cache. Origin: ${server.id}. Key: ${path}`)
         server.log.debug('Failed cache entry: ' + JSON.stringify(cachedResponse))
       }
 
@@ -238,7 +236,7 @@ export default async function (server, opts) {
         try {
           await multi.exec()
         } catch (err) {
-          server.log.error(err, `Error while storing in the cache. Origin: ${server.name}. Key: ${path}`)
+          server.log.error(err, `Error while storing in the cache. Origin: ${server.id}. Key: ${path}`)
           server.log.debug('Failed cache entry: ' + JSON.stringify(cacheEntry))
         }
       }
