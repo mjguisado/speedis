@@ -1,0 +1,27 @@
+{
+    "prefix": "/restful-api",
+    "logLevel": "info",
+    "name": "restful-api",
+    "origin": {
+        "http2": false,
+        "httpxoptions": {
+            "protocol": "https:",
+            "hostname": "api.restful-api.dev",
+            "port": 443,
+            "method": "GET",
+            "headers": {
+              "Content-Type": "application/json"
+            },
+            "timeout": 2000
+        }
+    },
+    "agentOpts": {
+        "keepAlive": true
+    },
+    "redisOpts": {
+        "socket": {
+            "host": "localhost",
+            "port": 6379
+        }
+    }
+}
