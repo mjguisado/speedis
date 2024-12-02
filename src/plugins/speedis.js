@@ -3,7 +3,6 @@ import http from 'http'
 import https from 'https'
 // import http2 from 'http2'
 import { createClient } from 'redis'
-import tlch from '../transformers/toLowerCaseHeaders.js'
 import aorh from '../transformers/addOrReplaceHeaders.js'
 import * as utils from '../util/utils.js'
 
@@ -34,7 +33,12 @@ export default async function (server, opts) {
      * comparisons, which are case-sensitive.
      * Node HTTP sets all headers to lower case automatically.
      */
-    tlch(origin.httpxoptions, null)
+    let aux = null
+    for (const header in origin.httpxoptions.headers) {
+      aux = origin.httpxoptions.headers[header]
+      delete origin.httpxoptions.headers[header]
+      origin.httpxoptions.headers[header.toLowerCase()] = aux
+    };
   }
   server.decorate('origin', origin)
 
