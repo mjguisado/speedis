@@ -3,7 +3,6 @@ import http from 'http'
 import https from 'https'
 // import http2 from 'http2'
 import { createClient } from 'redis'
-import aorh from '../transformers/addOrReplaceHeaders.js'
 import * as utils from '../util/utils.js'
 
 export default async function (server, opts) {
@@ -71,25 +70,25 @@ export default async function (server, opts) {
     handler: async function (request, reply) {
       let prefix = request.routeOptions.url.replace("/*", "")
       let path = request.url.replace(prefix, "")
-      let forceFetch   = (Object.prototype.hasOwnProperty.call(request.headers, 'x-speedis-force-fetch'))
-      let preview      = (Object.prototype.hasOwnProperty.call(request.headers, 'x-speedis-preview'))
+      let forceFetch = (Object.prototype.hasOwnProperty.call(request.headers, 'x-speedis-force-fetch'))
+      let preview = (Object.prototype.hasOwnProperty.call(request.headers, 'x-speedis-preview'))
       try {
         let response = await _get(path, forceFetch, preview, request.id)
         reply.code(response.statusCode)
         reply.headers(response.headers)
         reply.send(response.body)
       } catch (error) {
-        const msg = 
-          "Error requesting to the origin and there is no entry in the cache. " + 
+        const msg =
+          "Error requesting to the origin and there is no entry in the cache. " +
           `Origin: ${server.id}. Url: ${request.url}. RID: ${request.id}.`
-        if (server.origin.exposeErrors) { throw new Error (msg, { cause: err }) }
+        if (server.origin.exposeErrors) { throw new Error(msg, { cause: err }) }
         else throw new Error(msg);
       }
     }
   })
 
   function generateCacheKey(server, path) {
-    return server.id + path.replace('/',':')
+    return server.id + path.replace('/', ':')
   }
 
   async function _get(path, forceFetch, preview, rid) {
@@ -105,7 +104,7 @@ export default async function (server, opts) {
     try {
       cachedResponse = await server.redis.json.get(cacheKey)
     } catch (error) {
-      server.log.warn(err, 
+      server.log.warn(err,
         "Error querying the cache entry in Redis. " +
         `Origin: ${server.id}. Key: ${cacheKey}. RID: ${rid}.`)
     }
@@ -136,16 +135,17 @@ export default async function (server, opts) {
       * the x-speedis-freshness-lifetime-infinity header.
       */
       if (!forceFetch && (utils.isFreshnessLifeTime(cachedResponse) || responseIsFresh)) {
-        aorh(cachedResponse, { age: utils.calculateAge(cachedResponse) })
+
+        cachedResponse.headers['age'] = utils.calculateAge(cachedResponse)
         utils.memHeader('HIT', forceFetch, preview, cachedResponse)
         return cachedResponse
       } else {
         // We need to revalidate the response through a conditional request.
         if ('etag' in cachedResponse.headers) {
-          aorh(options, { 'if-none-match': cachedResponse.headers.etag })
+          options.headers['if-none-match'] = cachedResponse.headers.etag
         }
         if ('last-modified' in cachedResponse.headers) {
-          aorh(options, { 'if-modified-since': cachedResponse.headers['last-modified'] })
+          options.headers['if-modified-since'] = cachedResponse.headers['last-modified']
         }
       }
     }
@@ -180,14 +180,13 @@ export default async function (server, opts) {
       * https://developer.mozilla.org/es/docs/Web/HTTP/Headers/Cache-Control
       */
       if (cachedResponse != null) {
-        server.log.warn(error, 
+        server.log.warn(error,
           "Serving stale content from cache. " +
           `Origin: ${server.id}. Key: ${cacheKey}. RID: ${rid}.`)
         server.log.debug('Failed cache entry: ' + JSON.stringify(cachedResponse))
-        aorh(cachedResponse, {
-          warning: '111 ' + os.hostname() + ' "Revalidation Failed" "' + (new Date()).toUTCString() + '"',
-          age: utils.calculateAge(cachedResponse)
-        })
+        cachedResponse.headers['warning'] = 
+          '111 ' + os.hostname() + ' "Revalidation Failed" "' + (new Date()).toUTCString() + '"'
+        cachedResponse.headers['age'] = utils.calculateAge(cachedResponse)
         utils.memHeader('STALE', forceFetch, preview, cachedResponse)
         return cachedResponse
       } else {
@@ -207,15 +206,15 @@ export default async function (server, opts) {
       cachedResponse.responseTime = responseTime
       multi.json.set(cacheKey, '$.responseTime', responseTime)
       if ('date' in originResponse.headers) {
-        aorh(cachedResponse, { date: originResponse.headers.date })
+        cachedResponse.headers['date'] = originResponse.headers.date
         multi.json.set(cacheKey, '$.headers.date', cachedResponse.headers.date)
       }
       // Update the cache
       try {
         await multi.exec()
       } catch (err) {
-        server.log.warn(err, 
-          "Error while storing in the cache. " + 
+        server.log.warn(err,
+          "Error while storing in the cache. " +
           `Origin: ${server.id}. Key: ${cacheKey}. RID: ${rid}.`
         )
         server.log.debug('Failed cache entry: ' + JSON.stringify(cachedResponse))
@@ -224,7 +223,7 @@ export default async function (server, opts) {
       // Las siguientes modificaciones no queremos que persistan en caché.
       // Por ello clonamos la respuesta.
       outputResponse = utils.cloneAndTrimResponse(path, cachedResponse)
-      aorh(outputResponse, { age: utils.calculateAge(outputResponse) })
+      outputResponse.headers['age'] = utils.calculateAge(outputResponse)
       utils.memHeader('HIT', forceFetch, preview, outputResponse)
     } else {
       // We set the attributes involved in calculating the
@@ -258,8 +257,8 @@ export default async function (server, opts) {
           try {
             await multi.exec()
           } catch (err) {
-            server.log.warn(err, 
-              "Error while storing in the cache. " + 
+            server.log.warn(err,
+              "Error while storing in the cache. " +
               `Origin: ${server.id}. Key: ${cacheKey}. RID: ${rid}.`
             )
             server.log.debug('Failed cache entry: ' + JSON.stringify(cachedResponse))
@@ -271,7 +270,7 @@ export default async function (server, opts) {
       // transformaciones para su salida.
       outputResponse = utils.cloneAndTrimResponse(path, originResponse)
       // _transform(TARGET_TYPE_RESPONSE, ...);
-      aorh(outputResponse, { age: utils.calculateAge(outputResponse) })
+      outputResponse.headers['age'] = utils.calculateAge(outputResponse)
       utils.memHeader('MISS', forceFetch, preview, outputResponse)
     }
     return outputResponse
