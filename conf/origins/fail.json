@@ -1,13 +1,13 @@
 {
-    "id": "restful-api",
-    "prefix": "/restful-api",
+    "id": "fail",
+    "prefix": "/fail",
     "logLevel": "info",
     "origin": {
         "http2": false,
         "exposeErrors": false,
         "httpxoptions": {
             "protocol": "https:",
-            "hostname": "api.restful-api.dev",
+            "hostname": "api.restful-api.devop",
             "port": 443,
             "method": "GET",
             "headers": {

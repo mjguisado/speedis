@@ -8,24 +8,32 @@ import aorh from '../transformers/addOrReplaceHeaders.js'
 import * as utils from '../util/utils.js'
 
 export default async function (server, opts) {
-  // https://nodejs.org/api/http.html#httprequestoptions-callback
-  // https://nodejs.org/api/http.html#new-agentoptions
-  // https://github.com/redis/node-redis/blob/master/docs/client-configuration.md
+  /*
+   * https://nodejs.org/api/http.html#httprequestoptions-callback
+   * https://nodejs.org/api/http.html#new-agentoptions
+   * https://github.com/redis/node-redis/blob/master/docs/client-configuration.md
+   */
   const { id, origin, agentOpts, redisOpts } = opts
+
   server.decorate('id', id)
 
-  // Initially, we are only going to support GET requests.
-  // The default method is GET
-  if (origin.httpxoptions.method && origin.httpxoptions.method !== 'GET') {
-    throw new Error(`Origin: ${id}. Unsupported HTTP method: ${origin.httpxoptions.method}. Only GET is supported.`)
+  /*
+   * Initially, we are only going to support GET requests.
+   * The default method is GET
+   */
+  if (origin.httpxoptions.method &&
+    origin.httpxoptions.method !== 'GET') {
+    throw new Error(`Unsupported HTTP method: ${origin.httpxoptions.method}. Only GET is supported. Origin: ${id}`)
   }
   // Ensuring the header array exists
   if (!Object.prototype.hasOwnProperty.call(origin.httpxoptions, 'headers')) {
     origin.httpxoptions.headers = []
   } else {
-    // We ensure that header names are in lowercase for the following
-    // comparisons, which are case-sensitive.
-    // Node HTTP sets all headers to lower case automatically.
+    /*
+     * We ensure that header names are in lowercase for the following
+     * comparisons, which are case-sensitive.
+     * Node HTTP sets all headers to lower case automatically.
+     */
     tlch(origin.httpxoptions, null)
   }
   server.decorate('origin', origin)
@@ -43,7 +51,7 @@ export default async function (server, opts) {
   // Connecting to Redis
   const client = await createClient(redisOpts)
     .on('error', err => {
-      throw new Error(`Origin: ${id}. Error connecting to Redis.`, { cause: err })
+      throw new Error(`Error connecting to Redis. Origin: ${id}.`, { cause: err })
     })
     .connect()
   server.decorate('redis', client)
@@ -53,41 +61,53 @@ export default async function (server, opts) {
     if (server.redis) server.redis.quit()
   })
 
-  /*
-  server.get('/',
-    {
-      schema: {
-        querystring: {
-          type: 'object',
-          properties: {
-            oid: { type: 'string' },
-            path: { type: 'string' },
-            ff: { type: 'boolean' },
-            pv: { type: 'boolean' }
-          }
-        }
+  server.route({
+    method: 'GET',
+    url: '/*',
+    handler: async function (request, reply) {
+      let prefix = request.routeOptions.url.replace("/*", "")
+      let path = request.url.replace(prefix, "")
+      let forceFetch   = (Object.prototype.hasOwnProperty.call(request.headers, 'x-speedis-force-fetch'))
+      let preview      = (Object.prototype.hasOwnProperty.call(request.headers, 'x-speedis-preview'))
+      try {
+        let response = await _get(path, forceFetch, preview, request.id)
+        reply.code(response.statusCode)
+        reply.headers(response.headers)
+        reply.send(response.body)
+      } catch (error) {
+        const msg = 
+          "Error requesting to the origin and there is no entry in the cache. " + 
+          `Origin: ${server.id}. Url: ${request.url}. RID: ${request.id}.`
+        if (server.origin.exposeErrors) { throw new Error (msg, { cause: err }) }
+        else throw new Error(msg);
       }
-    },
-    async (req, reply) => {
     }
-  )
-  */
+  })
 
-  await _get('/objects?id=3&id=5&id=10', false, false)
+  function generateCacheKey(server, path) {
+    return server.id + path.replace('/',':')
+  }
 
-  async function _get (path, forceFetch, preview) {
+  async function _get(path, forceFetch, preview, rid) {
     // We create options for an HTTP/S request to the required path
     // based on the default ones that must not be modified.
     const options = { ...server.origin.httpxoptions, path }
 
     // We try to look for the entry in the cache.
-    // FIXME: ¿Consultamos Redis incluso si nos fuerzan el fetch?
-    // TODO: Recuperar sólo los campos que necesitamos: requestTime, responseTime, headers
-    const cachedResponse = await server.redis.json.get(path)
-
-    cachedResponse.headers['cache-control'] = 'max-age=30, s-maxage=300'
+    // TODO: ¿Consultamos Redis incluso si nos fuerzan el fetch?
+    // TODO: Pensar en recuperar sólo los campos que necesitamos: requestTime, responseTime, headers
+    const cacheKey = generateCacheKey(server, path)
+    let cachedResponse = null
+    try {
+      cachedResponse = await server.redis.json.get(cacheKey)
+    } catch (error) {
+      server.log.warn(err, 
+        "Error querying the cache entry in Redis. " +
+        `Origin: ${server.id}. Key: ${cacheKey}. RID: ${rid}.`)
+    }
 
     if (cachedResponse) {
+
       // We calculate whether the cache entry is fresh or stale.
       // See: https://tools.ietf.org/html/rfc7234#section-4.2
       const freshnessLifetime = utils.calculateFreshnessLifetime(cachedResponse)
@@ -101,19 +121,12 @@ export default async function (server, opts) {
       * the origin by attacking it, from those generated by the origin itself.
       * The latter, if considered a problem, can always be modified by a
       * transformer.
-      *
       * https://tools.ietf.org/html/rfc7234#section-4.2.4
       * https://developer.mozilla.org/es/docs/Web/HTTP/Headers/Cache-Control
-      *
-      * &&
-      *     ! (   cacheDirectives.hasOwnProperty('no-store')
-      *        || cacheDirectives.hasOwnProperty('no-cache')
-      *        || cacheDirectives.hasOwnProperty('must-revalidate')
-      *        || cacheDirectives.hasOwnProperty('proxy-revalidate')))
-      *     || cacheDirectives.hasOwnProperty('immutable')) {
+      * no-store, no-cache, must-revalidate, proxy-revalidate, immutable
       */
 
-      /**
+      /*
       * If the response is fresh, we serve it immediately from the cache.
       * It can be fresh for a specific period or indefinitely if it contains
       * the x-speedis-freshness-lifetime-infinity header.
@@ -149,12 +162,12 @@ export default async function (server, opts) {
       // The current value of the clock at the host at the time the
       // response was received.
       responseTime = Date.now() / 1000 | 0
-    } catch (err) {
-      server.log.error(err,
-        `Error while requesting to the origin ${server.id} with this options: ` +
-        JSON.stringify(options)
+    } catch (error) {
+      delete options.agent
+      server.log.error(error,
+        "Error requesting to the origin. " +
+        `Origin: ${server.id}. Options: ` + JSON.stringify(options) + `. RID: ${rid}.`
       )
-
       /*
       * If I was trying to refresh a cache entry, I may consider serving the
       * stale content.
@@ -163,7 +176,9 @@ export default async function (server, opts) {
       * https://developer.mozilla.org/es/docs/Web/HTTP/Headers/Cache-Control
       */
       if (cachedResponse != null) {
-        server.log.warn(err, `Serving stale content. Origin: ${server.id}. Key: ${path}.`)
+        server.log.warn(error, 
+          "Serving stale content from cache. " +
+          `Origin: ${server.id}. Key: ${cacheKey}. RID: ${rid}.`)
         server.log.debug('Failed cache entry: ' + JSON.stringify(cachedResponse))
         aorh(cachedResponse, {
           warning: '111 ' + os.hostname() + ' "Revalidation Failed" "' + (new Date()).toUTCString() + '"',
@@ -172,7 +187,8 @@ export default async function (server, opts) {
         utils.memHeader('STALE', forceFetch, preview, cachedResponse)
         return cachedResponse
       } else {
-        return outputResponse
+        // There is no entry in the cache, and it could not be retrieved from the source. 
+        throw error
       }
     }
 
@@ -183,18 +199,21 @@ export default async function (server, opts) {
       // age of the content.
       const multi = server.redis.multi()
       cachedResponse.requestTime = requestTime
-      multi.json.set(path, '$.requestTime', requestTime)
+      multi.json.set(cacheKey, '$.requestTime', requestTime)
       cachedResponse.responseTime = responseTime
-      multi.json.set(path, '$.responseTime', responseTime)
+      multi.json.set(cacheKey, '$.responseTime', responseTime)
       if ('date' in originResponse.headers) {
         aorh(cachedResponse, { date: originResponse.headers.date })
-        multi.json.set(path, '$.headers.date', cachedResponse.headers.date)
+        multi.json.set(cacheKey, '$.headers.date', cachedResponse.headers.date)
       }
       // Update the cache
       try {
         await multi.exec()
       } catch (err) {
-        server.log.error(err, `Error while storing in the cache. Origin: ${server.id}. Key: ${path}`)
+        server.log.warn(err, 
+          "Error while storing in the cache. " + 
+          `Origin: ${server.id}. Key: ${cacheKey}. RID: ${rid}.`
+        )
         server.log.debug('Failed cache entry: ' + JSON.stringify(cachedResponse))
       }
 
@@ -211,33 +230,36 @@ export default async function (server, opts) {
 
       // If we are not in preview mode, it is cached.
       if (!preview) {
-        // We generate a cache entry from the response.
-        const cacheEntry = utils.cloneAndTrimResponse(path, originResponse)
-
-        // Apply transformations to the cache entry
-        // _transform(TARGET_TYPE_CACHE, ...);
-
         // We parse the Cache-Control header to extract cache directives.
-        const cacheDirectives = utils.parseCacheControlHeader(cacheEntry)
+        const cacheDirectives = utils.parseCacheControlHeader(originResponse)
 
-        // Indicates that the response is intended for a single user and must
+        // Private indicates that the response is intended for a single user and must
         // not be stored by a shared cache. A private cache may store the response.
-        if (Object.prototype.hasOwnProperty.call(cacheDirectives, 'private')) return
+        // No-store indicates that the cache should not store anything about the 
+        // client request or server response.
+        if (!Object.prototype.hasOwnProperty.call(cacheDirectives, 'private') &&
+          !Object.prototype.hasOwnProperty.call(cacheDirectives, 'no-store')) {
 
-        // The cache should not store anything about the client request
-        // or server response.
-        if (Object.prototype.hasOwnProperty.call(cacheDirectives, 'no-store')) return
+          // We generate a cache entry from the response.
+          const cacheEntry = utils.cloneAndTrimResponse(path, originResponse)
 
-        // Storing in the cache
-        const multi = server.redis.multi()
-        multi.json.set(path, '$', cacheEntry)
-        const ttl = _ttl(cacheEntry.ttl)
-        if (ttl) multi.expire(path, ttl)
-        try {
-          await multi.exec()
-        } catch (err) {
-          server.log.error(err, `Error while storing in the cache. Origin: ${server.id}. Key: ${path}`)
-          server.log.debug('Failed cache entry: ' + JSON.stringify(cacheEntry))
+          // Apply transformations to the cache entry
+          // _transform(TARGET_TYPE_CACHE, ...);
+
+          // Storing in the cache
+          const multi = server.redis.multi()
+          multi.json.set(cacheKey, '$', cacheEntry)
+          const ttl = _ttl(cacheEntry.ttl)
+          if (ttl) multi.expire(cacheKey, ttl)
+          try {
+            await multi.exec()
+          } catch (err) {
+            server.log.warn(err, 
+              "Error while storing in the cache. " + 
+              `Origin: ${server.id}. Key: ${cacheKey}. RID: ${rid}.`
+            )
+            server.log.debug('Failed cache entry: ' + JSON.stringify(cachedResponse))
+          }
         }
       }
 
@@ -248,11 +270,10 @@ export default async function (server, opts) {
       aorh(outputResponse, { age: utils.calculateAge(outputResponse) })
       utils.memHeader('MISS', forceFetch, preview, outputResponse)
     }
-
     return outputResponse
   }
 
-  function _fetch (options) {
+  function _fetch(options) {
     // Transformacion cuando es una request
     // _transform(TARGET_TYPE_REQUEST, ...);
     return new Promise((resolve, reject) => {
@@ -278,8 +299,9 @@ export default async function (server, opts) {
    * which results in a TTL of 0 being returned.
    * This subsequently causes the cache entry not to expire.
    */
-  function _ttl (ttl = 'Infinity') {
-    if (ttl === 'Infinity' || Infinity === ttl) return 0
+  function _ttl(ttl = 'Infinity') {
+    if ('Infinity' === ttl || Infinity === ttl) return 0
     return parseInt(ttl)
   }
+
 }

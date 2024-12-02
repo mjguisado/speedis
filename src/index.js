@@ -26,20 +26,15 @@ origins = await Promise.all(origins)
 origins.forEach((origin) => {
   if (undefined !== origin) {
     server.register(speedisPlugin, origin)
-    // `after` will be executed once the previous declared `register` has finished
+    // `after` will be executed once the previous declared `register` has finished.
     server.after(err => server.log.error(err))
   }
 })
 
-/**
- * Run the server!
- */
-const start = async () => {
-  try {
-    await server.listen({ host: '::', port: 3000 })
-  } catch (err) {
-    server.log.fatal(err)
-    process.exit(1)
-  }
+// Run the server!
+try {
+  await server.listen({ port: 3000 })
+} catch (err) {
+  server.log.error(err)
+  process.exit(1)
 }
-start()

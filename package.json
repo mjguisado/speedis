@@ -7,6 +7,7 @@
   "scripts": {
     "dev": "nodemon src/index.js",
     "prod": "node src/index.js",
+    "mocks": "mocks-server",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {
@@ -20,13 +21,10 @@
   },
   "homepage": "https://github.com/mjguisado/speedis#readme",
   "dependencies": {
-    "@fastify/redis": "^7.0.1",
-    "@fastify/swagger": "^9.4.0",
-    "fastify": "^5.1.0",
-    "fastify-plugin": "^5.0.1"
+    "fastify": "^5.1.0"
   },
   "devDependencies": {
-    "nodemon": "^3.1.7",
-    "standard": "^17.1.2"
+    "@mocks-server/main": "^4.1.0",
+    "nodemon": "^3.1.7"
   }
 }
