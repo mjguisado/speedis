@@ -9,14 +9,67 @@ import Ajv from "ajv"
 
 export default async function (server, opts) {
 
-  /*
-   * https://nodejs.org/api/http.html#httprequestoptions-callback
-   * https://nodejs.org/api/http.html#new-agentoptions
-   * https://github.com/redis/node-redis/blob/master/docs/client-configuration.md
-   */
   const { id, origin, agentOpts, redisOpts, mutations } = opts
 
   server.decorate('id', id)
+
+  const ajv = new Ajv()
+
+  // TODO: Completar validaciones.
+  // https://nodejs.org/api/http.html#httprequestoptions-callback
+  // https://github.com/redis/node-redis/blob/master/docs/client-configuration.md
+
+  // https://nodejs.org/api/http.html#new-agentoptions
+  const validateAgentOptions = ajv.compile(
+    {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        keepAlive: { type: "boolean" },
+        keepAliveMsecs: { type: "integer" },
+        maxSockets: { type: "integer" },
+        maxTotalSockets: { type: "integer" },
+        maxFreeSockets: { type: "integer" },
+        scheduling: { type: "string" },
+        timeout: { type: "integer" }
+      }
+    }
+  )
+
+  const ORIGIN_REQUEST  = "OriginRequest"
+  const ORIGIN_RESPONSE = "OriginResponse"
+  const CACHE_REQUEST   = "CacheRequest"
+  const CACHE_RESPONSE  = "CacheResponse"
+
+  const validateMutations = ajv.compile(
+    {
+      type: "array",
+      items: {
+        type: "object",
+        minProperties: 2,
+        maxProperties: 2,
+        additionalProperties: false,
+        required: ["urlPattern", "actions"],
+        properties: {
+          urlPattern: { type: "string" },
+          actions: {
+            type: "array",
+            items: {
+              type: "object",
+              minProperties: 2,
+              maxProperties: 3,
+              required: ["phase", "func"],
+              properties: {
+                phase:  { enum: [ORIGIN_REQUEST, ORIGIN_RESPONSE, CACHE_REQUEST, CACHE_RESPONSE] },
+                func:   { type: "string" },
+                params: { type: "object" }
+              }
+            }
+          }
+        }
+      }
+    }
+  )
 
   /*
    * Initially, we are only going to support GET requests.
@@ -26,7 +79,7 @@ export default async function (server, opts) {
     origin.httpxoptions.method !== 'GET') {
     throw new Error(`Unsupported HTTP method: ${origin.httpxoptions.method}. Only GET is supported. Origin: ${id}`)
   }
-
+  
   // Ensuring the header array exists inside the origin
   if (!Object.prototype.hasOwnProperty.call(origin.httpxoptions, 'headers')) {
     origin.httpxoptions.headers = []
@@ -49,10 +102,16 @@ export default async function (server, opts) {
   // For HTTP/2, you don’t need an agent per se, but you can maintain reusable
   // connections by configuring the HTTP/2 client instance.
   if (!origin.http2 && agentOpts) {
-    // The default protocol is 'http:'
-    const agent = (origin.httpxoptions.protocol === 'https:' ? https : http).Agent(agentOpts)
-    origin.httpxoptions.agent = agent
-    server.decorate('agent', agent)
+    const valid = validateAgentOptions(agentOpts);
+    if (valid) {
+      // The default protocol is 'http:'
+      const agent = (origin.httpxoptions.protocol === 'https:' ? https : http).Agent(agentOpts)
+      origin.httpxoptions.agent = agent
+      server.decorate('agent', agent)
+    } else {
+      server.log.error(validateAgentOptions.errors)
+      throw new Error(`The agent configuration is invalid. Origin: ${id}`)
+    }
   }
 
   // Connecting to Redis
@@ -63,44 +122,9 @@ export default async function (server, opts) {
     .connect()
   server.decorate('redis', client)
 
-  const ORIGIN_REQUEST  = "OriginRequest"
-  const ORIGIN_RESPONSE = "OriginResponse"
-  const CACHE_REQUEST   = "CacheRequest"
-  const CACHE_RESPONSE  = "CacheResponse"
-
   if (mutations) {
-    const ajv = new Ajv()
-    const validate = ajv.compile(
-      {
-        type: "array",
-        items: {
-          type: "object",
-          minProperties: 2,
-          maxProperties: 2,
-          additionalProperties: false,
-          required: ["urlPattern", "actions"],
-          properties: {
-            urlPattern: { type: "string" },
-            actions: {
-              type: "array",
-              items: {
-                type: "object",
-                minProperties: 2,
-                maxProperties: 3,
-                required: ["phase", "func"],
-                properties: {
-                  phase:  { enum: [ORIGIN_REQUEST, ORIGIN_RESPONSE, CACHE_REQUEST, CACHE_RESPONSE] },
-                  func:   { type: "string" },
-                  params: { type: "object" }
-                }
-              }
-            }
-          }
-        }
-      }
-    )
-    const mutationsValid = validate(mutations)
-    if (mutationsValid) {
+    const valid = validateMutations(mutations)
+    if (valid) {
       mutations.forEach(mutation => {
         try {
           mutation.re = new RegExp(mutation.urlPattern)
@@ -116,7 +140,7 @@ export default async function (server, opts) {
         })
       })
     } else {
-      server.log.error(validate.errors)
+      server.log.error(validateMutations.errors)
       throw new Error(`The mutation configuration is invalid. Origin: ${id}`)
     }
   }
