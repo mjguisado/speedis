@@ -290,8 +290,9 @@ export default async function (server, opts) {
         throw error
       }
     }
+
     // Apply mutations to the response received from the origin
-    _mutate(ORIGIN_RESPONSE, options, server);
+    _mutate(ORIGIN_RESPONSE, originResponse, server);
 
     // The HTTP 304 status code, “Not Modified,” tells the client that the
     // requested resource hasn't changed since the last access
