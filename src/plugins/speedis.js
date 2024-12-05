@@ -4,14 +4,17 @@ import https from 'https'
 // import http2 from 'http2'
 import { createClient } from 'redis'
 import * as utils from '../util/utils.js'
+import * as actionsLib from '../actions/actions.js'
+import Ajv from "ajv"
 
 export default async function (server, opts) {
+
   /*
    * https://nodejs.org/api/http.html#httprequestoptions-callback
    * https://nodejs.org/api/http.html#new-agentoptions
    * https://github.com/redis/node-redis/blob/master/docs/client-configuration.md
    */
-  const { id, origin, agentOpts, redisOpts } = opts
+  const { id, origin, agentOpts, redisOpts, mutations } = opts
 
   server.decorate('id', id)
 
@@ -23,7 +26,8 @@ export default async function (server, opts) {
     origin.httpxoptions.method !== 'GET') {
     throw new Error(`Unsupported HTTP method: ${origin.httpxoptions.method}. Only GET is supported. Origin: ${id}`)
   }
-  // Ensuring the header array exists
+
+  // Ensuring the header array exists inside the origin
   if (!Object.prototype.hasOwnProperty.call(origin.httpxoptions, 'headers')) {
     origin.httpxoptions.headers = []
   } else {
@@ -59,6 +63,66 @@ export default async function (server, opts) {
     .connect()
   server.decorate('redis', client)
 
+  const ORIGIN_REQUEST  = "OriginRequest"
+  const ORIGIN_RESPONSE = "OriginResponse"
+  const CACHE_REQUEST   = "CacheRequest"
+  const CACHE_RESPONSE  = "CacheResponse"
+
+  if (mutations) {
+    const ajv = new Ajv()
+    const validate = ajv.compile(
+      {
+        type: "array",
+        items: {
+          type: "object",
+          minProperties: 2,
+          maxProperties: 2,
+          additionalProperties: false,
+          required: ["urlPattern", "actions"],
+          properties: {
+            urlPattern: { type: "string" },
+            actions: {
+              type: "array",
+              items: {
+                type: "object",
+                minProperties: 2,
+                maxProperties: 3,
+                required: ["phase", "func"],
+                properties: {
+                  phase:  { enum: [ORIGIN_REQUEST, ORIGIN_RESPONSE, CACHE_REQUEST, CACHE_RESPONSE] },
+                  func:   { type: "string" },
+                  params: { type: "object" }
+                }
+              }
+            }
+          }
+        }
+      }
+    )
+    const mutationsValid = validate(mutations)
+    if (mutationsValid) {
+      mutations.forEach(mutation => {
+        try {
+          mutation.re = new RegExp(mutation.urlPattern)
+        } catch (error) {
+          server.log.error(`urlPattern ${mutation.urlPattern} is not a valid regular expresion. Origin: ${id}`)
+          throw new Error(`The mutation configuration is invalid. Origin: ${id}`)
+        }
+        mutation.actions.forEach(action => {
+          if (!Object.prototype.hasOwnProperty.call(actionsLib, action.func)) {
+            server.log.error(`Function ${action.func} was not found among the available actions. Origin: ${id}`)
+            throw new Error(`The mutation configuration is invalid. Origin: ${id}`)
+          }
+        })
+      })
+    } else {
+      server.log.error(validate.errors)
+      throw new Error(`The mutation configuration is invalid. Origin: ${id}`)
+    }
+  }
+
+  server.decorate('mutations', mutations ? mutations : [])
+
   server.addHook('onClose', (server) => {
     if (server.agent) server.agent.destroy()
     if (server.redis) server.redis.quit()
@@ -73,7 +137,7 @@ export default async function (server, opts) {
       let forceFetch = (Object.prototype.hasOwnProperty.call(request.headers, 'x-speedis-force-fetch'))
       let preview = (Object.prototype.hasOwnProperty.call(request.headers, 'x-speedis-preview'))
       try {
-        let response = await _get(path, forceFetch, preview, request.id)
+        let response = await _get(server, path, forceFetch, preview, request.id)
         reply.code(response.statusCode)
         reply.headers(response.headers)
         reply.send(response.body)
@@ -81,7 +145,7 @@ export default async function (server, opts) {
         const msg =
           "Error requesting to the origin and there is no entry in the cache. " +
           `Origin: ${server.id}. Url: ${request.url}. RID: ${request.id}.`
-        if (server.origin.exposeErrors) { throw new Error(msg, { cause: err }) }
+        if (server.exposeErrors) { throw new Error(msg, { cause: err }) }
         else throw new Error(msg);
       }
     }
@@ -91,7 +155,7 @@ export default async function (server, opts) {
     return server.id + path.replace('/', ':')
   }
 
-  async function _get(path, forceFetch, preview, rid) {
+  async function _get(server, path, forceFetch, preview, rid) {
     // We create options for an HTTP/S request to the required path
     // based on the default ones that must not be modified.
     const options = { ...server.origin.httpxoptions, path }
@@ -110,6 +174,8 @@ export default async function (server, opts) {
     }
 
     if (cachedResponse) {
+      // Apply mutations to the entry fetched from the cache
+      _mutate(CACHE_RESPONSE, cachedResponse, server)
 
       // We calculate whether the cache entry is fresh or stale.
       // See: https://tools.ietf.org/html/rfc7234#section-4.2
@@ -131,11 +197,14 @@ export default async function (server, opts) {
 
       /*
       * If the response is fresh, we serve it immediately from the cache.
+      */
+     
+     /*
+      * @ Deprecated
       * It can be fresh for a specific period or indefinitely if it contains
       * the x-speedis-freshness-lifetime-infinity header.
       */
       if (!forceFetch && (utils.isFreshnessLifeTime(cachedResponse) || responseIsFresh)) {
-
         cachedResponse.headers['age'] = utils.calculateAge(cachedResponse)
         utils.memHeader('HIT', forceFetch, preview, cachedResponse)
         return cachedResponse
@@ -161,6 +230,9 @@ export default async function (server, opts) {
     // Make the request to the origin
     let originResponse = null
     let responseTime = null
+
+    // Apply mutations to the request before sending it to the origin
+    _mutate(ORIGIN_REQUEST, options, server);
     try {
       originResponse = await _fetch(options)
       // The current value of the clock at the host at the time the
@@ -184,7 +256,7 @@ export default async function (server, opts) {
           "Serving stale content from cache. " +
           `Origin: ${server.id}. Key: ${cacheKey}. RID: ${rid}.`)
         server.log.debug('Failed cache entry: ' + JSON.stringify(cachedResponse))
-        cachedResponse.headers['warning'] = 
+        cachedResponse.headers['warning'] =
           '111 ' + os.hostname() + ' "Revalidation Failed" "' + (new Date()).toUTCString() + '"'
         cachedResponse.headers['age'] = utils.calculateAge(cachedResponse)
         utils.memHeader('STALE', forceFetch, preview, cachedResponse)
@@ -194,6 +266,8 @@ export default async function (server, opts) {
         throw error
       }
     }
+    // Apply mutations to the response received from the origin
+    _mutate(ORIGIN_RESPONSE, options, server);
 
     // The HTTP 304 status code, “Not Modified,” tells the client that the
     // requested resource hasn't changed since the last access
@@ -209,6 +283,7 @@ export default async function (server, opts) {
         cachedResponse.headers['date'] = originResponse.headers.date
         multi.json.set(cacheKey, '$.headers.date', cachedResponse.headers.date)
       }
+
       // Update the cache
       try {
         await multi.exec()
@@ -246,8 +321,8 @@ export default async function (server, opts) {
           // We generate a cache entry from the response.
           const cacheEntry = utils.cloneAndTrimResponse(path, originResponse)
 
-          // Apply transformations to the cache entry
-          // _transform(TARGET_TYPE_CACHE, ...);
+          // Apply mutations to the cache entry before storing it in the cache.
+          _mutate(CACHE_REQUEST, cacheEntry, server)
 
           // Storing in the cache
           const multi = server.redis.multi()
@@ -269,16 +344,25 @@ export default async function (server, opts) {
       // Se clona la respuesta del origen y se le aplican
       // transformaciones para su salida.
       outputResponse = utils.cloneAndTrimResponse(path, originResponse)
-      // _transform(TARGET_TYPE_RESPONSE, ...);
       outputResponse.headers['age'] = utils.calculateAge(outputResponse)
       utils.memHeader('MISS', forceFetch, preview, outputResponse)
-    }
+    }   
     return outputResponse
   }
 
+  function _mutate(type, target, server) {
+    server.mutations.forEach(mutation => {
+      if (mutation.re.test(target.path)) {
+        mutation.actions.forEach(action => {
+          if (action.phase === type) {
+            actionsLib[action.func](target, action.params ? action.params : null)
+          }
+        })
+      }
+    })
+  }
+
   function _fetch(options) {
-    // Transformacion cuando es una request
-    // _transform(TARGET_TYPE_REQUEST, ...);
     return new Promise((resolve, reject) => {
       if (server.origin.http2) {
         // TODO: Implement HTTP2 support

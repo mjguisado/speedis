@@ -6,7 +6,9 @@
   "type": "module",
   "scripts": {
     "dev": "nodemon src/index.js",
+    "debug": "node --inspect-brk src/index.js",
     "prod": "node src/index.js",
+
     "mocks": "mocks-server",
     "test": "echo \"Error: no test specified\" && exit 1"
   },

@@ -23,13 +23,14 @@ originFiles.forEach((originFile) => {
 origins = await Promise.all(origins)
 
 // For each valid origin, we register an instance of the plugin that manages it.
+
 origins.forEach((origin) => {
   if (undefined !== origin) {
     server.register(speedisPlugin, origin)
-    // `after` will be executed once the previous declared `register` has finished.
-    server.after(err => server.log.error(err))
+    server.after(err => { if (err) console.log(err) })
   }
 })
+server.ready(err => { if (err) console.log(err) })
 
 // Run the server!
 try {
