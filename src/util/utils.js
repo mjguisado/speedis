@@ -1,6 +1,6 @@
 import os from 'os'
 
-export function cloneAndTrimResponse (path, response) {
+export function cloneAndTrimResponse(path, response) {
   return {
     statusCode: response.statusCode,
     body: response.body,
@@ -12,7 +12,7 @@ export function cloneAndTrimResponse (path, response) {
 }
 
 // We parse the Cache-Control header to extract cache directives.
-export function parseCacheControlHeader (response) {
+export function parseCacheControlHeader(response) {
   const cacheDirectives = {}
   if (!response.headers) return cacheDirectives
   if ('cache-control' in response.headers) {
@@ -29,7 +29,7 @@ export function parseCacheControlHeader (response) {
 }
 
 // See: https://tools.ietf.org/html/rfc7234#section-4.2.1
-export function calculateFreshnessLifetime (response) {
+export function calculateFreshnessLifetime(response) {
   // TODO: What do we do with TTL Infinity?
   let freshnessLifetime = 0
   const cacheDirectives = parseCacheControlHeader(response)
@@ -38,7 +38,7 @@ export function calculateFreshnessLifetime (response) {
   } else if (Object.prototype.hasOwnProperty.call(cacheDirectives, 'max-age')) {
     freshnessLifetime = parseInt(cacheDirectives['max-age'])
   } else if (Object.prototype.hasOwnProperty.call(response.headers, 'expires') &&
-        Object.prototype.hasOwnProperty.call(response.headers, 'date')) {
+    Object.prototype.hasOwnProperty.call(response.headers, 'date')) {
     const expires = Date.parse(response.headers.expires)
     const date = Date.parse(response.headers.date)
     if (!(isNaN(expires) || isNaN(date))) {
@@ -55,7 +55,7 @@ export function calculateFreshnessLifetime (response) {
 };
 
 // See: https://tools.ietf.org/html/rfc7234#section-4.2.3
-export function calculateAge (response) {
+export function calculateAge(response) {
   let ageValue = 0
   if (Object.prototype.hasOwnProperty.call(response.headers, 'age')) {
     ageValue = parseInt(response.headers.age)
@@ -79,7 +79,7 @@ export function calculateAge (response) {
   return currentAge
 };
 
-export function isFreshnessLifeTime (response) {
+export function isFreshnessLifeTime(response) {
   if (Object.prototype.hasOwnProperty.call(response.headers, 'x-speedis-freshness-lifetime-infinity')) {
     return response.headers['x-speedis-freshness-lifetime-infinity']
   } else {
@@ -87,7 +87,7 @@ export function isFreshnessLifeTime (response) {
   }
 }
 
-export function memHeader (trigger, ff, pv, outResponse) {
+export function memHeader(trigger, ff, pv, outResponse) {
   switch (trigger) {
     case 'HIT':
       outResponse.headers['x-speedis-cache'] = 'TCP_MEM_HIT from ' + os.hostname()

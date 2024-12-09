@@ -36,10 +36,10 @@ export default async function (server, opts) {
     }
   )
 
-  const ORIGIN_REQUEST  = "OriginRequest"
+  const ORIGIN_REQUEST = "OriginRequest"
   const ORIGIN_RESPONSE = "OriginResponse"
-  const CACHE_REQUEST   = "CacheRequest"
-  const CACHE_RESPONSE  = "CacheResponse"
+  const CACHE_REQUEST = "CacheRequest"
+  const CACHE_RESPONSE = "CacheResponse"
 
   const validateMutations = ajv.compile(
     {
@@ -60,8 +60,8 @@ export default async function (server, opts) {
               maxProperties: 3,
               required: ["phase", "func"],
               properties: {
-                phase:  { enum: [ORIGIN_REQUEST, ORIGIN_RESPONSE, CACHE_REQUEST, CACHE_RESPONSE] },
-                func:   { type: "string" },
+                phase: { enum: [ORIGIN_REQUEST, ORIGIN_RESPONSE, CACHE_REQUEST, CACHE_RESPONSE] },
+                func: { type: "string" },
                 params: { type: "object" }
               }
             }
@@ -79,7 +79,7 @@ export default async function (server, opts) {
     origin.httpxoptions.method !== 'GET') {
     throw new Error(`Unsupported HTTP method: ${origin.httpxoptions.method}. Only GET is supported. Origin: ${id}`)
   }
-  
+
   // Ensuring the header array exists inside the origin
   if (!Object.prototype.hasOwnProperty.call(origin.httpxoptions, 'headers')) {
     origin.httpxoptions.headers = []
@@ -189,7 +189,7 @@ export default async function (server, opts) {
     // TODO: Pensar en recuperar sólo los campos que necesitamos: requestTime, responseTime, headers
     const cacheKey = generateCacheKey(server, path)
     let cachedResponse = null
-    
+
     try {
       cachedResponse = await server.redis.json.get(cacheKey)
     } catch (error) {
@@ -223,12 +223,12 @@ export default async function (server, opts) {
       /*
       * If the response is fresh, we serve it immediately from the cache.
       */
-     
-     /*
-      * @ Deprecated
-      * It can be fresh for a specific period or indefinitely if it contains
-      * the x-speedis-freshness-lifetime-infinity header.
-      */
+
+      /*
+       * @ Deprecated
+       * It can be fresh for a specific period or indefinitely if it contains
+       * the x-speedis-freshness-lifetime-infinity header.
+       */
       if (!forceFetch && (utils.isFreshnessLifeTime(cachedResponse) || responseIsFresh)) {
         cachedResponse.headers['age'] = utils.calculateAge(cachedResponse)
         utils.memHeader('HIT', forceFetch, preview, cachedResponse)
@@ -372,7 +372,7 @@ export default async function (server, opts) {
       outputResponse = utils.cloneAndTrimResponse(path, originResponse)
       outputResponse.headers['age'] = utils.calculateAge(outputResponse)
       utils.memHeader('MISS', forceFetch, preview, outputResponse)
-    }   
+    }
     return outputResponse
   }
 
