@@ -116,8 +116,8 @@ export default async function (server, opts) {
 
   // Connecting to Redis
   const client = await createClient(redisOpts)
-    .on('error', err => {
-      throw new Error(`Error connecting to Redis. Origin: ${id}.`, { cause: err })
+    .on('error', error => {
+      throw new Error(`Error connecting to Redis. Origin: ${id}.`, { cause: error })
     })
     .connect()
   server.decorate('redis', client)
@@ -169,7 +169,7 @@ export default async function (server, opts) {
         const msg =
           "Error requesting to the origin and there is no entry in the cache. " +
           `Origin: ${server.id}. Url: ${request.url}. RID: ${request.id}.`
-        if (server.exposeErrors) { throw new Error(msg, { cause: err }) }
+        if (server.exposeErrors) { throw new Error(msg, { cause: error }) }
         else throw new Error(msg);
       }
     }
@@ -189,10 +189,11 @@ export default async function (server, opts) {
     // TODO: Pensar en recuperar sólo los campos que necesitamos: requestTime, responseTime, headers
     const cacheKey = generateCacheKey(server, path)
     let cachedResponse = null
+    
     try {
       cachedResponse = await server.redis.json.get(cacheKey)
     } catch (error) {
-      server.log.warn(err,
+      server.log.warn(error,
         "Error querying the cache entry in Redis. " +
         `Origin: ${server.id}. Key: ${cacheKey}. RID: ${rid}.`)
     }
@@ -312,8 +313,8 @@ export default async function (server, opts) {
       // Update the cache
       try {
         await multi.exec()
-      } catch (err) {
-        server.log.warn(err,
+      } catch (error) {
+        server.log.warn(error,
           "Error while storing in the cache. " +
           `Origin: ${server.id}. Key: ${cacheKey}. RID: ${rid}.`
         )
@@ -356,8 +357,8 @@ export default async function (server, opts) {
           if (ttl) multi.expire(cacheKey, ttl)
           try {
             await multi.exec()
-          } catch (err) {
-            server.log.warn(err,
+          } catch (error) {
+            server.log.warn(error,
               "Error while storing in the cache. " +
               `Origin: ${server.id}. Key: ${cacheKey}. RID: ${rid}.`
             )
