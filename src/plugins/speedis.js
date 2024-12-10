@@ -9,186 +9,176 @@ import Ajv from "ajv"
 
 export default async function (server, opts) {
 
-  const { id, origin, agentOpts, redisOpts, mutations } = opts
+  const { id, origin, redisOptions } = opts
 
   server.decorate('id', id)
 
-  const ajv = new Ajv()
-
   // TODO: Completar validaciones.
-  // https://nodejs.org/api/http.html#httprequestoptions-callback
-  // https://github.com/redis/node-redis/blob/master/docs/client-configuration.md
-
-
-  const validateHttpxOptions = ajv.compile(
-    {
-      type: "object",
-      properties: {
-        auth: { type: "string" },
-        defaultPort: { type: "integer" },
-        family: { enum: [4, 6] },
-        headers: { type: "object" },
-        hints: { type: "integer" },
-        host: { type: "string" },
-        hostname: { type: "string" },
-        insecureHTTPParser: { type: "boolean" },
-        joinDuplicateHeaders: { type: "boolean" },
-        localAddress: { type: "string" },
-        localPort: { type: "integer" },
-        maxHeaderSize: { type: "integer" },
-        method: { type: "string" },
-        path: { type: "string" },
-        port: { type: "integer" },
-        protocol: { type: "string" },
-        setHost: { type: "boolean" },
-        socketPath: { type: "string" },
-        timeout: { type: "integer" },
-        uniqueHeaders: { type: "array" }
-      }
-    }
-  )
-
-  // https://nodejs.org/api/http.html#new-agentoptions
-  const validateAgentOptions = ajv.compile(
-    {
-      type: "object",
-      additionalProperties: false,
-      properties: {
-        keepAlive: { type: "boolean" },
-        keepAliveMsecs: { type: "integer" },
-        maxSockets: { type: "integer" },
-        maxTotalSockets: { type: "integer" },
-        maxFreeSockets: { type: "integer" },
-        scheduling: { type: "string" },
-        timeout: { type: "integer" }
-      }
-    }
-  )
+  const ajv = new Ajv()
 
   const ORIGIN_REQUEST = "OriginRequest"
   const ORIGIN_RESPONSE = "OriginResponse"
   const CACHE_REQUEST = "CacheRequest"
   const CACHE_RESPONSE = "CacheResponse"
 
-  const validateMutations = ajv.compile(
-    {
-      type: "array",
-      items: {
+  if (origin) {
+
+    const validateOrigin = ajv.compile(
+      {
         type: "object",
-        minProperties: 2,
-        maxProperties: 2,
         additionalProperties: false,
-        required: ["urlPattern", "actions"],
+        required: ["httpxOptions"],
         properties: {
-          urlPattern: { type: "string" },
-          actions: {
+          http2: { type: "boolean" },
+          fetchTimeout: { type: "integer" },
+          // https://nodejs.org/api/http.html#httprequestoptions-callback
+          httpxOptions: {
+            type: "object",
+            properties: {
+              auth: { type: "string" },
+              defaultPort: { type: "integer" },
+              family: { enum: [4, 6] },
+              headers: { type: "object" },
+              hints: { type: "integer" },
+              host: { type: "string" },
+              hostname: { type: "string" },
+              insecureHTTPParser: { type: "boolean" },
+              joinDuplicateHeaders: { type: "boolean" },
+              localAddress: { type: "string" },
+              localPort: { type: "integer" },
+              maxHeaderSize: { type: "integer" },
+              method: { type: "string" },
+              path: { type: "string" },
+              port: { type: "integer" },
+              protocol: { type: "string" },
+              setHost: { type: "boolean" },
+              socketPath: { type: "string" },
+              timeout: { type: "integer" },
+              uniqueHeaders: { type: "array" }
+            }
+          },
+          // https://nodejs.org/api/http.html#new-agentoptions
+          agentOptions:
+          {
+            type: "object",
+            additionalProperties: false,
+            properties: {
+              keepAlive: { type: "boolean" },
+              keepAliveMsecs: { type: "integer" },
+              maxSockets: { type: "integer" },
+              maxTotalSockets: { type: "integer" },
+              maxFreeSockets: { type: "integer" },
+              scheduling: { type: "string" },
+              timeout: { type: "integer" }
+            }
+          },
+          mutations:
+          {
             type: "array",
             items: {
               type: "object",
               minProperties: 2,
-              maxProperties: 3,
-              required: ["phase", "func"],
+              maxProperties: 2,
+              additionalProperties: false,
+              required: ["urlPattern", "actions"],
               properties: {
-                phase: { enum: [ORIGIN_REQUEST, ORIGIN_RESPONSE, CACHE_REQUEST, CACHE_RESPONSE] },
-                func: { type: "string" },
-                params: { type: "object" }
+                urlPattern: { type: "string" },
+                actions: {
+                  type: "array",
+                  items: {
+                    type: "object",
+                    minProperties: 2,
+                    maxProperties: 3,
+                    required: ["phase", "func"],
+                    properties: {
+                      phase: { enum: [ORIGIN_REQUEST, ORIGIN_RESPONSE, CACHE_REQUEST, CACHE_RESPONSE] },
+                      func: { type: "string" },
+                      params: { type: "object" }
+                    }
+                  }
+                }
               }
             }
           }
         }
       }
-    }
-  )
+    )
+  
+    const validOrigin = validateOrigin(origin)
 
-  /*
-   * Initially, we are only going to support GET requests.
-   * The default method is GET
-   */
-  if (origin.httpxoptions.method &&
-    origin.httpxoptions.method !== 'GET') {
-    throw new Error(`Unsupported HTTP method: ${origin.httpxoptions.method}. Only GET is supported. Origin: ${id}`)
-  }
+    if (validOrigin) {
 
-  if (Object.prototype.hasOwnProperty.call(origin, 'httpxoptions')) {
-    const valid = validateHttpxOptions(origin.httpxoptions);
-    if (valid) {
-      // Ensuring the header array exists inside the origin
-      if (!Object.prototype.hasOwnProperty.call(origin.httpxoptions, 'headers')) {
-        origin.httpxoptions.headers = {}
+      /*
+     * Initially, we are only going to support GET requests.
+     * The default method is GET
+     */
+      if (Object.prototype.hasOwnProperty.call(origin.httpxOptions, 'method') &&
+        origin.httpxOptions.method !== 'GET') {
+        throw new Error(`Unsupported HTTP method: ${origin.httpxOptions.method}. Only GET is supported. Origin: ${id}`)
+      }
+
+      // Ensuring the header array exists
+      if (!Object.prototype.hasOwnProperty.call(origin.httpxOptions, 'headers')) {
+        origin.httpxOptions.headers = {}
       } else {
         /*
-        * We ensure that header names are in lowercase for the following
-        * comparisons, which are case-sensitive.
-        * Node HTTP sets all headers to lower case automatically.
-        */
+         * We ensure that header names are in lowercase for the following
+         * comparisons, which are case-sensitive.
+         * Node HTTP library sets all headers to lower case automatically.
+         */
         let aux = null
-        for (const header in origin.httpxoptions.headers) {
-          aux = origin.httpxoptions.headers[header]
-          delete origin.httpxoptions.headers[header]
-          origin.httpxoptions.headers[header.toLowerCase()] = aux
-        };
+        for (const header in origin.httpxOptions.headers) {
+          aux = origin.httpxOptions.headers[header]
+          delete origin.httpxOptions.headers[header]
+          origin.httpxOptions.headers[header.toLowerCase()] = aux
+        }
       }
+
+      // Agents are responsible for managing connections.
+      // For HTTP/2, you don’t need an agent per se, but you can maintain reusable
+      // connections by configuring the HTTP/2 client instance.
+      if (!origin.http2 && Object.prototype.hasOwnProperty.call(origin, 'agentOptions')) {
+        // The default protocol is 'http:'
+        const agent = ('https:' === origin.httpxOptions.protocol ? https : http).Agent(origin.agentOptions)
+        origin.httpxOptions.agent = agent
+      }
+
+      if (Object.prototype.hasOwnProperty.call(origin, 'mutations')) {
+        origin.mutations.forEach(mutation => {
+          try {
+            mutation.re = new RegExp(mutation.urlPattern)
+          } catch (error) {
+            server.log.error(`urlPattern ${mutation.urlPattern} is not a valid regular expresion. Origin: ${id}`)
+            throw new Error(`The mutation configuration is invalid. Origin: ${id}`)
+          }
+          mutation.actions.forEach(action => {
+            if (!Object.prototype.hasOwnProperty.call(actionsLib, action.func)) {
+              server.log.error(`Function ${action.func} was not found among the available actions. Origin: ${id}`)
+              throw new Error(`The mutation configuration is invalid. Origin: ${id}`)
+            }
+          })
+        })
+      }
+
     } else {
-      server.log.error(validateHttpxOptions.errors)
-      throw new Error(`The HTTP/HTTPS configuration is invalid. Origin: ${id}`)
+      server.log.error(validateOrigin.errors)
+      throw new Error(`Origin configuration is invalid. Origin: ${id}`)
     }
   } else {
-    server.log.error(validateHttpxOptions.errors)
-    throw new Error(`The HTTP/HTTPS configuration is not found. Origin: ${id}`)
+    throw new Error(`Origin configuration not found. Origin: ${id}`)
   }
   server.decorate('origin', origin)
 
-  // Agents are responsible for managing connections.
-  // For HTTP/2, you don’t need an agent per se, but you can maintain reusable
-  // connections by configuring the HTTP/2 client instance.
-  if (!origin.http2 && agentOpts) {
-    const valid = validateAgentOptions(agentOpts);
-    if (valid) {
-      // The default protocol is 'http:'
-      const agent = (origin.httpxoptions.protocol === 'https:' ? https : http).Agent(agentOpts)
-      origin.httpxoptions.agent = agent
-      server.decorate('agent', agent)
-    } else {
-      server.log.error(validateAgentOptions.errors)
-      throw new Error(`The agent configuration is invalid. Origin: ${id}`)
-    }
-  }
-
   // Connecting to Redis
-  const client = await createClient(redisOpts)
+  const client = await createClient(redisOptions)
     .on('error', error => {
       throw new Error(`Error connecting to Redis. Origin: ${id}.`, { cause: error })
     })
     .connect()
   server.decorate('redis', client)
 
-  if (mutations) {
-    const valid = validateMutations(mutations)
-    if (valid) {
-      mutations.forEach(mutation => {
-        try {
-          mutation.re = new RegExp(mutation.urlPattern)
-        } catch (error) {
-          server.log.error(`urlPattern ${mutation.urlPattern} is not a valid regular expresion. Origin: ${id}`)
-          throw new Error(`The mutation configuration is invalid. Origin: ${id}`)
-        }
-        mutation.actions.forEach(action => {
-          if (!Object.prototype.hasOwnProperty.call(actionsLib, action.func)) {
-            server.log.error(`Function ${action.func} was not found among the available actions. Origin: ${id}`)
-            throw new Error(`The mutation configuration is invalid. Origin: ${id}`)
-          }
-        })
-      })
-    } else {
-      server.log.error(validateMutations.errors)
-      throw new Error(`The mutation configuration is invalid. Origin: ${id}`)
-    }
-  }
-
-  server.decorate('mutations', mutations ? mutations : [])
-
   server.addHook('onClose', (server) => {
-    if (server.agent) server.agent.destroy()
+    if (server.origin.httpxOptions.agent) server.origin.httpxOptions.agent.destroy()
     if (server.redis) server.redis.quit()
   })
 
@@ -222,7 +212,7 @@ export default async function (server, opts) {
   async function _get(server, path, forceFetch, preview, rid) {
     // We create options for an HTTP/S request to the required path
     // based on the default ones that must not be modified.
-    const options = { ...server.origin.httpxoptions, path }
+    const options = { ...server.origin.httpxOptions, path }
 
     // We try to look for the entry in the cache.
     // TODO: ¿Consultamos Redis incluso si nos fuerzan el fetch?
@@ -300,7 +290,7 @@ export default async function (server, opts) {
     _mutate(ORIGIN_REQUEST, options, server);
 
     try {
-      originResponse = await _fetch(options)
+      originResponse = await _fetch(server, options)
       // The current value of the clock at the host at the time the
       // response was received.
       responseTime = Date.now() / 1000 | 0
@@ -418,15 +408,17 @@ export default async function (server, opts) {
   }
 
   function _mutate(type, target, server) {
-    server.mutations.forEach(mutation => {
-      if (mutation.re.test(target.path)) {
-        mutation.actions.forEach(action => {
-          if (action.phase === type) {
-            actionsLib[action.func](target, action.params ? action.params : null)
-          }
-        })
-      }
-    })
+    if (Object.prototype.hasOwnProperty.call(server.origin, 'mutations')) {
+      server.origin.mutations.forEach(mutation => {
+        if (mutation.re.test(target.path)) {
+          mutation.actions.forEach(action => {
+            if (action.phase === type) {
+              actionsLib[action.func](target, action.params ? action.params : null)
+            }
+          })
+        }
+      })
+    }
   }
 
   function _fetch(server, options) {
@@ -435,7 +427,7 @@ export default async function (server, opts) {
         // TODO: Implement HTTP2 support
       } else {
         // The default protocol is 'http:'
-        const request = (server.origin.httpxoptions.protocol === 'https:' ? https : http)
+        const request = (options.protocol === 'https:' ? https : http)
           .get(options, (res) => {
             let rawData = ''
             res.on('data', chunk => { rawData += chunk })
