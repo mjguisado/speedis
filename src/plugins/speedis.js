@@ -30,6 +30,8 @@ export default async function (server, opts) {
         required: ["httpxOptions"],
         properties: {
           http2: { type: "boolean" },
+          localRequestCoalescing: { type: "boolean" },
+          remoteRequestCoalescing: { type: "boolean" },
           fetchTimeout: { type: "integer" },
           // https://nodejs.org/api/http.html#httprequestoptions-callback
           httpxOptions: {
@@ -103,7 +105,7 @@ export default async function (server, opts) {
         }
       }
     )
-  
+
     const validOrigin = validateOrigin(origin)
 
     if (validOrigin) {
@@ -169,6 +171,9 @@ export default async function (server, opts) {
   }
   server.decorate('origin', origin)
 
+  // This Map storages the ongoing Fecth Operations
+  if (origin.localRequestCoalescing) server.decorate('ongoing', new Map())
+
   // Connecting to Redis
   const client = await createClient(redisOptions)
     .on('error', error => {
@@ -179,6 +184,7 @@ export default async function (server, opts) {
 
   server.addHook('onClose', (server) => {
     if (server.origin.httpxOptions.agent) server.origin.httpxOptions.agent.destroy()
+    if (origin.localRequestCoalescing) server.ongoing.clear()
     if (server.redis) server.redis.quit()
   })
 
@@ -206,20 +212,23 @@ export default async function (server, opts) {
   })
 
   function generateCacheKey(server, path) {
-    return server.id + path.replace('/', ':')
+    return server.id + path.replaceAll('/', ':')
   }
 
   async function _get(server, path, forceFetch, preview, rid) {
+
     // We create options for an HTTP/S request to the required path
     // based on the default ones that must not be modified.
     const options = { ...server.origin.httpxOptions, path }
 
-    // We try to look for the entry in the cache.
+
     // TODO: ¿Consultamos Redis incluso si nos fuerzan el fetch?
     // TODO: Pensar en recuperar sólo los campos que necesitamos: requestTime, responseTime, headers
-    const cacheKey = generateCacheKey(server, path)
-    let cachedResponse = null
 
+    // We try to look for the entry in the cache.
+    const cacheKey = generateCacheKey(server, path)
+
+    let cachedResponse = null
     try {
       cachedResponse = await server.redis.json.get(cacheKey)
     } catch (error) {
@@ -229,13 +238,17 @@ export default async function (server, opts) {
     }
 
     if (cachedResponse) {
+
       // Apply mutations to the entry fetched from the cache
       _mutate(CACHE_RESPONSE, cachedResponse, server)
 
       // We calculate whether the cache entry is fresh or stale.
-      // See: https://tools.ietf.org/html/rfc7234#section-4.2
+
+      // See: https://tools.ietf.org/html/rfc7234#section-4.2.1
       const freshnessLifetime = utils.calculateFreshnessLifetime(cachedResponse)
+      // See: https://tools.ietf.org/html/rfc7234#section-4.2.3
       const currentAge = utils.calculateAge(cachedResponse)
+
       const responseIsFresh = (freshnessLifetime > currentAge)
 
       /*
@@ -265,6 +278,7 @@ export default async function (server, opts) {
         return cachedResponse
       } else {
         // We need to revalidate the response through a conditional request.
+        // https://www.npmjs.com/package/etag
         if ('etag' in cachedResponse.headers) {
           options.headers['if-none-match'] = cachedResponse.headers.etag
         }
@@ -289,20 +303,37 @@ export default async function (server, opts) {
     // Apply mutations to the request before sending it to the origin
     _mutate(ORIGIN_REQUEST, options, server);
 
+    let amITheFetcher = false;
+
     try {
-      originResponse = await _fetch(server, options)
+
+      // Verify if there is an ongoing fetch operation
+      let fetch = null;
+      if (origin.localRequestCoalescing) {
+        fetch = server.ongoing.get(cacheKey);
+      }
+      if (!fetch) {
+        fetch = _fetch(server, options)
+        if (origin.localRequestCoalescing) server.ongoing.set(cacheKey, fetch)
+        amITheFetcher = true;
+      }
+      originResponse = await fetch;
+
       // The current value of the clock at the host at the time the
       // response was received.
       responseTime = Date.now() / 1000 | 0
+
     } catch (error) {
+
       delete options.agent
       server.log.error(error,
         "Error requesting to the origin. " +
         `Origin: ${server.id}. Options: ` + JSON.stringify(options) + `. RID: ${rid}.`
       )
+
       /*
-      * If I was trying to refresh a cache entry, I may consider serving the
-      * stale content.
+      * If I was trying to refresh a cache entry,
+      * I may consider serving the stale content.
       * TODO: Evaluate whether to handle cache directives related to this.
       * https://tools.ietf.org/html/rfc7234#section-4.2.4
       * https://developer.mozilla.org/es/docs/Web/HTTP/Headers/Cache-Control
@@ -321,6 +352,9 @@ export default async function (server, opts) {
         // There is no entry in the cache, and it could not be retrieved from the source. 
         throw error
       }
+
+    } finally {
+      if (origin.localRequestCoalescing) server.ongoing.delete(cacheKey)
     }
 
     // Apply mutations to the response received from the origin
@@ -328,28 +362,34 @@ export default async function (server, opts) {
 
     // The HTTP 304 status code, “Not Modified,” tells the client that the
     // requested resource hasn't changed since the last access
+
     if (originResponse.statusCode === 304) {
+
       // We set the attributes involved in calculating the
       // age of the content.
-      const multi = server.redis.multi()
       cachedResponse.requestTime = requestTime
-      multi.json.set(cacheKey, '$.requestTime', requestTime)
       cachedResponse.responseTime = responseTime
-      multi.json.set(cacheKey, '$.responseTime', responseTime)
       if ('date' in originResponse.headers) {
         cachedResponse.headers['date'] = originResponse.headers.date
-        multi.json.set(cacheKey, '$.headers.date', cachedResponse.headers.date)
       }
 
-      // Update the cache
-      try {
-        await multi.exec()
-      } catch (error) {
-        server.log.warn(error,
-          "Error while storing in the cache. " +
-          `Origin: ${server.id}. Key: ${cacheKey}. RID: ${rid}.`
-        )
-        server.log.debug('Failed cache entry: ' + JSON.stringify(cachedResponse))
+      if (amITheFetcher) {
+        try {
+          // Update the cache
+          await server.redis.json.merge(cacheKey, '$',
+            {
+              requestTime: cachedResponse.requestTime,
+              responseTime: cachedResponse.responseTime,
+              headers: { date: cachedResponse.headers.date }
+            }
+          )
+        } catch (error) {
+          server.log.warn(error,
+            "Error while storing in the cache. " +
+            `Origin: ${server.id}. Key: ${cacheKey}. RID: ${rid}.`
+          )
+          server.log.debug('Failed cache entry: ' + JSON.stringify(cachedResponse))
+        }
       }
 
       // Las siguientes modificaciones no queremos que persistan en caché.
@@ -357,7 +397,9 @@ export default async function (server, opts) {
       outputResponse = utils.cloneAndTrimResponse(path, cachedResponse)
       outputResponse.headers['age'] = utils.calculateAge(outputResponse)
       utils.memHeader('HIT', forceFetch, preview, outputResponse)
+
     } else {
+
       // We set the attributes involved in calculating the
       // age of the content.
       originResponse.requestTime = requestTime
@@ -382,18 +424,20 @@ export default async function (server, opts) {
           _mutate(CACHE_REQUEST, cacheEntry, server)
 
           // Storing in the cache
-          const multi = server.redis.multi()
-          multi.json.set(cacheKey, '$', cacheEntry)
-          const ttl = _ttl(cacheEntry.ttl)
-          if (ttl) multi.expire(cacheKey, ttl)
-          try {
-            await multi.exec()
-          } catch (error) {
-            server.log.warn(error,
-              "Error while storing in the cache. " +
-              `Origin: ${server.id}. Key: ${cacheKey}. RID: ${rid}.`
-            )
-            server.log.debug('Failed cache entry: ' + JSON.stringify(cachedResponse))
+          if (amITheFetcher) {
+            const multi = server.redis.multi()
+            multi.json.set(cacheKey, '$', cacheEntry)
+            const ttl = _ttl(cacheEntry.ttl)
+            if (ttl) multi.expire(cacheKey, ttl)
+            try {
+              await multi.exec()
+            } catch (error) {
+              server.log.warn(error,
+                "Error while storing in the cache. " +
+                `Origin: ${server.id}. Key: ${cacheKey}. RID: ${rid}.`
+              )
+              server.log.debug('Failed cache entry: ' + JSON.stringify(cachedResponse))
+            }
           }
         }
       }

@@ -2,106 +2,64 @@
 // For a detailed explanation regarding each routes property, visit:
 // https://mocks-server.org/docs/usage/routes
 
-// users data
-const USERS = [
-  {
-    id: 1,
-    name: "John Doe",
-  },
-  {
-    id: 2,
-    name: "Jane Doe",
-  },
-];
-
-const ALL_USERS = [
-  ...USERS,
-  {
-    id: 3,
-    name: "Tommy",
-  },
-  {
-    id: 4,
-    name: "Timmy",
-  },
-];
+// items data
+const ITEMS = []
+for (let index = 0; index < 5; index++) {
+  ITEMS[index] = {
+    id: index,
+    name: `Item ${index}`
+  }
+}
 
 module.exports = [
   {
-    id: "get-users", // route id
-    url: "/speedis/users", // url in express format
-    method: "GET", // HTTP method
+    id: "get-items",
+    url: "/speedis/items",
+    method: "GET",
     variants: [
       {
-        id: "success", // variant id
-        type: "json", // variant handler id
+        id: "success",
+        type: "json",
         options: {
-          status: 200, // status to send
-          body: USERS, // body to send
-        },
+          status: 200, 
+          body: ITEMS
+        }
       },
       {
-        id: "all", // variant id
-        type: "json", // variant handler id
+        id: "success-slow",
+        type: "json",
+        delay: 5000,
         options: {
-          status: 200, // status to send
-          body: ALL_USERS, // body to send
-        },
+          status: 200,
+          body: ITEMS
+        }
       },
-      {
-        id: "error", // variant id
-        type: "json", // variant handler id
-        options: {
-          status: 400, // status to send
-          // body to send
-          body: {
-            message: "Error",
-          },
-        },
-      },
-    ],
+    ]
   },
   {
-    id: "get-user", // route id
-    url: "/api/users/:id", // url in express format
-    method: "GET", // HTTP method
+    id: "get-item",
+    url: "/speedis/items/:id",
+    method: "GET",
     variants: [
       {
-        id: "success", // variant id
-        type: "json", // variant handler id
+        id: "success",
+        type: "middleware",
         options: {
-          status: 200, // status to send
-          body: USERS[0], // body to send
-        },
-      },
-      {
-        id: "id-3", // variant id
-        type: "json", // variant handler id
-        options: {
-          status: 200, // status to send
-          body: ALL_USERS[2], // body to send
-        },
-      },
-      {
-        id: "real", // variant id
-        type: "middleware", // variant handler id
-        options: {
-          // Express middleware to execute
           middleware: (req, res) => {
-            const userId = req.params.id;
-            const user = USERS.find((userData) => userData.id === Number(userId));
-            if (user) {
+            const itemId = req.params.id;
+            const item = ITEMS.find((itemData) => itemData.id === Number(itemId));
+            if (item) {
               res.status(200);
-              res.send(user);
+              res.send(item);
             } else {
               res.status(404);
               res.send({
-                message: "User not found",
-              });
+                message: "Item not found",
+              })
             }
-          },
-        },
-      },
-    ],
-  },
-];
+          }
+        }
+      }
+    ]
+  }
+]
