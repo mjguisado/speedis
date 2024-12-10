@@ -19,6 +19,35 @@ export default async function (server, opts) {
   // https://nodejs.org/api/http.html#httprequestoptions-callback
   // https://github.com/redis/node-redis/blob/master/docs/client-configuration.md
 
+
+  const validateHttpxOptions = ajv.compile(
+    {
+      type: "object",
+      properties: {
+        auth: { type: "string" },
+        defaultPort: { type: "integer" },
+        family: { enum: [4, 6] },
+        headers: { type: "object" },
+        hints: { type: "integer" },
+        host: { type: "string" },
+        hostname: { type: "string" },
+        insecureHTTPParser: { type: "boolean" },
+        joinDuplicateHeaders: { type: "boolean" },
+        localAddress: { type: "string" },
+        localPort: { type: "integer" },
+        maxHeaderSize: { type: "integer" },
+        method: { type: "string" },
+        path: { type: "string" },
+        port: { type: "integer" },
+        protocol: { type: "string" },
+        setHost: { type: "boolean" },
+        socketPath: { type: "string" },
+        timeout: { type: "integer" },
+        uniqueHeaders: { type: "array" }
+      }
+    }
+  )
+
   // https://nodejs.org/api/http.html#new-agentoptions
   const validateAgentOptions = ajv.compile(
     {
@@ -80,21 +109,32 @@ export default async function (server, opts) {
     throw new Error(`Unsupported HTTP method: ${origin.httpxoptions.method}. Only GET is supported. Origin: ${id}`)
   }
 
-  // Ensuring the header array exists inside the origin
-  if (!Object.prototype.hasOwnProperty.call(origin.httpxoptions, 'headers')) {
-    origin.httpxoptions.headers = []
+  if (Object.prototype.hasOwnProperty.call(origin, 'httpxoptions')) {
+    const valid = validateHttpxOptions(origin.httpxoptions);
+    if (valid) {
+      // Ensuring the header array exists inside the origin
+      if (!Object.prototype.hasOwnProperty.call(origin.httpxoptions, 'headers')) {
+        origin.httpxoptions.headers = {}
+      } else {
+        /*
+        * We ensure that header names are in lowercase for the following
+        * comparisons, which are case-sensitive.
+        * Node HTTP sets all headers to lower case automatically.
+        */
+        let aux = null
+        for (const header in origin.httpxoptions.headers) {
+          aux = origin.httpxoptions.headers[header]
+          delete origin.httpxoptions.headers[header]
+          origin.httpxoptions.headers[header.toLowerCase()] = aux
+        };
+      }
+    } else {
+      server.log.error(validateHttpxOptions.errors)
+      throw new Error(`The HTTP/HTTPS configuration is invalid. Origin: ${id}`)
+    }
   } else {
-    /*
-     * We ensure that header names are in lowercase for the following
-     * comparisons, which are case-sensitive.
-     * Node HTTP sets all headers to lower case automatically.
-     */
-    let aux = null
-    for (const header in origin.httpxoptions.headers) {
-      aux = origin.httpxoptions.headers[header]
-      delete origin.httpxoptions.headers[header]
-      origin.httpxoptions.headers[header.toLowerCase()] = aux
-    };
+    server.log.error(validateHttpxOptions.errors)
+    throw new Error(`The HTTP/HTTPS configuration is not found. Origin: ${id}`)
   }
   server.decorate('origin', origin)
 
@@ -258,6 +298,7 @@ export default async function (server, opts) {
 
     // Apply mutations to the request before sending it to the origin
     _mutate(ORIGIN_REQUEST, options, server);
+
     try {
       originResponse = await _fetch(options)
       // The current value of the clock at the host at the time the
@@ -388,7 +429,7 @@ export default async function (server, opts) {
     })
   }
 
-  function _fetch(options) {
+  function _fetch(server, options) {
     return new Promise((resolve, reject) => {
       if (server.origin.http2) {
         // TODO: Implement HTTP2 support
