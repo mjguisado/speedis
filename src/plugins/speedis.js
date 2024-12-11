@@ -91,11 +91,11 @@ export default async function (server, opts) {
                     type: "object",
                     minProperties: 2,
                     maxProperties: 3,
-                    required: ["phase", "func"],
+                    required: ["phase", "uses"],
                     properties: {
                       phase: { enum: [ORIGIN_REQUEST, ORIGIN_RESPONSE, CACHE_REQUEST, CACHE_RESPONSE] },
-                      func: { type: "string" },
-                      params: { type: "object" }
+                      uses: { type: "string" },
+                      with: { type: "object" }
                     }
                   }
                 }
@@ -154,8 +154,8 @@ export default async function (server, opts) {
             throw new Error(`The transformation configuration is invalid. Origin: ${id}`)
           }
           transformation.actions.forEach(action => {
-            if (!Object.prototype.hasOwnProperty.call(actionsLib, action.func)) {
-              server.log.error(`Function ${action.func} was not found among the available actions. Origin: ${id}`)
+            if (!Object.prototype.hasOwnProperty.call(actionsLib, action.uses)) {
+              server.log.error(`Function ${action.uses} was not found among the available actions. Origin: ${id}`)
               throw new Error(`The transformation configuration is invalid. Origin: ${id}`)
             }
           })
@@ -457,7 +457,7 @@ export default async function (server, opts) {
         if (transformation.re.test(target.path)) {
           transformation.actions.forEach(action => {
             if (action.phase === type) {
-              actionsLib[action.func](target, action.params ? action.params : null)
+              actionsLib[action.uses](target, action.with ? action.with : null)
             }
           })
         }

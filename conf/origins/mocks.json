@@ -33,18 +33,18 @@
                 "actions": [
                     {
                         "phase": "OriginResponse",
-                        "func": "setHeaders",
-                        "params": {
+                        "uses": "setHeaders",
+                        "with": {
                             "cache-control": "public, s-maxage=60, max-age=15"
                         }
                     },
                     {
                         "phase": "CacheRequest",
-                        "func": "setLastModifiedAndDateHeaders"
+                        "uses": "setLastModifiedAndDateHeaders"
                     },
                     {
                         "phase": "CacheRequest",
-                        "func": "setETagHeader"
+                        "uses": "setETagHeader"
                     }
                 ]
             }
