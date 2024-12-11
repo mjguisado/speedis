@@ -1,30 +1,35 @@
 import { suite, test, before, after } from 'node:test'
-import { build } from './app.js'
+import { build as app } from './app.js'
+import mocksPlugin from './plugins/mocks.js'
 
 suite('GET Method', () => {
 
     let fastifyServer
-
     before(async () => {
-        fastifyServer = await build({
-            logger: { level: 'info' }
+        fastifyServer = await app({
+            logger: { level: 'warn' }
+        })
+        await fastifyServer.register(mocksPlugin, {
+            id: "mocks",
+            prefix: "/mocks",
+            logLevel: "warn"
         })
     })
 
-    test('Miss', async (t) => {
+    test('GET', async (t) => {
         t.plan(1)
         const response = await fastifyServer.inject({
             method: 'GET',
-            url: '/restful-api/objects?id=3&id=5&id=10'
+            url: 'mocks/items'
         })
         t.assert.strictEqual(response.statusCode, 200, 'returns a status code of 200')
     })
 
-    test('404', async (t) => {
+    test('404 Not Found', async (t) => {
         t.plan(1)
         const response = await fastifyServer.inject({
             method: 'GET',
-            url: '/restful-api/objects/100'
+            url: 'mocks/notfound'
         })
         t.assert.strictEqual(response.statusCode, 404, 'returns a status code of 404')
     })
