@@ -5,12 +5,9 @@
   "main": "An HTTP cache based on Redis",
   "type": "module",
   "scripts": {
-    "dev": "nodemon src/index.js",
-    "debug": "node --inspect-brk src/index.js",
-    "prod": "node src/index.js",
-
-    "mocks": "mocks-server",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "dev": "nodemon src/server.js",
+    "debug": "node --inspect-brk src/server.js",
+    "prod": "node src/server.js"
   },
   "repository": {
     "type": "git",

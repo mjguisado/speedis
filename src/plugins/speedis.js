@@ -74,7 +74,7 @@ export default async function (server, opts) {
               timeout: { type: "integer" }
             }
           },
-          mutations:
+          transformations:
           {
             type: "array",
             items: {
@@ -145,18 +145,18 @@ export default async function (server, opts) {
         origin.httpxOptions.agent = agent
       }
 
-      if (Object.prototype.hasOwnProperty.call(origin, 'mutations')) {
-        origin.mutations.forEach(mutation => {
+      if (Object.prototype.hasOwnProperty.call(origin, 'transformations')) {
+        origin.transformations.forEach(transformation => {
           try {
-            mutation.re = new RegExp(mutation.urlPattern)
+            transformation.re = new RegExp(transformation.urlPattern)
           } catch (error) {
-            server.log.error(`urlPattern ${mutation.urlPattern} is not a valid regular expresion. Origin: ${id}`)
-            throw new Error(`The mutation configuration is invalid. Origin: ${id}`)
+            server.log.error(`urlPattern ${transformation.urlPattern} is not a valid regular expresion. Origin: ${id}`)
+            throw new Error(`The transformation configuration is invalid. Origin: ${id}`)
           }
-          mutation.actions.forEach(action => {
+          transformation.actions.forEach(action => {
             if (!Object.prototype.hasOwnProperty.call(actionsLib, action.func)) {
               server.log.error(`Function ${action.func} was not found among the available actions. Origin: ${id}`)
-              throw new Error(`The mutation configuration is invalid. Origin: ${id}`)
+              throw new Error(`The transformation configuration is invalid. Origin: ${id}`)
             }
           })
         })
@@ -239,8 +239,8 @@ export default async function (server, opts) {
 
     if (cachedResponse) {
 
-      // Apply mutations to the entry fetched from the cache
-      _mutate(CACHE_RESPONSE, cachedResponse, server)
+      // Apply transformations to the entry fetched from the cache
+      _transform(CACHE_RESPONSE, cachedResponse, server)
 
       // We calculate whether the cache entry is fresh or stale.
 
@@ -300,8 +300,8 @@ export default async function (server, opts) {
     let originResponse = null
     let responseTime = null
 
-    // Apply mutations to the request before sending it to the origin
-    _mutate(ORIGIN_REQUEST, options, server);
+    // Apply transformations to the request before sending it to the origin
+    _transform(ORIGIN_REQUEST, options, server);
 
     let amITheFetcher = false;
 
@@ -357,8 +357,8 @@ export default async function (server, opts) {
       if (origin.localRequestCoalescing) server.ongoing.delete(cacheKey)
     }
 
-    // Apply mutations to the response received from the origin
-    _mutate(ORIGIN_RESPONSE, originResponse, server);
+    // Apply transformations to the response received from the origin
+    _transform(ORIGIN_RESPONSE, originResponse, server);
 
     // The HTTP 304 status code, “Not Modified,” tells the client that the
     // requested resource hasn't changed since the last access
@@ -420,8 +420,8 @@ export default async function (server, opts) {
           // We generate a cache entry from the response.
           const cacheEntry = utils.cloneAndTrimResponse(path, originResponse)
 
-          // Apply mutations to the cache entry before storing it in the cache.
-          _mutate(CACHE_REQUEST, cacheEntry, server)
+          // Apply transformations to the cache entry before storing it in the cache.
+          _transform(CACHE_REQUEST, cacheEntry, server)
 
           // Storing in the cache
           if (amITheFetcher) {
@@ -451,11 +451,11 @@ export default async function (server, opts) {
     return outputResponse
   }
 
-  function _mutate(type, target, server) {
-    if (Object.prototype.hasOwnProperty.call(server.origin, 'mutations')) {
-      server.origin.mutations.forEach(mutation => {
-        if (mutation.re.test(target.path)) {
-          mutation.actions.forEach(action => {
+  function _transform(type, target, server) {
+    if (Object.prototype.hasOwnProperty.call(server.origin, 'transformations')) {
+      server.origin.transformations.forEach(transformation => {
+        if (transformation.re.test(target.path)) {
+          transformation.actions.forEach(action => {
             if (action.phase === type) {
               actionsLib[action.func](target, action.params ? action.params : null)
             }

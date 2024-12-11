@@ -2,7 +2,7 @@
 // https://www.mocks-server.org/docs/configuration/how-to-change-settings
 // https://www.mocks-server.org/docs/configuration/options
 
-module.exports = {
+export default {
   // Log level. Can be one of silly, debug, verbose, info, warn or error
   //log: "info",
   config: {
@@ -50,7 +50,7 @@ module.exports = {
     },
     collections: {
       // Selected collection
-      selected: "slow",
+      //selected: "base",
     },
   },
   server: {

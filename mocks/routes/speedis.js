@@ -3,18 +3,12 @@
 // https://mocks-server.org/docs/usage/routes
 
 // items data
-const ITEMS = []
-for (let index = 0; index < 5; index++) {
-  ITEMS[index] = {
-    id: index,
-    name: `Item ${index}`
-  }
-}
+import items from '../fixtures/items .js'
 
-module.exports = [
+export default [
   {
     id: "get-items",
-    url: "/speedis/items",
+    url: "/items",
     method: "GET",
     variants: [
       {
@@ -22,7 +16,7 @@ module.exports = [
         type: "json",
         options: {
           status: 200, 
-          body: ITEMS
+          body: items
         }
       },
       {
@@ -31,14 +25,14 @@ module.exports = [
         delay: 5000,
         options: {
           status: 200,
-          body: ITEMS
+          body: items
         }
       },
     ]
   },
   {
     id: "get-item",
-    url: "/speedis/items/:id",
+    url: "/items/:id",
     method: "GET",
     variants: [
       {
@@ -47,7 +41,7 @@ module.exports = [
         options: {
           middleware: (req, res) => {
             const itemId = req.params.id;
-            const item = ITEMS.find((itemData) => itemData.id === Number(itemId));
+            const item = items.find((itemData) => itemData.id === Number(itemId));
             if (item) {
               res.status(200);
               res.send(item);

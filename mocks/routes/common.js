@@ -2,10 +2,10 @@
 // For a detailed explanation about using middlewares, visit:
 // https://mocks-server.org/docs/usage/variants/middlewares
 
-module.exports = [
+export default [
   {
     id: "add-headers", // route id
-    url: "/speedis/*", // url in express format
+    url: "/*", // url in express format
     method: ["GET"],   // HTTP methods
     variants: [
       {

@@ -27,7 +27,7 @@
         "agentOptions": {
             "keepAlive": true
         },
-        "mutations": [
+        "transformations": [
             {
                 "urlPattern": ".*",
                 "actions": [
