@@ -1,7 +1,7 @@
 {
     "id": "mocks",
     "prefix": "/mocks",
-    "logLevel": "warn",
+    "logLevel": "info",
     "exposeErrors": true,
     "redis": {
         "socket": {

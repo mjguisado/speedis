@@ -143,9 +143,8 @@ export default async function (server, opts) {
       if (!origin.http2 && Object.prototype.hasOwnProperty.call(origin, 'agentOptions')) {
         // The default protocol is 'http:'
         const agent = ('https:' === origin.httpxOptions.protocol ? https : http).Agent(origin.agentOptions)
-        origin.httpxOptions.agent = agent
+        server.decorate('agent', agent)
       }
-
       if (Object.prototype.hasOwnProperty.call(origin, 'transformations')) {
         origin.transformations.forEach(transformation => {
           try {
@@ -186,8 +185,8 @@ export default async function (server, opts) {
   server.decorate('redis', client)
 
   server.addHook('onClose', (server) => {
-    if (server.origin.httpxOptions.agent) server.origin.httpxOptions.agent.destroy()
-    if (origin.localRequestCoalescing) server.ongoing.clear()
+    if (server.agent) server.agent.destroy()
+    if (server.ongoing) server.ongoing.clear()
     if (server.redis) server.redis.quit()
   })
 
@@ -315,7 +314,9 @@ export default async function (server, opts) {
 
     // We create options for an HTTP/S request to the required path
     // based on the default ones that must not be modified.
-    const options = { ...server.origin.httpxOptions, path }
+    const options = JSON.parse(JSON.stringify(server.origin.httpxOptions))
+    if (server.agent) options.agent = server.agent
+    options.path = path
 
     // TODO: Pensar en recuperar sólo los campos que necesitamos: requestTime, responseTime, headers
 

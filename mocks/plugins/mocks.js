@@ -6,7 +6,7 @@ export default async function (server, opts) {
 
 
     const items = [];
-    for (let index = 0; index < 10; index++) {
+    for (let index = 0; index < 20; index++) {
         items[index] = {
             id: index,
             name: `Item ${index}`

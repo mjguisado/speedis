@@ -4,7 +4,7 @@ export function cloneAndTrimResponse(path, response) {
   return {
     statusCode: response.statusCode,
     body: response.body,
-    headers: { ...response.headers },
+    headers: JSON.parse(JSON.stringify(response.headers)),
     requestTime: response.requestTime,
     responseTime: response.responseTime,
     ttl: (Object.prototype.hasOwnProperty.call(response, 'ttl') ? response.ttl : 0)
