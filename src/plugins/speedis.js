@@ -191,33 +191,6 @@ export default async function (server, opts) {
     if (server.redis) server.redis.quit()
   })
 
-  server.route({
-    method: 'DELETE',
-    url: '/*',
-    handler: async function (request, reply) {
-      let prefix = request.routeOptions.url.replace("/*", "")
-      let path = request.url.replace(prefix, "")
-
-      // We try to look for the entry in the cache.
-      const cacheKey = generateCacheKey(server, path)
-      try {
-        // See: https://antirez.com/news/93
-        let result = await server.redis.unlink(cacheKey)
-        if (result) {
-          reply.code(204)
-        } else {
-          reply.code(404)
-        }
-      } catch (error) {
-        const msg =
-          "Error deleting the cache entry in Redis. " +
-          `Origin: ${server.id}. Key: ${cacheKey}. RID: ${rid}.`
-        if (server.exposeErrors) { throw new Error(msg, { cause: error }) }
-        else throw new Error(msg);
-      }
-    }
-  })
-
   // See: https://developer.mozilla.org/en-US/docs/Web/HTTP/Resources_and_specifications
   server.route({
     method: 'GET',
@@ -300,6 +273,33 @@ export default async function (server, opts) {
         const msg =
           "Error requesting to the origin and there is no entry in the cache. " +
           `Origin: ${server.id}. Url: ${request.url}. RID: ${request.id}.`
+        if (server.exposeErrors) { throw new Error(msg, { cause: error }) }
+        else throw new Error(msg);
+      }
+    }
+  })
+
+  server.route({
+    method: 'DELETE',
+    url: '/*',
+    handler: async function (request, reply) {
+      let prefix = request.routeOptions.url.replace("/*", "")
+      let path = request.url.replace(prefix, "")
+
+      // We try to look for the entry in the cache.
+      const cacheKey = generateCacheKey(server, path)
+      try {
+        // See: https://antirez.com/news/93
+        let result = await server.redis.unlink(cacheKey)
+        if (result) {
+          reply.code(204)
+        } else {
+          reply.code(404)
+        }
+      } catch (error) {
+        const msg =
+          "Error deleting the cache entry in Redis. " +
+          `Origin: ${server.id}. Key: ${cacheKey}. RID: ${rid}.`
         if (server.exposeErrors) { throw new Error(msg, { cause: error }) }
         else throw new Error(msg);
       }
