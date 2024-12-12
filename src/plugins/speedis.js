@@ -244,28 +244,30 @@ export default async function (server, opts) {
     return server.id + path.replaceAll('/', ':')
   }
 
-
-
   async function _get(server, path, forceFetch, preview, rid) {
 
     // We create options for an HTTP/S request to the required path
     // based on the default ones that must not be modified.
     const options = { ...server.origin.httpxOptions, path }
 
-
-    // TODO: ¿Consultamos Redis incluso si nos fuerzan el fetch?
     // TODO: Pensar en recuperar sólo los campos que necesitamos: requestTime, responseTime, headers
 
     // We try to look for the entry in the cache.
-    const cacheKey = generateCacheKey(server, path)
-
+    let cacheKey = null;
     let cachedResponse = null
-    try {
-      cachedResponse = await server.redis.json.get(cacheKey)
-    } catch (error) {
-      server.log.warn(error,
-        "Error querying the cache entry in Redis. " +
-        `Origin: ${server.id}. Key: ${cacheKey}. RID: ${rid}.`)
+
+    // Preview mode forces fetching from the origin without interacting with Redis.
+    // Warning: We should limit the use of preview mode as it could overload the 
+    // origin by bypassing the cache layer.
+    if (!preview) {
+      cacheKey = generateCacheKey(server, path)
+      try {
+        cachedResponse = await server.redis.json.get(cacheKey)
+      } catch (error) {
+        server.log.warn(error,
+          "Error querying the cache entry in Redis. " +
+          `Origin: ${server.id}. Key: ${cacheKey}. RID: ${rid}.`)
+      }
     }
 
     if (cachedResponse) {
@@ -334,10 +336,11 @@ export default async function (server, opts) {
     // Apply transformations to the request before sending it to the origin
     _transform(ORIGIN_REQUEST, options, server);
 
+    // If localRequestCoalescing is enabled, only the first request 
+    // will contact the origin to prevent overloading it.
     let amITheFetcher = false;
 
     try {
-
       // Verify if there is an ongoing fetch operation
       let fetch = null;
       if (origin.localRequestCoalescing) {
@@ -380,7 +383,8 @@ export default async function (server, opts) {
         utils.memHeader('STALE', forceFetch, preview, cachedResponse)
         return cachedResponse
       } else {
-        // There is no entry in the cache, and it could not be retrieved from the source. 
+        // It could not be retrieved from the source and
+        // there is no entry in the cache or preview mode is enabled
         throw error
       }
 
@@ -393,7 +397,6 @@ export default async function (server, opts) {
 
     // The HTTP 304 status code, “Not Modified,” tells the client that the
     // requested resource hasn't changed since the last access
-
     if (originResponse.statusCode === 304) {
 
       // We set the attributes involved in calculating the
@@ -436,8 +439,9 @@ export default async function (server, opts) {
       originResponse.requestTime = requestTime
       originResponse.responseTime = responseTime
 
-      // If we are not in preview mode, it is cached.
+      // If we are not in preview mode then we should store in Redis the response.
       if (!preview) {
+
         // We parse the Cache-Control header to extract cache directives.
         const cacheDirectives = utils.parseCacheControlHeader(originResponse)
 
@@ -446,7 +450,7 @@ export default async function (server, opts) {
         // No-store indicates that the cache should not store anything about the 
         // client request or server response.
         if (!Object.prototype.hasOwnProperty.call(cacheDirectives, 'private') &&
-          !Object.prototype.hasOwnProperty.call(cacheDirectives, 'no-store')) {
+            !Object.prototype.hasOwnProperty.call(cacheDirectives, 'no-store')) {
 
           // We generate a cache entry from the response.
           const cacheEntry = utils.cloneAndTrimResponse(path, originResponse)

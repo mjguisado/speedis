@@ -52,21 +52,24 @@ export function calculateFreshnessLifetime(response) {
     }
   }
   return freshnessLifetime
-};
+}
 
 // See: https://tools.ietf.org/html/rfc7234#section-4.2.3
 export function calculateAge(response) {
+  
   let ageValue = 0
   if (Object.prototype.hasOwnProperty.call(response.headers, 'age')) {
     ageValue = parseInt(response.headers.age)
     if (isNaN(ageValue)) ageValue = 0
   }
+  
   let dateValue = 0
   if (Object.prototype.hasOwnProperty.call(response.headers, 'date')) {
     dateValue = Date.parse(response.headers.date)
     if (isNaN(dateValue)) dateValue = 0
     else dateValue /= 1000
   }
+
   const now = Date.now() / 1000 | 0
 
   const apparentAge = Math.max(0, response.responseTime - dateValue)
@@ -77,7 +80,7 @@ export function calculateAge(response) {
   const currentAge = correctedInitialAge + residentTime
 
   return currentAge
-};
+}
 
 export function isFreshnessLifeTime(response) {
   if (Object.prototype.hasOwnProperty.call(response.headers, 'x-speedis-freshness-lifetime-infinity')) {
@@ -104,5 +107,5 @@ export function memHeader(trigger, ff, pv, outResponse) {
         outResponse.headers['x-speedis-cache'] = 'TCP_MISS from ' + os.hostname()
       };
       break
-  };
-};
+  }
+}
