@@ -29,7 +29,7 @@ suite('Speedis', async () => {
             t.assert.match(response.headers['x-speedis-cache'], /^TCP_MISS/)
         })
 
-        test('GET 200 TCP_MEM_HIT', async (t) => {
+        test('GET 200 TCP_HIT', async (t) => {
             t.plan(10)
             const url = '/mocks/mocks/items?s-maxage=30&max-age=10'
             const deleteResponse = await fastifyServer.inject({
@@ -53,7 +53,7 @@ suite('Speedis', async () => {
             t.assert.ok(Object.prototype.hasOwnProperty.call(secondResponse.headers, 'age'))
             t.assert.ok(secondResponse.headers['age'] < 60)
             t.assert.ok(Object.prototype.hasOwnProperty.call(secondResponse.headers, 'x-speedis-cache'))
-            t.assert.match(secondResponse.headers['x-speedis-cache'], /^TCP_MEM_HIT/)
+            t.assert.match(secondResponse.headers['x-speedis-cache'], /^TCP_HIT/)
         })
 
         // test('GET 304 TCP_MEM_HIT ETAG', async (t) => {})

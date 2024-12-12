@@ -264,6 +264,7 @@ export default async function (server, opts) {
             reply.code(304)
           } else {
             reply.code(response.statusCode)
+            response.headers['date'] = new Date().toUTCString()
             reply.headers(response.headers)
             reply.send(response.body)
           }
@@ -336,6 +337,8 @@ export default async function (server, opts) {
       }
     }
 
+    let conditionalFetch = false
+
     if (cachedResponse) {
 
       // Apply transformations to the entry fetched from the cache
@@ -380,9 +383,11 @@ export default async function (server, opts) {
         // https://www.npmjs.com/package/etag
         if ('etag' in cachedResponse.headers) {
           options.headers['if-none-match'] = cachedResponse.headers.etag
+          conditionalFetch = true
         }
         if ('last-modified' in cachedResponse.headers) {
           options.headers['if-modified-since'] = cachedResponse.headers['last-modified']
+          conditionalFetch = true
         }
       }
     }
@@ -421,7 +426,13 @@ export default async function (server, opts) {
 
       // The current value of the clock at the host at the time the
       // response was received.
-      responseTime = Date.now() / 1000 | 0
+      responseTime = Date.now()
+
+      // Unsure that we have a valid Date Header
+      utils.ensureValidDateHeader(originResponse, responseTime)
+
+      // We reduce precision once it’s no longer needed to ensure the Date header.
+      responseTime = responseTime / 1000 | 0
 
     } catch (error) {
 
@@ -446,7 +457,7 @@ export default async function (server, opts) {
         cachedResponse.headers['warning'] =
           '111 ' + os.hostname() + ' "Revalidation Failed" "' + (new Date()).toUTCString() + '"'
         cachedResponse.headers['age'] = utils.calculateAge(cachedResponse)
-        utils.memHeader('STALE', forceFetch, preview, cachedResponse)
+        utils.memHeader('REFRESH_FAIL_HIT', forceFetch, preview, cachedResponse)
         return cachedResponse
       } else {
         // It could not be retrieved from the source and
@@ -469,10 +480,9 @@ export default async function (server, opts) {
       // age of the content.
       cachedResponse.requestTime = requestTime
       cachedResponse.responseTime = responseTime
-      if ('date' in originResponse.headers) {
+      if (Object.prototype.hasOwnProperty.call(originResponse.headers, 'date')) {
         cachedResponse.headers['date'] = originResponse.headers.date
       }
-
       if (amITheFetcher) {
         try {
           // Update the cache
@@ -495,8 +505,7 @@ export default async function (server, opts) {
       // Las siguientes modificaciones no queremos que persistan en caché.
       // Por ello clonamos la respuesta.
       outputResponse = utils.cloneAndTrimResponse(path, cachedResponse)
-      outputResponse.headers['age'] = utils.calculateAge(outputResponse)
-      utils.memHeader('HIT', forceFetch, preview, outputResponse)
+      utils.memHeader('REFRESH_HIT', forceFetch, preview, outputResponse)
 
     } else {
 
@@ -546,8 +555,7 @@ export default async function (server, opts) {
       // Se clona la respuesta del origen y se le aplican
       // transformaciones para su salida.
       outputResponse = utils.cloneAndTrimResponse(path, originResponse)
-      outputResponse.headers['age'] = utils.calculateAge(outputResponse)
-      utils.memHeader('MISS', forceFetch, preview, outputResponse)
+      utils.memHeader(conditionalFetch?'REFRESH_MISS':'MISS', forceFetch, preview, outputResponse)
     }
     return outputResponse
   }
