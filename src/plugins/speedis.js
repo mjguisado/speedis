@@ -228,7 +228,7 @@ export default async function (server, opts) {
               ifNoneMatchCondition = false
             }
           } else {
-            if (Object.prototype.hasOwnProperty.call(response.headers,'etag')) {
+            if (Object.prototype.hasOwnProperty.call(response.headers, 'etag')) {
               for (let index = 0; index < etags.length; index++) {
                 // A recipient MUST use the weak comparison function when 
                 // comparing entity tags for If-None-Match
