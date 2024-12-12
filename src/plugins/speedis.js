@@ -9,9 +9,10 @@ import Ajv from "ajv"
 
 export default async function (server, opts) {
 
-  const { id, origin, redisOptions } = opts
+  const { id, exposeErrors, origin, redisOptions } = opts
 
   server.decorate('id', id)
+  server.decorate('exposeErrors', exposeErrors)
 
   // TODO: Completar validaciones.
   const ajv = new Ajv()
@@ -202,7 +203,7 @@ export default async function (server, opts) {
       try {
         // See: https://antirez.com/news/93
         let result = await server.redis.unlink(cacheKey)
-        if ( result ) {
+        if (result) {
           reply.code(204)
         } else {
           reply.code(404)
@@ -217,6 +218,7 @@ export default async function (server, opts) {
     }
   })
 
+  // See: https://developer.mozilla.org/en-US/docs/Web/HTTP/Resources_and_specifications
   server.route({
     method: 'GET',
     url: '/*',
@@ -226,10 +228,74 @@ export default async function (server, opts) {
       let forceFetch = (Object.prototype.hasOwnProperty.call(request.headers, 'x-speedis-force-fetch'))
       let preview = (Object.prototype.hasOwnProperty.call(request.headers, 'x-speedis-preview'))
       try {
+
         let response = await _get(server, path, forceFetch, preview, request.id)
-        reply.code(response.statusCode)
-        reply.headers(response.headers)
-        reply.send(response.body)
+
+        // Check if we have received a conditional request.
+        var etags = [];
+        var lastModified = null;
+        for (var header in request.headers) {
+          switch (header) {
+            case 'if-none-match':
+              etags = request.headers[header]
+                .replace(/ /g, '')
+                .split(',')
+              break;
+            case 'if-modified-since':
+              lastModified = request.headers[header];
+              break;
+          }
+        }
+
+        // See: https://datatracker.ietf.org/doc/html/rfc9110#section-13.1.2
+        let ifNoneMatchCondition = true;
+        if (etags.length > 0) {
+          if (etags.length === 1 && etags[0] === '"*"') {
+            if (response && 200 === response.statusCode) {
+              ifNoneMatchCondition = false
+            }
+          } else {
+            if (Object.prototype.hasOwnProperty.call(response.headers,'etag')) {
+              for (let index = 0; index < etags.length; index++) {
+                // A recipient MUST use the weak comparison function when 
+                // comparing entity tags for If-None-Match
+                // https://datatracker.ietf.org/doc/html/rfc9110#section-8.8.3.2
+                let weakRequestETag = etags[index].startsWith('W/')
+                  ? etags[index].substring(2) : etags[index];
+                let weakCacheEtag = response.headers["etag"].startsWith('W/')
+                  ? response.headers["etag"].substring(2) : response.headers["etag"];
+                if (weakRequestETag === weakCacheEtag) {
+                  ifNoneMatchCondition = false
+                  break
+                }
+              }
+            }
+          }
+        }
+
+        if (!ifNoneMatchCondition) {
+          reply.code(304)
+        } else {
+          // See: https://datatracker.ietf.org/doc/html/rfc9110#section-13.1.3
+          let ifModifiedSinceCondition = true
+          if (!Object.prototype.hasOwnProperty.call(request.headers, 'if-none-match')) {
+            let requestlmd = lastModified
+              ? Date.parse(lastModified) : NaN
+            let cachelmd = Object.prototype.hasOwnProperty.call(response.headers, 'last-modified')
+              ? Date.parse(response.headers['last-modified']) : NaN
+            if (!Number.isNaN(requestlmd) && !Number.isNaN(cachelmd) && cachelmd <= requestlmd) {
+              ifModifiedSinceCondition = false
+            }
+          }
+          if (!ifModifiedSinceCondition) {
+            reply.code(304)
+          } else {
+            reply.code(response.statusCode)
+            reply.headers(response.headers)
+            reply.send(response.body)
+          }
+        }
+
       } catch (error) {
         const msg =
           "Error requesting to the origin and there is no entry in the cache. " +
@@ -450,7 +516,7 @@ export default async function (server, opts) {
         // No-store indicates that the cache should not store anything about the 
         // client request or server response.
         if (!Object.prototype.hasOwnProperty.call(cacheDirectives, 'private') &&
-            !Object.prototype.hasOwnProperty.call(cacheDirectives, 'no-store')) {
+          !Object.prototype.hasOwnProperty.call(cacheDirectives, 'no-store')) {
 
           // We generate a cache entry from the response.
           const cacheEntry = utils.cloneAndTrimResponse(path, originResponse)

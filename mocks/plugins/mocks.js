@@ -20,8 +20,10 @@ export default async function (server, opts) {
         let smaxage = request.query['s-maxage']
         if (smaxage) cachecontrol += `, s-maxage=${smaxage}`
         if (maxage)  cachecontrol += `, max-age=${maxage}`
+        let now = new Date().toUTCString();
         reply.headers({
-            'cache-control': cachecontrol
+            'cache-control': cachecontrol,
+            'last-modified': now
         })
         reply.send(items)        
     })
