@@ -175,6 +175,8 @@ export default async function (server, opts) {
   if (origin.localRequestCoalescing) server.decorate('ongoing', new Map())
 
   // Connecting to Redis
+  // TODO: Handling reconnections
+  // See: https://redis.io/docs/latest/develop/clients/nodejs/produsage/#handling-reconnections 
   const client = await createClient(redisOptions)
     .on('error', error => {
       throw new Error(`Error connecting to Redis. Origin: ${id}.`, { cause: error })
@@ -186,6 +188,33 @@ export default async function (server, opts) {
     if (server.origin.httpxOptions.agent) server.origin.httpxOptions.agent.destroy()
     if (origin.localRequestCoalescing) server.ongoing.clear()
     if (server.redis) server.redis.quit()
+  })
+
+  server.route({
+    method: 'DELETE',
+    url: '/*',
+    handler: async function (request, reply) {
+      let prefix = request.routeOptions.url.replace("/*", "")
+      let path = request.url.replace(prefix, "")
+
+      // We try to look for the entry in the cache.
+      const cacheKey = generateCacheKey(server, path)
+      try {
+        // See: https://antirez.com/news/93
+        let result = await server.redis.unlink(cacheKey)
+        if ( result ) {
+          reply.code(204)
+        } else {
+          reply.code(404)
+        }
+      } catch (error) {
+        const msg =
+          "Error deleting the cache entry in Redis. " +
+          `Origin: ${server.id}. Key: ${cacheKey}. RID: ${rid}.`
+        if (server.exposeErrors) { throw new Error(msg, { cause: error }) }
+        else throw new Error(msg);
+      }
+    }
   })
 
   server.route({
@@ -214,6 +243,8 @@ export default async function (server, opts) {
   function generateCacheKey(server, path) {
     return server.id + path.replaceAll('/', ':')
   }
+
+
 
   async function _get(server, path, forceFetch, preview, rid) {
 

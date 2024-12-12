@@ -3,7 +3,7 @@ import path from 'path'
 import fs from 'fs/promises'
 import speedisPlugin from './plugins/speedis.js'
 
-export async function build(opts = {}) {
+export async function app(opts = {}) {
     const server = fastify(opts)
 
     // Load the origin's configuration.

@@ -1,0 +1,31 @@
+{
+    "id": "mocks",
+    "prefix": "/mocks",
+    "logLevel": "warn",
+    "exposeErrors": true,
+    "redis": {
+        "socket": {
+            "host": "127.0.0.1",
+            "port": 6379
+        }
+    },
+    "origin": {
+        "http2": false,
+        "fetchTimeout": 2000,
+        "localRequestCoalescing": true,
+        "remoteRequestCoalescing": true,
+        "httpxOptions": {
+            "protocol": "http:",
+            "host": "127.0.0.1",
+            "family": 4,
+            "port": 3001,
+            "method": "GET",
+            "headers": {},
+            "timeout": 2000
+        },
+        "agentOptions": {
+            "keepAlive": true
+        },
+        "transformations": []
+    }
+}

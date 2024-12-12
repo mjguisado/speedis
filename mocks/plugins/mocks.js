@@ -12,4 +12,8 @@ export default async function (server, opts) {
         return { items: items }
     })
 
+    server.get('/code/:code', async (request, reply) => {
+        reply.code(request.params.code)
+    })
+
 }

@@ -1,7 +1,7 @@
-import { build } from './app.js'
+import { app } from './app.js'
 
 // See: https://fastify.dev/docs/latest/Guides/Testing/#separating-concerns-makes-testing-easy
-const server = await build({
+const server = await app({
   logger: { level: 'info' }
 })
 
