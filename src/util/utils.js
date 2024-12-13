@@ -46,9 +46,10 @@ export function calculateFreshnessLifetime(response) {
   } else if (Object.prototype.hasOwnProperty.call(cacheDirectives, 'max-age')) {
     freshnessLifetime = parseInt(cacheDirectives['max-age'])
   } else if (Object.prototype.hasOwnProperty.call(response.headers, 'expires')) {
+    // https://www.rfc-editor.org/rfc/rfc9111.html#name-expires
     const expires = Date.parse(response.headers.expires)
     const date = Date.parse(response.headers.date)
-    if (!(isNaN(expires) || isNaN(date))) {
+    if (!(Number.isNaN(expires) || Number.isNaN(date))) {
       freshnessLifetime = (expires - date) / 1000
     } else {
       // In the current implementation, we do not use the option to 
@@ -120,6 +121,6 @@ export function memHeader(trigger, outResponse) {
       break
     case 'REFRESH_FAIL_HIT':
       outResponse.headers['x-speedis-cache'] = 'TCP_REFRESH_FAIL_HIT from ' + os.hostname()
-    break
+      break
   }
 }

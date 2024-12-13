@@ -324,6 +324,10 @@ export default async function (server, opts) {
     return server.id + path.replaceAll('/', ':')
   }
 
+  // TODO: https://www.rfc-editor.org/rfc/rfc9111.html#name-must-understand
+  // TODO: https://www.rfc-editor.org/rfc/rfc9111.html#name-no-transform
+  // TODO: https://www.rfc-editor.org/rfc/rfc9111.html#name-no-transform-2
+  // TODO: https://www.rfc-editor.org/rfc/rfc9111.html#name-public
   async function _get(server, path, clientCacheDirectives, rid) {
 
     // We create options for an HTTP/S request to the required path
@@ -383,16 +387,19 @@ export default async function (server, opts) {
       }
 
       /*
-      * If the response is fresh and there is not a no-cache directive 
-      * we serve it immediately from the cache.
-      * 
-      * See: https://www.rfc-editor.org/rfc/rfc9111.html#cache-request-directive.no-store * 
+      * See: https://www.rfc-editor.org/rfc/rfc9111.html#name-no-cache 
+      * See: https://www.rfc-editor.org/rfc/rfc9111.html#name-no-cache-2
+      * See: https://www.rfc-editor.org/rfc/rfc9111.html#cache-request-directive.no-store 
       * Note that if a request containing the no-store directive is 
       * satisfied from a cache, the no-store request directive does 
       * not apply to the already stored response.
       */
+      const cachedCacheDirectives = utils.parseCacheControlHeader(cachedResponse);
       if (responseIsFresh
-        && !Object.prototype.hasOwnProperty.call(clientCacheDirectives, 'no-cache')) {
+        && !Object.prototype.hasOwnProperty.call(clientCacheDirectives, 'no-cache')
+        && (!Object.prototype.hasOwnProperty.call(cachedCacheDirectives, 'no-cache')
+        // The qualified form of the no-cache response directive 
+        || cachedCacheDirectives['no-cache'] !== null)) {
         utils.memHeader('HIT', cachedResponse)
         cachedResponse.headers['age'] = utils.calculateAge(cachedResponse)
         return cachedResponse
@@ -468,7 +475,6 @@ export default async function (server, opts) {
           `Origin: ${server.id}. Options: ` + JSON.stringify(options) + `. RID: ${rid}.`
         )
         // https://www.rfc-editor.org/rfc/rfc9111.html#cache-response-directive.must-revalidate
-        const cachedCacheDirectives = utils.parseCacheControlHeader(cachedResponse);
         if (!Object.prototype.hasOwnProperty.call(cachedCacheDirectives, 'must-revalidate')
           && !Object.prototype.hasOwnProperty.call(cachedCacheDirectives, 'proxy-revalidate')) {
           server.log.warn(error,
@@ -492,21 +498,33 @@ export default async function (server, opts) {
 
     // We parse the Cache-Control header to extract cache directives.
     const originCacheDirectives = utils.parseCacheControlHeader(originResponse)
-
     let writeCache = amITheFetcher
+      // See: https://www.rfc-editor.org/rfc/rfc9111.html#name-no-store
       && !Object.prototype.hasOwnProperty.call(clientCacheDirectives, 'no-store')
-      && !Object.prototype.hasOwnProperty.call(originCacheDirectives, 'private')
+      // See: https://www.rfc-editor.org/rfc/rfc9111.html#name-no-store-2
       && !Object.prototype.hasOwnProperty.call(originCacheDirectives, 'no-store')
+      // See: https://www.rfc-editor.org/rfc/rfc9111.html#name-private
+      && (!Object.prototype.hasOwnProperty.call(originCacheDirectives, 'private')
+        // // The qualified form of the private response directive
+        || originCacheDirectives['private'] !== null)
+
+
+    // We generate a cache entry from the response.
+    const cacheEntry = utils.cloneAndTrimResponse(originResponse)
+    cleanUpHeader(cacheEntry, originCacheDirectives)
 
     // The HTTP 304 status code, “Not Modified,” tells the client that the
     // requested resource hasn't changed since the last access
+    // TODO
+    // See: https://www.rfc-editor.org/rfc/rfc9111.html#freshening.responses
+    // See: https://www.rfc-editor.org/rfc/rfc9111.html#name-freshening-responses-with-h
     if (originResponse.statusCode === 304) {
 
       // We set the attributes involved in calculating the
       // age of the content.
-      cachedResponse.requestTime = originResponse.requestTime
-      cachedResponse.responseTime = originResponse.responseTime
-      cachedResponse.headers.date = originResponse.headers.date
+      cachedResponse.requestTime  = cacheEntry.requestTime
+      cachedResponse.responseTime = cacheEntry.responseTime
+      cachedResponse.headers.date = cacheEntry.headers.date
 
       if (writeCache) {
         try {
@@ -532,10 +550,6 @@ export default async function (server, opts) {
     } else {
 
       if (writeCache) {
-
-        // We generate a cache entry from the response.
-        const cacheEntry = utils.cloneAndTrimResponse(originResponse)
-
         // Apply transformations to the cache entry before storing it in the cache.
         _transform(CACHE_REQUEST, cacheEntry, server)
 
@@ -566,7 +580,9 @@ export default async function (server, opts) {
     * it is recommended to delete it to comply with the directive.
     */
     if (Object.prototype.hasOwnProperty.call(originCacheDirectives, 'no-store')
-      || Object.prototype.hasOwnProperty.call(originCacheDirectives, 'private')) {
+      // The unqualified form of the private response directive 
+      || (Object.prototype.hasOwnProperty.call(originCacheDirectives, 'private')
+        && originCacheDirectives['private'] === null)) {
       try {
         await server.redis.unlink(cacheKey)
       } catch (error) {
@@ -593,7 +609,6 @@ export default async function (server, opts) {
 
   }
 
-  // TODO: https://www.rfc-editor.org/rfc/rfc9111.html#cache-request-directive.no-transform
   function _transform(type, target, server) {
     if (Object.prototype.hasOwnProperty.call(server.origin, 'transformations')) {
       server.origin.transformations.forEach(transformation => {
@@ -625,6 +640,52 @@ export default async function (server, opts) {
         request.on('error', reject)
       }
     })
+  }
+
+  function cleanUpHeader(entry, cacheDirectives) {
+    // See: https://www.rfc-editor.org/rfc/rfc9111.html#name-storing-header-and-trailer-
+    let headersToRemove = []
+
+    if (Object.prototype.hasOwnProperty.call(entry.headers, 'connection')) {
+      headersToRemove = entry.headers['connection']
+        .replace(/ /g, '')
+        .split(',')
+      headersToRemove.push('connection')
+    }
+
+    headersToRemove.push('proxy-connection')
+    headersToRemove.push('keep-alive')
+    headersToRemove.push('te')
+    headersToRemove.push('transfer-encoding')
+    headersToRemove.push('ppgrade')
+
+    // The qualified form of the no-cache response directive
+    if (Object.prototype.hasOwnProperty.call(cacheDirectives, 'no-cache')
+      && cacheDirectives['no-cache'] !== null) {
+      headersToRemove = headersToRemove.concat(
+        cacheDirectives['no-cache']
+          .replace(/ /g, '')
+          .split(',')
+      )
+    }
+    // The qualified form of the private response directive
+    if (Object.prototype.hasOwnProperty.call(cacheDirectives, 'private')
+      && cacheDirectives['private'] !== null) {
+      headersToRemove = headersToRemove.concat(
+        cacheDirectives['private']
+          .replace(/ /g, '')
+          .split(',')
+      )
+    }
+
+    headersToRemove.push('proxy-authenticate')
+    headersToRemove.push('proxy-authentication-info')
+    headersToRemove.push('proxy-authorization')
+
+    headersToRemove.forEach(headerToRemove => {
+      delete entry.headers[headerToRemove]
+    })
+    
   }
 
 }
