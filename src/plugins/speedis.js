@@ -17,6 +17,8 @@ export default async function (server, opts) {
   // TODO: Completar validaciones.
   const ajv = new Ajv()
 
+  const CLIENT_REQUEST = "ClientRequest"
+  const CLIENT_RESPONSE = "ClientResponse"
   const ORIGIN_REQUEST = "OriginRequest"
   const ORIGIN_RESPONSE = "OriginResponse"
   const CACHE_REQUEST = "CacheRequest"
@@ -94,7 +96,16 @@ export default async function (server, opts) {
                     maxProperties: 3,
                     required: ["phase", "uses"],
                     properties: {
-                      phase: { enum: [ORIGIN_REQUEST, ORIGIN_RESPONSE, CACHE_REQUEST, CACHE_RESPONSE] },
+                      phase: {
+                        enum: [
+                          CLIENT_REQUEST,
+                          CLIENT_RESPONSE,
+                          ORIGIN_REQUEST,
+                          ORIGIN_RESPONSE,
+                          CACHE_REQUEST,
+                          CACHE_RESPONSE
+                        ]
+                      },
                       uses: { type: "string" },
                       with: { type: "object" }
                     }
@@ -195,86 +206,91 @@ export default async function (server, opts) {
     method: 'GET',
     url: '/*',
     handler: async function (request, reply) {
+
       let prefix = request.routeOptions.url.replace("/*", "")
       let path = request.url.replace(prefix, "")
-      let forceFetch = (Object.prototype.hasOwnProperty.call(request.headers, 'x-speedis-force-fetch'))
-      let preview = (Object.prototype.hasOwnProperty.call(request.headers, 'x-speedis-preview'))
+
+      // We parse the Cache-Control header to extract cache directives.
+      const clientCacheDirectives = utils.parseCacheControlHeader(request)
+
+      let response = null;
       try {
-
-        let response = await _get(server, path, forceFetch, preview, request.id)
-
-        // Check if we have received a conditional request.
-        var etags = [];
-        var lastModified = null;
-        for (var header in request.headers) {
-          switch (header) {
-            case 'if-none-match':
-              etags = request.headers[header]
-                .replace(/ /g, '')
-                .split(',')
-              break;
-            case 'if-modified-since':
-              lastModified = request.headers[header];
-              break;
-          }
-        }
-
-        // See: https://datatracker.ietf.org/doc/html/rfc9110#section-13.1.2
-        let ifNoneMatchCondition = true;
-        if (etags.length > 0) {
-          if (etags.length === 1 && etags[0] === '"*"') {
-            if (response && 200 === response.statusCode) {
-              ifNoneMatchCondition = false
-            }
-          } else {
-            if (Object.prototype.hasOwnProperty.call(response.headers, 'etag')) {
-              for (let index = 0; index < etags.length; index++) {
-                // A recipient MUST use the weak comparison function when 
-                // comparing entity tags for If-None-Match
-                // https://datatracker.ietf.org/doc/html/rfc9110#section-8.8.3.2
-                let weakRequestETag = etags[index].startsWith('W/')
-                  ? etags[index].substring(2) : etags[index];
-                let weakCacheEtag = response.headers["etag"].startsWith('W/')
-                  ? response.headers["etag"].substring(2) : response.headers["etag"];
-                if (weakRequestETag === weakCacheEtag) {
-                  ifNoneMatchCondition = false
-                  break
-                }
-              }
-            }
-          }
-        }
-
-        if (!ifNoneMatchCondition) {
-          reply.code(304)
-        } else {
-          // See: https://datatracker.ietf.org/doc/html/rfc9110#section-13.1.3
-          let ifModifiedSinceCondition = true
-          if (!Object.prototype.hasOwnProperty.call(request.headers, 'if-none-match')) {
-            let requestlmd = lastModified
-              ? Date.parse(lastModified) : NaN
-            let cachelmd = Object.prototype.hasOwnProperty.call(response.headers, 'last-modified')
-              ? Date.parse(response.headers['last-modified']) : NaN
-            if (!Number.isNaN(requestlmd) && !Number.isNaN(cachelmd) && cachelmd <= requestlmd) {
-              ifModifiedSinceCondition = false
-            }
-          }
-          if (!ifModifiedSinceCondition) {
-            reply.code(304)
-          } else {
-            reply.code(response.statusCode)
-            response.headers['date'] = new Date().toUTCString()
-            reply.headers(response.headers)
-            reply.send(response.body)
-          }
-        }
-
+        response = await _get(server, path, clientCacheDirectives, request.id)
       } catch (error) {
         const msg =
           "Error requesting to the origin and there is no entry in the cache. " +
           `Origin: ${server.id}. Url: ${request.url}. RID: ${request.id}.`
         if (server.exposeErrors) { throw new Error(msg, { cause: error }) }
         else throw new Error(msg);
+      }
+
+      // Check if we have received a conditional request.
+      var etags = [];
+      var lastModified = null;
+      for (var header in request.headers) {
+        switch (header) {
+          case 'if-none-match':
+            etags = request.headers[header]
+              .replace(/ /g, '')
+              .split(',')
+            break;
+          case 'if-modified-since':
+            lastModified = request.headers[header];
+            break;
+        }
+      }
+
+      // See: https://datatracker.ietf.org/doc/html/rfc9110#section-13.1.2
+      let ifNoneMatchCondition = true;
+      if (etags.length > 0) {
+        if (etags.length === 1 && etags[0] === '"*"') {
+          if (response && 200 === response.statusCode) {
+            ifNoneMatchCondition = false
+          }
+        } else {
+          if (Object.prototype.hasOwnProperty.call(response.headers, 'etag')) {
+            for (let index = 0; index < etags.length; index++) {
+              // A recipient MUST use the weak comparison function when 
+              // comparing entity tags for If-None-Match
+              // https://datatracker.ietf.org/doc/html/rfc9110#section-8.8.3.2
+              let weakRequestETag = etags[index].startsWith('W/')
+                ? etags[index].substring(2) : etags[index];
+              let weakCacheEtag = response.headers["etag"].startsWith('W/')
+                ? response.headers["etag"].substring(2) : response.headers["etag"];
+              if (weakRequestETag === weakCacheEtag) {
+                ifNoneMatchCondition = false
+                break
+              }
+            }
+          }
+        }
+      }
+
+      const now = new Date().toUTCString()
+      if (!ifNoneMatchCondition) {
+        reply.code(304)
+        reply.headers({ date: now })
+      } else {
+        // See: https://datatracker.ietf.org/doc/html/rfc9110#section-13.1.3
+        let ifModifiedSinceCondition = true
+        if (!Object.prototype.hasOwnProperty.call(request.headers, 'if-none-match')) {
+          let requestlmd = lastModified
+            ? Date.parse(lastModified) : NaN
+          let cachelmd = Object.prototype.hasOwnProperty.call(response.headers, 'last-modified')
+            ? Date.parse(response.headers['last-modified']) : NaN
+          if (!Number.isNaN(requestlmd) && !Number.isNaN(cachelmd) && cachelmd <= requestlmd) {
+            ifModifiedSinceCondition = false
+          }
+        }
+        if (!ifModifiedSinceCondition) {
+          reply.code(304)
+          reply.headers({ date: now })
+        } else {
+          reply.code(response.statusCode)
+          response.headers['date'] = now
+          reply.headers(response.headers)
+          reply.send(response.body)
+        }
       }
     }
   })
@@ -310,7 +326,7 @@ export default async function (server, opts) {
     return server.id + path.replaceAll('/', ':')
   }
 
-  async function _get(server, path, forceFetch, preview, rid) {
+  async function _get(server, path, clientCacheDirectives, rid) {
 
     // We create options for an HTTP/S request to the required path
     // based on the default ones that must not be modified.
@@ -318,24 +334,14 @@ export default async function (server, opts) {
     if (server.agent) options.agent = server.agent
     options.path = path
 
-    // TODO: Pensar en recuperar sólo los campos que necesitamos: requestTime, responseTime, headers
-
-    // We try to look for the entry in the cache.
-    let cacheKey = null;
+    let cacheKey = generateCacheKey(server, path);
     let cachedResponse = null
-
-    // Preview mode forces fetching from the origin without interacting with Redis.
-    // Warning: We should limit the use of preview mode as it could overload the 
-    // origin by bypassing the cache layer.
-    if (!preview) {
-      cacheKey = generateCacheKey(server, path)
-      try {
-        cachedResponse = await server.redis.json.get(cacheKey)
-      } catch (error) {
-        server.log.warn(error,
-          "Error querying the cache entry in Redis. " +
-          `Origin: ${server.id}. Key: ${cacheKey}. RID: ${rid}.`)
-      }
+    try {
+      cachedResponse = await server.redis.json.get(cacheKey)
+    } catch (error) {
+      server.log.warn(error,
+        "Error querying the cache entry in Redis. " +
+        `Origin: ${server.id}. Key: ${cacheKey}. RID: ${rid}.`)
     }
 
     let conditionalFetch = false
@@ -345,65 +351,67 @@ export default async function (server, opts) {
       // Apply transformations to the entry fetched from the cache
       _transform(CACHE_RESPONSE, cachedResponse, server)
 
-      // We calculate whether the cache entry is fresh or stale.
-
       // See: https://tools.ietf.org/html/rfc7234#section-4.2.1
       const freshnessLifetime = utils.calculateFreshnessLifetime(cachedResponse)
+
       // See: https://tools.ietf.org/html/rfc7234#section-4.2.3
       const currentAge = utils.calculateAge(cachedResponse)
 
-      const responseIsFresh = (freshnessLifetime > currentAge)
+      // We calculate whether the cache entry is fresh or stale.
+      let responseIsFresh = (currentAge <= freshnessLifetime);
+
+      // See: https://httpwg.org/specs/rfc9111.html#cache-request-directive.max-age
+      if (Object.prototype.hasOwnProperty.call(clientCacheDirectives, 'max-age')) {
+        const maxAge = parseInt(clientCacheDirectives['max-age'])
+        if (!Number.isNaN(maxAge) && currentAge > maxAge) {
+          responseIsFresh = false
+        }
+      }
+      // See: https://httpwg.org/specs/rfc9111.html#cache-request-directive.min-fresh
+      if (Object.prototype.hasOwnProperty.call(clientCacheDirectives, 'min-fresh')) {
+        const minFresh = parseInt(clientCacheDirectives['min-fresh'])
+        const fresh = freshnessLifetime - currentAge
+        if (!Number.isNaN(minFresh) && fresh < minFresh) {
+          responseIsFresh = false
+        }
+      }
+      // See: https://httpwg.org/specs/rfc9111.html#cache-request-directive.max-stale
+      if (Object.prototype.hasOwnProperty.call(clientCacheDirectives, 'max-stale')) {
+        const maxStale = parseInt(clientCacheDirectives['max-stale'])
+        const fresh = freshnessLifetime - currentAge
+        if (!Number.isNaN(maxStale) && -maxStale <= fresh) {
+          responseIsFresh = true
+        }
+      }
 
       /*
-      * TODO: Evaluate whether to handle cache directives that force a request
-      * to the origin. It should be analyzed whether to treat differently the
-      * headers coming from the client request, which can be used to overload
-      * the origin by attacking it, from those generated by the origin itself.
-      * The latter, if considered a problem, can always be modified by a
-      * transformer.
-      * https://tools.ietf.org/html/rfc7234#section-4.2.4
-      * https://developer.mozilla.org/es/docs/Web/HTTP/Headers/Cache-Control
-      * no-store, no-cache, must-revalidate, proxy-revalidate, immutable
+      * If the response is fresh and there is not a no-cache directive 
+      * we serve it immediately from the cache.
+      * 
+      * See: https://httpwg.org/specs/rfc9111.html#cache-request-directive.no-store * 
+      * Note that if a request containing the no-store directive is 
+      * satisfied from a cache, the no-store request directive does 
+      * not apply to the already stored response.
       */
-
-      /*
-      * If the response is fresh, we serve it immediately from the cache.
-      */
-
-      /*
-       * @ Deprecated
-       * It can be fresh for a specific period or indefinitely if it contains
-       * the x-speedis-freshness-lifetime-infinity header.
-       */
-      if (!forceFetch && (utils.isFreshnessLifeTime(cachedResponse) || responseIsFresh)) {
+      if (responseIsFresh
+        && !Object.prototype.hasOwnProperty.call(clientCacheDirectives, 'no-cache')) {
+        utils.memHeader('HIT', cachedResponse)
         cachedResponse.headers['age'] = utils.calculateAge(cachedResponse)
-        utils.memHeader('HIT', forceFetch, preview, cachedResponse)
         return cachedResponse
       } else {
         // We need to revalidate the response through a conditional request.
         // https://www.npmjs.com/package/etag
-        if ('etag' in cachedResponse.headers) {
-          options.headers['if-none-match'] = cachedResponse.headers.etag
+        if (Object.prototype.hasOwnProperty.call(cachedResponse.headers, 'etag')) {
+          options.headers['if-none-match'] = cachedResponse.headers['etag']
           conditionalFetch = true
         }
-        if ('last-modified' in cachedResponse.headers) {
+        if (Object.prototype.hasOwnProperty.call(cachedResponse.headers, 'last-modified')) {
           options.headers['if-modified-since'] = cachedResponse.headers['last-modified']
           conditionalFetch = true
         }
       }
+
     }
-
-    // If we reach this point, it is because we need to make a request to
-    // the origin to retrieve or revalidate the response.
-    let outputResponse = null
-
-    // The current value of the clock at the host at the time the
-    // request resulting in the stored response was made.
-    const requestTime = Date.now() / 1000 | 0
-
-    // Make the request to the origin
-    let originResponse = null
-    let responseTime = null
 
     // Apply transformations to the request before sending it to the origin
     _transform(ORIGIN_REQUEST, options, server);
@@ -412,7 +420,13 @@ export default async function (server, opts) {
     // will contact the origin to prevent overloading it.
     let amITheFetcher = false;
 
+    // Make the request to the origin
+    let originResponse = null
+    let requestTime = null
+    let responseTime = null
+
     try {
+
       // Verify if there is an ongoing fetch operation
       let fetch = null;
       if (origin.localRequestCoalescing) {
@@ -423,6 +437,11 @@ export default async function (server, opts) {
         if (origin.localRequestCoalescing) server.ongoing.set(cacheKey, fetch)
         amITheFetcher = true;
       }
+      // The current value of the clock at the host at the time the
+      // request resulting in the stored response was made.
+      requestTime = Date.now() / 1000 | 0
+
+      // Fecth
       originResponse = await fetch;
 
       // The current value of the clock at the host at the time the
@@ -435,6 +454,11 @@ export default async function (server, opts) {
       // We reduce precision once it’s no longer needed to ensure the Date header.
       responseTime = responseTime / 1000 | 0
 
+      // We set the attributes involved in calculating the
+      // age of the content.
+      originResponse.requestTime = requestTime
+      originResponse.responseTime = responseTime
+
     } catch (error) {
 
       delete options.agent
@@ -446,23 +470,15 @@ export default async function (server, opts) {
       /*
       * If I was trying to refresh a cache entry,
       * I may consider serving the stale content.
-      * TODO: Evaluate whether to handle cache directives related to this.
-      * https://tools.ietf.org/html/rfc7234#section-4.2.4
-      * https://developer.mozilla.org/es/docs/Web/HTTP/Headers/Cache-Control
       */
       if (cachedResponse != null) {
         server.log.warn(error,
           "Serving stale content from cache. " +
           `Origin: ${server.id}. Key: ${cacheKey}. RID: ${rid}.`)
-        server.log.debug('Failed cache entry: ' + JSON.stringify(cachedResponse))
-        cachedResponse.headers['warning'] =
-          '111 ' + os.hostname() + ' "Revalidation Failed" "' + (new Date()).toUTCString() + '"'
+        utils.memHeader('REFRESH_FAIL_HIT', cachedResponse)
         cachedResponse.headers['age'] = utils.calculateAge(cachedResponse)
-        utils.memHeader('REFRESH_FAIL_HIT', forceFetch, preview, cachedResponse)
         return cachedResponse
       } else {
-        // It could not be retrieved from the source and
-        // there is no entry in the cache or preview mode is enabled
         throw error
       }
 
@@ -473,19 +489,29 @@ export default async function (server, opts) {
     // Apply transformations to the response received from the origin
     _transform(ORIGIN_RESPONSE, originResponse, server);
 
+    // We parse the Cache-Control header to extract cache directives.
+    const originCacheDirectives = utils.parseCacheControlHeader(originResponse)
+
+    let writeCache = amITheFetcher
+      && !Object.prototype.hasOwnProperty.call(clientCacheDirectives, 'no-store')
+      && !Object.prototype.hasOwnProperty.call(originCacheDirectives, 'private')
+      && !Object.prototype.hasOwnProperty.call(originCacheDirectives, 'no-store')
+
     // The HTTP 304 status code, “Not Modified,” tells the client that the
     // requested resource hasn't changed since the last access
     if (originResponse.statusCode === 304) {
 
       // We set the attributes involved in calculating the
       // age of the content.
-      cachedResponse.requestTime = requestTime
-      cachedResponse.responseTime = responseTime
-      if (Object.prototype.hasOwnProperty.call(originResponse.headers, 'date')) {
-        cachedResponse.headers['date'] = originResponse.headers.date
-      }
-      if (amITheFetcher) {
+      cachedResponse.requestTime = originResponse.requestTime
+      cachedResponse.responseTime = originResponse.responseTime
+      cachedResponse.headers.date = originResponse.headers.date
+
+      if (writeCache) {
         try {
+          // Apply transformations to the cache entry before storing it in the cache.
+          _transform(CACHE_REQUEST, cachedResponse, server)
+
           // Update the cache
           await server.redis.json.merge(cacheKey, '$',
             {
@@ -496,71 +522,82 @@ export default async function (server, opts) {
           )
         } catch (error) {
           server.log.warn(error,
-            "Error while storing in the cache. " +
+            "Error while updating the cache. " +
             `Origin: ${server.id}. Key: ${cacheKey}. RID: ${rid}.`
           )
-          server.log.debug('Failed cache entry: ' + JSON.stringify(cachedResponse))
         }
       }
-
-      // Las siguientes modificaciones no queremos que persistan en caché.
-      // Por ello clonamos la respuesta.
-      outputResponse = utils.cloneAndTrimResponse(path, cachedResponse)
-      utils.memHeader('REFRESH_HIT', forceFetch, preview, outputResponse)
 
     } else {
 
-      // We set the attributes involved in calculating the
-      // age of the content.
-      originResponse.requestTime = requestTime
-      originResponse.responseTime = responseTime
+      if (writeCache) {
 
-      // If we are not in preview mode then we should store in Redis the response.
-      if (!preview) {
+        // We generate a cache entry from the response.
+        const cacheEntry = utils.cloneAndTrimResponse(originResponse)
 
-        // We parse the Cache-Control header to extract cache directives.
-        const cacheDirectives = utils.parseCacheControlHeader(originResponse)
+        // Apply transformations to the cache entry before storing it in the cache.
+        _transform(CACHE_REQUEST, cacheEntry, server)
 
-        // Private indicates that the response is intended for a single user and must
-        // not be stored by a shared cache. A private cache may store the response.
-        // No-store indicates that the cache should not store anything about the 
-        // client request or server response.
-        if (!Object.prototype.hasOwnProperty.call(cacheDirectives, 'private') &&
-          !Object.prototype.hasOwnProperty.call(cacheDirectives, 'no-store')) {
-
-          // We generate a cache entry from the response.
-          const cacheEntry = utils.cloneAndTrimResponse(path, originResponse)
-
-          // Apply transformations to the cache entry before storing it in the cache.
-          _transform(CACHE_REQUEST, cacheEntry, server)
-
-          // Storing in the cache
-          if (amITheFetcher) {
-            const multi = server.redis.multi()
-            multi.json.set(cacheKey, '$', cacheEntry)
-            const ttl = _ttl(cacheEntry.ttl)
-            if (ttl) multi.expire(cacheKey, ttl)
-            try {
-              await multi.exec()
-            } catch (error) {
-              server.log.warn(error,
-                "Error while storing in the cache. " +
-                `Origin: ${server.id}. Key: ${cacheKey}. RID: ${rid}.`
-              )
-              server.log.debug('Failed cache entry: ' + JSON.stringify(cachedResponse))
-            }
-          }
+        const multi = server.redis.multi()
+        multi.json.set(cacheKey, '$', cacheEntry)
+        const ttl = parseInt(cacheEntry.ttl)
+        if (!Number.isNaN(ttl) && ttl > 0) multi.expire(cacheKey, ttl)
+        try {
+          await multi.exec()
+        } catch (error) {
+          server.log.warn(error,
+            "Error while storing in the cache. " +
+            `Origin: ${server.id}. Key: ${cacheKey}. RID: ${rid}.`
+          )
         }
       }
 
-      // Se clona la respuesta del origen y se le aplican
-      // transformaciones para su salida.
-      outputResponse = utils.cloneAndTrimResponse(path, originResponse)
-      utils.memHeader(conditionalFetch?'REFRESH_MISS':'MISS', forceFetch, preview, outputResponse)
     }
-    return outputResponse
+
+    /*
+    * If the origin server response included Cache-Control: no-store,
+    * it should not have been stored in the cache at all.
+    * If, by mistake, it was stored, you must delete it immediately.
+    * 
+    * If the origin server response included Cache-Control: private,
+    * a shared caches should not store it in the cache at all.
+    * If a shared cache has already stored the response by mistake,
+    * it is recommended to delete it to comply with the directive.
+    */
+    if (Object.prototype.hasOwnProperty.call(originCacheDirectives, 'no-store')
+      || Object.prototype.hasOwnProperty.call(originCacheDirectives, 'private')) {
+      try {
+        await server.redis.unlink(cacheKey)
+      } catch (error) {
+        server.log.warn(error,
+          "Error while removing private/no-store entry in the cache. " +
+          `Origin: ${server.id}. Key: ${cacheKey}. RID: ${rid}.`
+        )
+      }
+    }
+
+    // See: https://httpwg.org/specs/rfc9111.html#cache-request-directive.only-if-cached
+    if (Object.prototype.hasOwnProperty.call(clientCacheDirectives, 'only-if-cached')
+      && cachedResponse == null) {
+      return {
+        statusCode: 504,
+        headers: {
+          date: new Date().toUTCString()
+        }
+      }
+    }
+
+    if (originResponse.statusCode === 304) {
+      utils.memHeader('REFRESH_HIT', cachedResponse)
+      return utils.cloneAndTrimResponse(cachedResponse)
+    } else {
+      utils.memHeader(conditionalFetch ? 'REFRESH_MISS' : 'MISS', originResponse)
+      return utils.cloneAndTrimResponse(originResponse)
+    }
+
   }
 
+  // TODO: https://httpwg.org/specs/rfc9111.html#cache-request-directive.no-transform
   function _transform(type, target, server) {
     if (Object.prototype.hasOwnProperty.call(server.origin, 'transformations')) {
       server.origin.transformations.forEach(transformation => {
@@ -592,16 +629,6 @@ export default async function (server, opts) {
         request.on('error', reject)
       }
     })
-  }
-
-  /**
-   * If the response does not have a TTL, it is assigned Infinity by default
-   * which results in a TTL of 0 being returned.
-   * This subsequently causes the cache entry not to expire.
-   */
-  function _ttl(ttl = 'Infinity') {
-    if ('Infinity' === ttl || Infinity === ttl) return 0
-    return parseInt(ttl)
   }
 
 }

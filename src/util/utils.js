@@ -1,6 +1,6 @@
 import os from 'os'
 
-export function cloneAndTrimResponse(path, response) {
+export function cloneAndTrimResponse(response) {
   return {
     statusCode: response.statusCode,
     body: response.body,
@@ -103,28 +103,14 @@ export function calculateAge(response) {
   return currentAge
 }
 
-export function isFreshnessLifeTime(response) {
-  if (Object.prototype.hasOwnProperty.call(response.headers, 'x-speedis-freshness-lifetime-infinity')) {
-    return response.headers['x-speedis-freshness-lifetime-infinity']
-  } else {
-    return false
-  }
-}
-
 // See: https://techdocs.akamai.com/edge-diagnostics/docs/pragma-headers
-export function memHeader(trigger, ff, pv, outResponse) {
+export function memHeader(trigger, outResponse) {
   switch (trigger) {
     case 'HIT':
       outResponse.headers['x-speedis-cache'] = 'TCP_HIT from ' + os.hostname()
       break
     case 'MISS':
-      if (ff) {
-        outResponse.headers['x-speedis-cache'] = 'TCP_FF_MISS from ' + os.hostname()
-      } else if (pv) {
-        outResponse.headers['x-speedis-cache'] = 'TCP_PV_MISS from ' + os.hostname()
-      } else {
-        outResponse.headers['x-speedis-cache'] = 'TCP_MISS from ' + os.hostname()
-      };
+      outResponse.headers['x-speedis-cache'] = 'TCP_MISS from ' + os.hostname()
       break
     case 'REFRESH_HIT':
       outResponse.headers['x-speedis-cache'] = 'TCP_REFRESH_HIT from ' + os.hostname()
