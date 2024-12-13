@@ -62,7 +62,7 @@ export default async function (server, opts) {
               uniqueHeaders: { type: "array" }
             }
           },
-          // https://nodejs.org/api/http.html#new-agentoptions
+          // See: https://nodejs.org/api/http.html#new-agentoptions
           agentOptions:
           {
             type: "object",
@@ -240,7 +240,7 @@ export default async function (server, opts) {
         }
       }
 
-      // See: https://datatracker.ietf.org/doc/html/rfc9110#section-13.1.2
+      // See: https://www.rfc-editor.org/rfc/rfc9110.html#section-13.1.2
       let ifNoneMatchCondition = true;
       if (etags.length > 0) {
         if (etags.length === 1 && etags[0] === '"*"') {
@@ -252,7 +252,7 @@ export default async function (server, opts) {
             for (let index = 0; index < etags.length; index++) {
               // A recipient MUST use the weak comparison function when 
               // comparing entity tags for If-None-Match
-              // https://datatracker.ietf.org/doc/html/rfc9110#section-8.8.3.2
+              // https://www.rfc-editor.org/rfc/rfc9110.html#section-8.8.3.2
               let weakRequestETag = etags[index].startsWith('W/')
                 ? etags[index].substring(2) : etags[index];
               let weakCacheEtag = response.headers["etag"].startsWith('W/')
@@ -271,7 +271,7 @@ export default async function (server, opts) {
         reply.code(304)
         reply.headers({ date: now })
       } else {
-        // See: https://datatracker.ietf.org/doc/html/rfc9110#section-13.1.3
+        // See: https://www.rfc-editor.org/rfc/rfc9110.html#section-13.1.3
         let ifModifiedSinceCondition = true
         if (!Object.prototype.hasOwnProperty.call(request.headers, 'if-none-match')) {
           let requestlmd = lastModified
@@ -349,23 +349,23 @@ export default async function (server, opts) {
       // Apply transformations to the entry fetched from the cache
       _transform(CACHE_RESPONSE, cachedResponse, server)
 
-      // See: https://tools.ietf.org/html/rfc7234#section-4.2.1
+      // See: https://www.rfc-editor.org/rfc/rfc9111.html#name-calculating-freshness-lifet
       const freshnessLifetime = utils.calculateFreshnessLifetime(cachedResponse)
 
-      // See: https://tools.ietf.org/html/rfc7234#section-4.2.3
+      // See: https://www.rfc-editor.org/rfc/rfc9111.html#name-calculating-age
       const currentAge = utils.calculateAge(cachedResponse)
 
       // We calculate whether the cache entry is fresh or stale.
       let responseIsFresh = (currentAge <= freshnessLifetime);
 
-      // See: https://httpwg.org/specs/rfc9111.html#cache-request-directive.max-age
+      // See: https://www.rfc-editor.org/rfc/rfc9111.html#cache-request-directive.max-age
       if (Object.prototype.hasOwnProperty.call(clientCacheDirectives, 'max-age')) {
         const maxAge = parseInt(clientCacheDirectives['max-age'])
         if (!Number.isNaN(maxAge) && currentAge > maxAge) {
           responseIsFresh = false
         }
       }
-      // See: https://httpwg.org/specs/rfc9111.html#cache-request-directive.min-fresh
+      // See: https://www.rfc-editor.org/rfc/rfc9111.html#cache-request-directive.min-fresh
       if (Object.prototype.hasOwnProperty.call(clientCacheDirectives, 'min-fresh')) {
         const minFresh = parseInt(clientCacheDirectives['min-fresh'])
         const fresh = freshnessLifetime - currentAge
@@ -373,7 +373,7 @@ export default async function (server, opts) {
           responseIsFresh = false
         }
       }
-      // See: https://httpwg.org/specs/rfc9111.html#cache-request-directive.max-stale
+      // See: https://www.rfc-editor.org/rfc/rfc9111.html#cache-request-directive.max-stale
       if (Object.prototype.hasOwnProperty.call(clientCacheDirectives, 'max-stale')) {
         const maxStale = parseInt(clientCacheDirectives['max-stale'])
         const fresh = freshnessLifetime - currentAge
@@ -386,7 +386,7 @@ export default async function (server, opts) {
       * If the response is fresh and there is not a no-cache directive 
       * we serve it immediately from the cache.
       * 
-      * See: https://httpwg.org/specs/rfc9111.html#cache-request-directive.no-store * 
+      * See: https://www.rfc-editor.org/rfc/rfc9111.html#cache-request-directive.no-store * 
       * Note that if a request containing the no-store directive is 
       * satisfied from a cache, the no-store request directive does 
       * not apply to the already stored response.
@@ -397,8 +397,7 @@ export default async function (server, opts) {
         cachedResponse.headers['age'] = utils.calculateAge(cachedResponse)
         return cachedResponse
       } else {
-        // We need to revalidate the response through a conditional request.
-        // https://www.npmjs.com/package/etag
+        // We need to revalidate the response.
         if (Object.prototype.hasOwnProperty.call(cachedResponse.headers, 'etag')) {
           options.headers['if-none-match'] = cachedResponse.headers['etag']
           conditionalFetch = true
@@ -468,9 +467,10 @@ export default async function (server, opts) {
           "Error requesting to the origin. " +
           `Origin: ${server.id}. Options: ` + JSON.stringify(options) + `. RID: ${rid}.`
         )
-        // https://httpwg.org/specs/rfc9111.html#cache-response-directive.must-revalidate
+        // https://www.rfc-editor.org/rfc/rfc9111.html#cache-response-directive.must-revalidate
         const cachedCacheDirectives = utils.parseCacheControlHeader(cachedResponse);
-        if (!Object.prototype.hasOwnProperty.call(cachedCacheDirectives,'must-revalidate')) {
+        if (!Object.prototype.hasOwnProperty.call(cachedCacheDirectives, 'must-revalidate')
+          && !Object.prototype.hasOwnProperty.call(cachedCacheDirectives, 'proxy-revalidate')) {
           server.log.warn(error,
             "Serving stale content from cache. " +
             `Origin: ${server.id}. Key: ${cacheKey}. RID: ${rid}.`)
@@ -478,7 +478,7 @@ export default async function (server, opts) {
           cachedResponse.headers['age'] = utils.calculateAge(cachedResponse)
           return cachedResponse
         } else {
-          return { statusCode: 504, headers: { date: new Date().toUTCString() }}
+          return { statusCode: 504, headers: { date: new Date().toUTCString() } }
         }
       } else {
         throw error
@@ -577,10 +577,10 @@ export default async function (server, opts) {
       }
     }
 
-    // See: https://httpwg.org/specs/rfc9111.html#cache-request-directive.only-if-cached
+    // See: https://www.rfc-editor.org/rfc/rfc9111.html#cache-request-directive.only-if-cached
     if (Object.prototype.hasOwnProperty.call(clientCacheDirectives, 'only-if-cached')
       && cachedResponse == null) {
-      return { statusCode: 504, headers: { date: new Date().toUTCString() }}
+      return { statusCode: 504, headers: { date: new Date().toUTCString() } }
     }
 
     if (originResponse.statusCode === 304) {
@@ -593,7 +593,7 @@ export default async function (server, opts) {
 
   }
 
-  // TODO: https://httpwg.org/specs/rfc9111.html#cache-request-directive.no-transform
+  // TODO: https://www.rfc-editor.org/rfc/rfc9111.html#cache-request-directive.no-transform
   function _transform(type, target, server) {
     if (Object.prototype.hasOwnProperty.call(server.origin, 'transformations')) {
       server.origin.transformations.forEach(transformation => {
