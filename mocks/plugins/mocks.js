@@ -15,36 +15,12 @@ export default async function (server, opts) {
 
     server.get('/items', async (request, reply) => {
         reply.code(200)     
-        let cachecontrol = "public";
-        let  maxage = request.query['max-age']
-        let smaxage = request.query['s-maxage']
-        if (smaxage) cachecontrol += `, s-maxage=${smaxage}`
-        if (maxage)  cachecontrol += `, max-age=${maxage}`
-        let now = new Date().toUTCString();
-        reply.headers({
-            'cache-control': cachecontrol,
-            'last-modified': now
-        })
-        reply.send(items)        
-    })
-
-    server.get('/code/:code', async (request, reply) => {
-        reply.code(request.params.code)
-    })
-
-    server.get('/no-store', async (request, reply) => {
+        let headers = {}
+        let cc = request.query['cc']
+        if (cc) headers['cache-control'] = cc
+        headers['last-modified'] = new Date().toUTCString()
         reply.code(200)
-        reply.headers({
-            'cache-control': 'no-store'
-        })
-        reply.send(items)        
-    })
-
-    server.get('/private', async (request, reply) => {
-        reply.code(200)
-        reply.headers({
-            'cache-control': 'private'
-        })
+        reply.headers(headers)
         reply.send(items)        
     })
 

@@ -218,7 +218,7 @@ export default async function (server, opts) {
         response = await _get(server, path, clientCacheDirectives, request.id)
       } catch (error) {
         const msg =
-          "Error requesting to the origin and there is no entry in the cache. " +
+          "Error requesting to the origin and there is no a valid entry in the cache. " +
           `Origin: ${server.id}. Url: ${request.url}. RID: ${request.id}.`
         if (server.exposeErrors) { throw new Error(msg, { cause: error }) }
         else throw new Error(msg);
@@ -301,8 +301,6 @@ export default async function (server, opts) {
     handler: async function (request, reply) {
       let prefix = request.routeOptions.url.replace("/*", "")
       let path = request.url.replace(prefix, "")
-
-      // We try to look for the entry in the cache.
       const cacheKey = generateCacheKey(server, path)
       try {
         // See: https://antirez.com/news/93
@@ -460,28 +458,31 @@ export default async function (server, opts) {
       originResponse.responseTime = responseTime
 
     } catch (error) {
-
-      delete options.agent
-      server.log.error(error,
-        "Error requesting to the origin. " +
-        `Origin: ${server.id}. Options: ` + JSON.stringify(options) + `. RID: ${rid}.`
-      )
-
       /*
       * If I was trying to refresh a cache entry,
       * I may consider serving the stale content.
       */
       if (cachedResponse != null) {
-        server.log.warn(error,
-          "Serving stale content from cache. " +
-          `Origin: ${server.id}. Key: ${cacheKey}. RID: ${rid}.`)
-        utils.memHeader('REFRESH_FAIL_HIT', cachedResponse)
-        cachedResponse.headers['age'] = utils.calculateAge(cachedResponse)
-        return cachedResponse
+        delete options.agent
+        server.log.error(error,
+          "Error requesting to the origin. " +
+          `Origin: ${server.id}. Options: ` + JSON.stringify(options) + `. RID: ${rid}.`
+        )
+        // https://httpwg.org/specs/rfc9111.html#cache-response-directive.must-revalidate
+        const cachedCacheDirectives = utils.parseCacheControlHeader(cachedResponse);
+        if (!Object.prototype.hasOwnProperty.call(cachedCacheDirectives,'must-revalidate')) {
+          server.log.warn(error,
+            "Serving stale content from cache. " +
+            `Origin: ${server.id}. Key: ${cacheKey}. RID: ${rid}.`)
+          utils.memHeader('REFRESH_FAIL_HIT', cachedResponse)
+          cachedResponse.headers['age'] = utils.calculateAge(cachedResponse)
+          return cachedResponse
+        } else {
+          return { statusCode: 504, headers: { date: new Date().toUTCString() }}
+        }
       } else {
         throw error
       }
-
     } finally {
       if (origin.localRequestCoalescing) server.ongoing.delete(cacheKey)
     }
@@ -579,12 +580,7 @@ export default async function (server, opts) {
     // See: https://httpwg.org/specs/rfc9111.html#cache-request-directive.only-if-cached
     if (Object.prototype.hasOwnProperty.call(clientCacheDirectives, 'only-if-cached')
       && cachedResponse == null) {
-      return {
-        statusCode: 504,
-        headers: {
-          date: new Date().toUTCString()
-        }
-      }
+      return { statusCode: 504, headers: { date: new Date().toUTCString() }}
     }
 
     if (originResponse.statusCode === 304) {
