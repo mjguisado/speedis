@@ -398,8 +398,8 @@ export default async function (server, opts) {
       if (responseIsFresh
         && !Object.prototype.hasOwnProperty.call(clientCacheDirectives, 'no-cache')
         && (!Object.prototype.hasOwnProperty.call(cachedCacheDirectives, 'no-cache')
-        // The qualified form of the no-cache response directive 
-        || cachedCacheDirectives['no-cache'] !== null)) {
+          // The qualified form of the no-cache response directive 
+          || cachedCacheDirectives['no-cache'] !== null)) {
         utils.memHeader('HIT', cachedResponse)
         cachedResponse.headers['age'] = utils.calculateAge(cachedResponse)
         return cachedResponse
@@ -498,16 +498,12 @@ export default async function (server, opts) {
 
     // We parse the Cache-Control header to extract cache directives.
     const originCacheDirectives = utils.parseCacheControlHeader(originResponse)
-    let writeCache = amITheFetcher
-      // See: https://www.rfc-editor.org/rfc/rfc9111.html#name-no-store
-      && !Object.prototype.hasOwnProperty.call(clientCacheDirectives, 'no-store')
-      // See: https://www.rfc-editor.org/rfc/rfc9111.html#name-no-store-2
-      && !Object.prototype.hasOwnProperty.call(originCacheDirectives, 'no-store')
-      // See: https://www.rfc-editor.org/rfc/rfc9111.html#name-private
-      && (!Object.prototype.hasOwnProperty.call(originCacheDirectives, 'private')
-        // // The qualified form of the private response directive
-        || originCacheDirectives['private'] !== null)
 
+    let writeCache = amITheFetcher
+      && !Object.prototype.hasOwnProperty.call(clientCacheDirectives, 'no-store')
+      && isCacheable(originResponse, originCacheDirectives)
+      // See: https://www.rfc-editor.org/rfc/rfc9111.html#name-no-store
+      // See: https://www.rfc-editor.org/rfc/rfc9111.html#name-storing-responses-in-caches
 
     // We generate a cache entry from the response.
     const cacheEntry = utils.cloneAndTrimResponse(originResponse)
@@ -522,7 +518,7 @@ export default async function (server, opts) {
 
       // We set the attributes involved in calculating the
       // age of the content.
-      cachedResponse.requestTime  = cacheEntry.requestTime
+      cachedResponse.requestTime = cacheEntry.requestTime
       cachedResponse.responseTime = cacheEntry.responseTime
       cachedResponse.headers.date = cacheEntry.headers.date
 
@@ -642,6 +638,45 @@ export default async function (server, opts) {
     })
   }
 
+  // See: https://www.rfc-editor.org/rfc/rfc9111.html#name-storing-responses-in-caches
+  function isCacheable(originResponse, originCacheDirectives) {
+    let isTheResponseCacheable = 
+      // The request method is always GET
+      // The response status code is final
+      originResponse.statusCode >= 200
+        // This cache doesn't understands Partial Content
+      && originResponse.statusCode !== 206
+      // This cache understands 304 Not Modified
+      // && originResponse.statusCode !== 304
+
+      // FIXME: Implements support for the must-understand cache directive
+      // In this context, a cache has "understood" a request method or a 
+      // response status code if it recognizes it and implements all 
+      // specified caching-related behavior.
+      // https://www.rfc-editor.org/rfc/rfc9111.html#cache-response-directive.must-understand
+
+      // See: https://www.rfc-editor.org/rfc/rfc9111.html#name-no-store-2
+      && !Object.prototype.hasOwnProperty.call(originCacheDirectives, 'no-store')
+      // See: https://www.rfc-editor.org/rfc/rfc9111.html#name-private
+      && (!Object.prototype.hasOwnProperty.call(originCacheDirectives, 'private')
+        // // The qualified form of the private response directive
+        || originCacheDirectives['private'] !== null
+      )
+      && (!Object.prototype.hasOwnProperty.call(originResponse.headers, 'authorization')
+        || Object.prototype.hasOwnProperty.call(originCacheDirectives, 'must-revalidate')
+        || Object.prototype.hasOwnProperty.call(originCacheDirectives, 'public')
+        || Object.prototype.hasOwnProperty.call(originCacheDirectives, 's-maxage')
+      )
+      && (Object.prototype.hasOwnProperty.call(originCacheDirectives, 'public')
+        || Object.prototype.hasOwnProperty.call(originResponse.headers, 'expires')
+        || Object.prototype.hasOwnProperty.call(originCacheDirectives, 'max-age')
+        || Object.prototype.hasOwnProperty.call(originCacheDirectives, 's-maxage')
+        //  || a cache extension that allows it to be cached
+        //  || a status code that is defined as heuristically cacheable
+      )
+      return isTheResponseCacheable
+  }
+
   function cleanUpHeader(entry, cacheDirectives) {
     // See: https://www.rfc-editor.org/rfc/rfc9111.html#name-storing-header-and-trailer-
     let headersToRemove = []
@@ -685,7 +720,7 @@ export default async function (server, opts) {
     headersToRemove.forEach(headerToRemove => {
       delete entry.headers[headerToRemove]
     })
-    
+
   }
 
 }

@@ -4,16 +4,7 @@ export default async function (server, opts) {
 
     await server.register(etag)
 
-
-    const items = [];
-    for (let index = 0; index < 20; index++) {
-        items[index] = {
-            id: index,
-            name: `Item ${index}`
-        }
-    } 
-
-    server.get('/items', async (request, reply) => {
+    server.get('/items/:uuid', async (request, reply) => {
         reply.code(200)     
         let headers = {}
         let cc = request.query['cc']
@@ -21,7 +12,10 @@ export default async function (server, opts) {
         headers['last-modified'] = new Date().toUTCString()
         reply.code(200)
         reply.headers(headers)
-        reply.send(items)        
+        reply.send({
+            id: request.params.uuid,
+            name: `Item ${request.params.uuid}`
+        })
     })
 
 }

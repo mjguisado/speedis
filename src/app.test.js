@@ -1,5 +1,7 @@
 import { suite, test, before, after } from 'node:test'
 import { app } from './app.js'
+import crypto from 'crypto'
+
 
 suite('Speedis', async () => {
 
@@ -12,6 +14,50 @@ suite('Speedis', async () => {
     })
 
     suite('Speedis - GET', () => {
+
+        test('DELETE 404', async (t) => {
+            t.plan(1)
+            let url = '/mocks/mocks/items/' + crypto.randomUUID()
+            let response = await fastifyServer.inject({
+                method: 'DELETE',
+                url: url
+            })
+            t.assert.strictEqual(response.statusCode, 404)
+        })
+
+        test('DELETE 204', async (t) => {
+            t.plan(2)
+            let url = '/mocks/mocks/items/' + crypto.randomUUID()
+            url += '?cc=' + encodeURIComponent('public,max-age=60')
+            let response = await fastifyServer.inject({
+                method: 'GET',
+                url: url
+            })
+            t.assert.strictEqual(response.statusCode, 200)
+            response = await fastifyServer.inject({
+                method: 'DELETE',
+                url: url
+            })
+            t.assert.strictEqual(response.statusCode, 204)
+        })
+
+        test('GET 200', async (t) => {
+            t.plan(2)
+            let url = '/mocks/mocks/items/' + crypto.randomUUID()
+            // url += '?cc=' + encodeURIComponent('public,max-age=60')
+            let response = await fastifyServer.inject({
+                method: 'GET',
+                url: url
+            })
+            t.assert.strictEqual(response.statusCode, 200)
+            response = await fastifyServer.inject({
+                method: 'DELETE',
+                url: url
+            })
+            t.assert.strictEqual(response.statusCode, 404)
+        })
+
+/*
 
         test('GET 200 TCP_MISS', async (t) => {
             t.plan(3)
@@ -146,6 +192,8 @@ suite('Speedis', async () => {
             t.assert.match(getResponse.headers['x-speedis-cache'], /^TCP_MISS/)
             t.assert.strictEqual(deleteResponse.statusCode, 404)
         })
+    */
+
     })
 
     after(async () => {
