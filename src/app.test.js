@@ -19,41 +19,6 @@ suite('Speedis', async () => {
 
     suite('Speedis - GET', () => {
 
-        test('GET - RESPONSE qualified no-cache', async (t) => {
-            t.plan(15)
-
-            let originmaxage = 4
-
-            let url = '/mocks/mocks/items/' + crypto.randomUUID()
-            url += '?cc=' + encodeURIComponent(`public,max-age=${originmaxage},no-cache="x-mocks-custom-header-1,x-mocks-custom-header-2"`)
-            console.log(url)
-            let response = await fastifyServer.inject({
-                method: 'GET',
-                url: url,
-            })
-            t.assert.strictEqual(response.statusCode, 200)
-            t.assert.ok(Object.prototype.hasOwnProperty.call(response.headers, 'x-speedis-cache'))
-            t.assert.match(response.headers['x-speedis-cache'], /^TCP_MISS/)     
-            t.assert.ok(!Object.prototype.hasOwnProperty.call(response.headers, 'age'))
-            t.assert.ok(Object.prototype.hasOwnProperty.call(response.headers, 'x-mocks-custom-header-1'))
-            t.assert.ok(Object.prototype.hasOwnProperty.call(response.headers, 'x-mocks-custom-header-2'))
-            t.assert.ok(Object.prototype.hasOwnProperty.call(response.headers, 'x-mocks-custom-header-3'))
-
-            response = await fastifyServer.inject({
-                method: 'GET',
-                url: url
-            })
-            t.assert.strictEqual(response.statusCode, 200)
-            t.assert.ok(Object.prototype.hasOwnProperty.call(response.headers, 'x-speedis-cache'))
-            t.assert.match(response.headers['x-speedis-cache'], /^TCP_HIT/)
-            t.assert.ok(Object.prototype.hasOwnProperty.call(response.headers, 'age'))
-            t.assert.ok(Number.parseInt(response.headers['age']) <= originmaxage)
-            t.assert.ok(!Object.prototype.hasOwnProperty.call(response.headers, 'x-mocks-custom-header-1'))
-            t.assert.ok(!Object.prototype.hasOwnProperty.call(response.headers, 'x-mocks-custom-header-2'))
-            t.assert.ok(Object.prototype.hasOwnProperty.call(response.headers, 'x-mocks-custom-header-3'))
-
-        })
-
         test('DELETE 404', async (t) => {
             t.plan(1)
             let url = '/mocks/mocks/items/' + crypto.randomUUID()
@@ -378,7 +343,119 @@ suite('Speedis', async () => {
             t.assert.ok(!Object.prototype.hasOwnProperty.call(response.headers, 'age'))
 
         })
-        
+
+        test('GET - RESPONSE unqualified private', async (t) => {
+            t.plan(8)
+
+            let originmaxage = 4
+
+            let url = '/mocks/mocks/items/' + crypto.randomUUID()
+            url += '?cc=' + encodeURIComponent(`public,max-age=${originmaxage},private`)
+            let response = await fastifyServer.inject({
+                method: 'GET',
+                url: url,
+            })
+            t.assert.strictEqual(response.statusCode, 200)
+            t.assert.ok(Object.prototype.hasOwnProperty.call(response.headers, 'x-speedis-cache'))
+            t.assert.match(response.headers['x-speedis-cache'], /^TCP_MISS/)     
+            t.assert.ok(!Object.prototype.hasOwnProperty.call(response.headers, 'age'))
+
+            response = await fastifyServer.inject({
+                method: 'GET',
+                url: url
+            })
+            t.assert.strictEqual(response.statusCode, 200)
+            t.assert.ok(Object.prototype.hasOwnProperty.call(response.headers, 'x-speedis-cache'))
+            t.assert.match(response.headers['x-speedis-cache'], /^TCP_MISS/)
+            t.assert.ok(!Object.prototype.hasOwnProperty.call(response.headers, 'age'))
+
+        })
+
+        test('GET - RESPONSE qualified private', async (t) => {
+            t.plan(15)
+
+            let originmaxage = 4
+
+            let url = '/mocks/mocks/items/' + crypto.randomUUID()
+            url += '?cc=' + encodeURIComponent(`public,max-age=${originmaxage},private="x-mocks-custom-header-1,x-mocks-custom-header-2"`)
+            console.log(url)
+            let response = await fastifyServer.inject({
+                method: 'GET',
+                url: url,
+            })
+            t.assert.strictEqual(response.statusCode, 200)
+            t.assert.ok(Object.prototype.hasOwnProperty.call(response.headers, 'x-speedis-cache'))
+            t.assert.match(response.headers['x-speedis-cache'], /^TCP_MISS/)     
+            t.assert.ok(!Object.prototype.hasOwnProperty.call(response.headers, 'age'))
+            t.assert.ok(Object.prototype.hasOwnProperty.call(response.headers, 'x-mocks-custom-header-1'))
+            t.assert.ok(Object.prototype.hasOwnProperty.call(response.headers, 'x-mocks-custom-header-2'))
+            t.assert.ok(Object.prototype.hasOwnProperty.call(response.headers, 'x-mocks-custom-header-3'))
+
+            response = await fastifyServer.inject({
+                method: 'GET',
+                url: url
+            })
+            t.assert.strictEqual(response.statusCode, 200)
+            t.assert.ok(Object.prototype.hasOwnProperty.call(response.headers, 'x-speedis-cache'))
+            t.assert.match(response.headers['x-speedis-cache'], /^TCP_HIT/)
+            t.assert.ok(Object.prototype.hasOwnProperty.call(response.headers, 'age'))
+            t.assert.ok(Number.parseInt(response.headers['age']) <= originmaxage)
+            t.assert.ok(!Object.prototype.hasOwnProperty.call(response.headers, 'x-mocks-custom-header-1'))
+            t.assert.ok(!Object.prototype.hasOwnProperty.call(response.headers, 'x-mocks-custom-header-2'))
+            t.assert.ok(Object.prototype.hasOwnProperty.call(response.headers, 'x-mocks-custom-header-3'))
+
+        })
+
+        test('GET - RESPONSE qualified no-cache', async (t) => {
+            t.plan(15)
+
+            let originmaxage = 4
+
+            let url = '/mocks/mocks/items/' + crypto.randomUUID()
+            url += '?cc=' + encodeURIComponent(`public,max-age=${originmaxage},no-cache="x-mocks-custom-header-1,x-mocks-custom-header-2"`)
+            console.log(url)
+            let response = await fastifyServer.inject({
+                method: 'GET',
+                url: url,
+            })
+            t.assert.strictEqual(response.statusCode, 200)
+            t.assert.ok(Object.prototype.hasOwnProperty.call(response.headers, 'x-speedis-cache'))
+            t.assert.match(response.headers['x-speedis-cache'], /^TCP_MISS/)     
+            t.assert.ok(!Object.prototype.hasOwnProperty.call(response.headers, 'age'))
+            t.assert.ok(Object.prototype.hasOwnProperty.call(response.headers, 'x-mocks-custom-header-1'))
+            t.assert.ok(Object.prototype.hasOwnProperty.call(response.headers, 'x-mocks-custom-header-2'))
+            t.assert.ok(Object.prototype.hasOwnProperty.call(response.headers, 'x-mocks-custom-header-3'))
+
+            response = await fastifyServer.inject({
+                method: 'GET',
+                url: url
+            })
+            t.assert.strictEqual(response.statusCode, 200)
+            t.assert.ok(Object.prototype.hasOwnProperty.call(response.headers, 'x-speedis-cache'))
+            t.assert.match(response.headers['x-speedis-cache'], /^TCP_HIT/)
+            t.assert.ok(Object.prototype.hasOwnProperty.call(response.headers, 'age'))
+            t.assert.ok(Number.parseInt(response.headers['age']) <= originmaxage)
+            t.assert.ok(!Object.prototype.hasOwnProperty.call(response.headers, 'x-mocks-custom-header-1'))
+            t.assert.ok(!Object.prototype.hasOwnProperty.call(response.headers, 'x-mocks-custom-header-2'))
+            t.assert.ok(Object.prototype.hasOwnProperty.call(response.headers, 'x-mocks-custom-header-3'))
+
+        })
+
+        test('GET - RESPONSE Not Modified', async (t) => {
+            t.plan(1)
+            let originmaxage = 4
+            const uuid = crypto.randomUUID()
+            let url = '/mocks/mocks/items/' + uuid 
+            url += '?cc=' + encodeURIComponent(`public,max-age=${originmaxage}`)
+            let response = await fastifyServer.inject({
+                method: 'GET',
+                url: url,
+                headers: {
+                    'if-none-match': 'W/"' + crypto.randomUUID() + `", W/"${uuid}"`
+                }
+            })
+            t.assert.strictEqual(response.statusCode, 304)
+        })
 
         /*
         test('GET Sequence - TCP_REFRESH_MISS', async (t) => {

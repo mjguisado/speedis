@@ -267,14 +267,14 @@ export default async function (server, opts) {
           }
         } else {
           if (Object.prototype.hasOwnProperty.call(response.headers, 'etag')) {
+            let weakCacheEtag = response.headers["etag"].startsWith('W/')
+              ? response.headers["etag"].substring(2) : response.headers["etag"];
             for (let index = 0; index < etags.length; index++) {
               // A recipient MUST use the weak comparison function when 
               // comparing entity tags for If-None-Match
               // https://www.rfc-editor.org/rfc/rfc9110.html#section-8.8.3.2
               let weakRequestETag = etags[index].startsWith('W/')
                 ? etags[index].substring(2) : etags[index];
-              let weakCacheEtag = response.headers["etag"].startsWith('W/')
-                ? response.headers["etag"].substring(2) : response.headers["etag"];
               if (weakRequestETag === weakCacheEtag) {
                 ifNoneMatchCondition = false
                 break
