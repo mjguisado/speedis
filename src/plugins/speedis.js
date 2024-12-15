@@ -348,7 +348,7 @@ export default async function (server, opts) {
   // TODO: https://www.rfc-editor.org/rfc/rfc9111.html#name-no-transform-2
   // TODO: https://www.rfc-editor.org/rfc/rfc9111.html#name-public
   // TODO: https://www.rfc-editor.org/rfc/rfc9111#name-storing-incomplete-response
-  
+
   async function _get(server, path, clientCacheDirectives, rid) {
 
     // We create options for an HTTP/S request to the required path
@@ -538,7 +538,7 @@ export default async function (server, opts) {
     if (originResponse.statusCode === 304) {
 
       // We set the attributes involved in calculating the age of the content.
-      cachedResponse.requestTime  = cacheEntry.requestTime
+      cachedResponse.requestTime = cacheEntry.requestTime
       cachedResponse.responseTime = cacheEntry.responseTime
       // See: https://www.rfc-editor.org/rfc/rfc9111#name-updating-stored-header-fiel
       for (let header in cacheEntry.headers) {
@@ -701,5 +701,5 @@ export default async function (server, opts) {
       )
     return isTheResponseCacheable
   }
- 
+
 }
