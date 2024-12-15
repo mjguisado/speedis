@@ -50,7 +50,7 @@ quoted-pair = \\[\x09\x20\x21-\x7E\x80-\xFF]
 
 // RegExp Named Capture Groups 
 const cacheDirectiveRE = /(?<key>[!#$%&'*+`~\-\.\^\|\w]+)(?:=(?<value>[!#$%&'*+`~\-\.\^\|\w]+|\x22(?:[\x09\x20\x21\x23-\x5B\x5D-\x7E\x80-\xFF]|\\[\x09\x20\x21-\x7E\x80-\xFF])*\x22))?/g
-// response.headers['cache-control']='public,max-age=60,nocache="cabecera1,cabecera2",s-maxage=300,private="cabecera3,cabecera4",must-revalidate'
+
 export function parseCacheControlHeader(response) {
   let cacheDirectives = {}
   if (!response.headers) return cacheDirectives
@@ -141,22 +141,24 @@ export function calculateAge(response) {
 }
 
 // See: https://www.rfc-editor.org/rfc/rfc9111.html#name-storing-header-and-trailer-
+
+/*
+ * https://www.rfc-editor.org/rfc/rfc9110#name-connection
+ * Connection        = #connection-option
+ * connection-option = token
+ * https://www.rfc-editor.org/rfc/rfc9110#name-tokens
+ * token = 1*tchar
+ * tchar = "!" / "#" / "$" / "%" / "&" / "'" / "*"
+ *         / "+" / "-" / "." / "^" / "_" / "`" / "|" / "~"
+ *         / DIGIT / ALPHA
+ *         ; any VCHAR, except delimiter
+*/
+const tokenRE = /[!#$%&'*+`~\-\.\^\|\w]+/g
+
 export function cleanUpHeader(entry, cacheDirectives) {
 
   let headersToRemove = []
 
-  /*
-   * https://www.rfc-editor.org/rfc/rfc9110#name-connection
-   * Connection        = #connection-option
-   * connection-option = token
-   * https://www.rfc-editor.org/rfc/rfc9110#name-tokens
-   * token = 1*tchar
-   * tchar = "!" / "#" / "$" / "%" / "&" / "'" / "*"
-   *         / "+" / "-" / "." / "^" / "_" / "`" / "|" / "~"
-   *         / DIGIT / ALPHA
-   *         ; any VCHAR, except delimiter
-  */
-  const tokenRE = /[!#$%&'*+`~\-\.\^\|\w]+/g
   if (Object.prototype.hasOwnProperty.call(entry.headers, 'connection')) {
     headersToRemove.push('connection')
     const tokens = entry.headers['connection'].match(tokenRE)
