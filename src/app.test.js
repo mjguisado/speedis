@@ -378,7 +378,6 @@ suite('Speedis', async () => {
 
             let url = '/mocks/mocks/items/' + crypto.randomUUID()
             url += '?cc=' + encodeURIComponent(`public,max-age=${originmaxage},private="x-mocks-custom-header-1,x-mocks-custom-header-2"`)
-            console.log(url)
             let response = await fastifyServer.inject({
                 method: 'GET',
                 url: url,
@@ -413,7 +412,6 @@ suite('Speedis', async () => {
 
             let url = '/mocks/mocks/items/' + crypto.randomUUID()
             url += '?cc=' + encodeURIComponent(`public,max-age=${originmaxage},no-cache="x-mocks-custom-header-1,x-mocks-custom-header-2"`)
-            console.log(url)
             let response = await fastifyServer.inject({
                 method: 'GET',
                 url: url,

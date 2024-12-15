@@ -140,6 +140,61 @@ export function calculateAge(response) {
   return currentAge
 }
 
+// See: https://www.rfc-editor.org/rfc/rfc9111.html#name-storing-header-and-trailer-
+export function cleanUpHeader(entry, cacheDirectives) {
+
+  let headersToRemove = []
+
+  /*
+   * https://www.rfc-editor.org/rfc/rfc9110#name-connection
+   * Connection        = #connection-option
+   * connection-option = token
+   * https://www.rfc-editor.org/rfc/rfc9110#name-tokens
+   * token = 1*tchar
+   * tchar = "!" / "#" / "$" / "%" / "&" / "'" / "*"
+   *         / "+" / "-" / "." / "^" / "_" / "`" / "|" / "~"
+   *         / DIGIT / ALPHA
+   *         ; any VCHAR, except delimiter
+  */
+  const tokenRE = /[!#$%&'*+`~\-\.\^\|\w]+/g
+  if (Object.prototype.hasOwnProperty.call(entry.headers, 'connection')) {
+    headersToRemove.push('connection')
+    const tokens = entry.headers['connection'].match(tokenRE)
+    if (tokens !== null) { headersToRemove = headersToRemove.concat(tokens) }
+  }
+
+  headersToRemove.push('proxy-connection')
+  headersToRemove.push('keep-alive')
+  headersToRemove.push('te')
+  headersToRemove.push('transfer-encoding')
+  headersToRemove.push('ppgrade')
+
+  // The qualified form of the no-cache response directive
+  if (Object.prototype.hasOwnProperty.call(cacheDirectives, 'no-cache')
+    && cacheDirectives['no-cache'] !== null) {
+    let aux = cacheDirectives['no-cache']
+    if (aux.startsWith('"') && aux.endsWith('"')) aux = aux.slice(1, -1).replace(/ /g, '')
+    headersToRemove = headersToRemove.concat(aux.split(','))
+  }
+
+  // The qualified form of the private response directive
+  if (Object.prototype.hasOwnProperty.call(cacheDirectives, 'private')
+    && cacheDirectives['private'] !== null) {
+    let aux = cacheDirectives['private']
+    if (aux.startsWith('"') && aux.endsWith('"')) aux = aux.slice(1, -1).replace(/ /g, '')
+    headersToRemove = headersToRemove.concat(aux.split(','))
+  }
+
+  headersToRemove.push('proxy-authenticate')
+  headersToRemove.push('proxy-authentication-info')
+  headersToRemove.push('proxy-authorization')
+
+  headersToRemove.forEach(headerToRemove => {
+    delete entry.headers[headerToRemove]
+  })
+
+}
+
 // See: https://techdocs.akamai.com/edge-diagnostics/docs/pragma-headers
 export function memHeader(trigger, outResponse) {
   switch (trigger) {
@@ -159,4 +214,5 @@ export function memHeader(trigger, outResponse) {
       outResponse.headers['x-speedis-cache'] = 'TCP_REFRESH_FAIL_HIT from ' + os.hostname()
       break
   }
+
 }

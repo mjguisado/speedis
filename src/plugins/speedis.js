@@ -339,6 +339,7 @@ export default async function (server, opts) {
   })
 
   function generateCacheKey(server, path) {
+    // TODO: Vary Header Management
     return server.id + path.replaceAll('/', ':')
   }
 
@@ -346,6 +347,8 @@ export default async function (server, opts) {
   // TODO: https://www.rfc-editor.org/rfc/rfc9111.html#name-no-transform
   // TODO: https://www.rfc-editor.org/rfc/rfc9111.html#name-no-transform-2
   // TODO: https://www.rfc-editor.org/rfc/rfc9111.html#name-public
+  // TODO: https://www.rfc-editor.org/rfc/rfc9111#name-storing-incomplete-response
+  
   async function _get(server, path, clientCacheDirectives, rid) {
 
     // We create options for an HTTP/S request to the required path
@@ -525,7 +528,7 @@ export default async function (server, opts) {
 
     // We generate a cache entry from the response.
     const cacheEntry = utils.cloneAndTrimResponse(originResponse)
-    cleanUpHeader(cacheEntry, originCacheDirectives)
+    utils.cleanUpHeader(cacheEntry, originCacheDirectives)
 
     // The HTTP 304 status code, “Not Modified,” tells the client that the
     // requested resource hasn't changed since the last access
@@ -534,11 +537,15 @@ export default async function (server, opts) {
     // See: https://www.rfc-editor.org/rfc/rfc9111.html#name-freshening-responses-with-h
     if (originResponse.statusCode === 304) {
 
-      // We set the attributes involved in calculating the
-      // age of the content.
-      cachedResponse.requestTime = cacheEntry.requestTime
+      // We set the attributes involved in calculating the age of the content.
+      cachedResponse.requestTime  = cacheEntry.requestTime
       cachedResponse.responseTime = cacheEntry.responseTime
-      cachedResponse.headers.date = cacheEntry.headers.date
+      // See: https://www.rfc-editor.org/rfc/rfc9111#name-updating-stored-header-fiel
+      for (let header in cacheEntry.headers) {
+        if ('content-length' !== header) {
+          cachedResponse.headers[header] = cacheEntry.headers[header]
+        }
+      }
 
       if (writeCache) {
         try {
@@ -550,7 +557,7 @@ export default async function (server, opts) {
             {
               requestTime: cachedResponse.requestTime,
               responseTime: cachedResponse.responseTime,
-              headers: { date: cachedResponse.headers.date }
+              headers: cachedResponse.headers
             }
           )
         } catch (error) {
@@ -667,7 +674,7 @@ export default async function (server, opts) {
       // This cache understands 304 Not Modified
       // && originResponse.statusCode !== 304
 
-      // FIXME: Implements support for the must-understand cache directive
+      // TODOD: Implements support for the must-understand cache directive
       // In this context, a cache has "understood" a request method or a 
       // response status code if it recognizes it and implements all 
       // specified caching-related behavior.
@@ -694,59 +701,5 @@ export default async function (server, opts) {
       )
     return isTheResponseCacheable
   }
-
-  function cleanUpHeader(entry, cacheDirectives) {
-    // See: https://www.rfc-editor.org/rfc/rfc9111.html#name-storing-header-and-trailer-
-    let headersToRemove = []
-
-    /*
-     * https://www.rfc-editor.org/rfc/rfc9110#name-connection
-     * Connection        = #connection-option
-     * connection-option = token
-     * https://www.rfc-editor.org/rfc/rfc9110#name-tokens
-     * token = 1*tchar
-     * tchar = "!" / "#" / "$" / "%" / "&" / "'" / "*"
-     *         / "+" / "-" / "." / "^" / "_" / "`" / "|" / "~"
-     *         / DIGIT / ALPHA
-     *         ; any VCHAR, except delimiter
-    */
-    const tokenRE = /[!#$%&'*+`~\-\.\^\|\w]+/g
-    if (Object.prototype.hasOwnProperty.call(entry.headers, 'connection')) {
-      headersToRemove.push('connection')
-      const tokens = entry.headers['connection'].match(tokenRE)
-      if (tokens !== null) { headersToRemove = headersToRemove.concat(tokens) }
-    }
-
-    headersToRemove.push('proxy-connection')
-    headersToRemove.push('keep-alive')
-    headersToRemove.push('te')
-    headersToRemove.push('transfer-encoding')
-    headersToRemove.push('ppgrade')
-
-    // The qualified form of the no-cache response directive
-    if (Object.prototype.hasOwnProperty.call(cacheDirectives, 'no-cache')
-      && cacheDirectives['no-cache'] !== null) {
-      let aux = cacheDirectives['no-cache']
-      if (aux.startsWith('"') && aux.endsWith('"')) aux = aux.slice(1, -1).replace(/ /g, '')
-      headersToRemove = headersToRemove.concat(aux.split(','))
-    }
-
-    // The qualified form of the private response directive
-    if (Object.prototype.hasOwnProperty.call(cacheDirectives, 'private')
-      && cacheDirectives['private'] !== null) {
-      let aux = cacheDirectives['private']
-      if (aux.startsWith('"') && aux.endsWith('"')) aux = aux.slice(1, -1).replace(/ /g, '')
-      headersToRemove = headersToRemove.concat(aux.split(','))
-    }
-
-    headersToRemove.push('proxy-authenticate')
-    headersToRemove.push('proxy-authentication-info')
-    headersToRemove.push('proxy-authorization')
-
-    headersToRemove.forEach(headerToRemove => {
-      delete entry.headers[headerToRemove]
-    })
-
-  }
-
+ 
 }

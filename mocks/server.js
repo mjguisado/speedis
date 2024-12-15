@@ -1,6 +1,8 @@
 import fastify from 'fastify'
 import mocksPlugin from './plugins/mocks.js'
 import fastifyCaching from '@fastify/caching'
+import fastifyETag from '@fastify/etag'
+
 const mockServer = fastify({
     logger: true
 })
@@ -11,8 +13,8 @@ await mockServer.register(mocksPlugin, {
     logLevel: "info"
 })
 
-await mockServer.register(fastifyCaching, {
-})
+// await mockServer.register(fastifyCaching, {})
+// await mockServer.register(fastifyETag, {})
 
 // Run the server!
 try {
