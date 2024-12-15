@@ -225,14 +225,32 @@ export default async function (server, opts) {
       }
 
       // Check if we have received a conditional request.
-      var etags = [];
-      var lastModified = null;
-      for (var header in request.headers) {
+
+      /*
+      https://www.rfc-editor.org/rfc/rfc9110#name-etag
+      ETag       = entity-tag
+
+      entity-tag = [ weak ] opaque-tag
+      weak       = %s"W/"
+      opaque-tag = DQUOTE *etagc DQUOTE
+      etagc      = %x21 / %x23-7E / obs-text
+                ; VCHAR except double quotes, plus obs-text
+
+
+      entity-tag = (W/)*\x22([\x21\x23-\x7E\x80-\xFF])*\x22
+      weak       = W/
+      opaque-tag = \x22([\x21\x23-\x7E\x80-\xFF])*\x22
+      etag       = [\x21\x23-\x7E\x80-\xFF]
+
+      */
+      const eTagRE = /(?:W\/)*\x22(?:[\x21\x23-\x7E\x80-\xFF])*\x22/g
+      let etags = [];
+      let lastModified = null;
+      for (let header in request.headers) {
         switch (header) {
           case 'if-none-match':
-            etags = request.headers[header]
-              .replace(/ /g, '')
-              .split(',')
+            etags = request.headers[header].match(eTagRE)
+            etags = etags !== null ? etags : []
             break;
           case 'if-modified-since':
             lastModified = request.headers[header];
@@ -502,8 +520,8 @@ export default async function (server, opts) {
     let writeCache = amITheFetcher
       && !Object.prototype.hasOwnProperty.call(clientCacheDirectives, 'no-store')
       && isCacheable(originResponse, originCacheDirectives)
-      // See: https://www.rfc-editor.org/rfc/rfc9111.html#name-no-store
-      // See: https://www.rfc-editor.org/rfc/rfc9111.html#name-storing-responses-in-caches
+    // See: https://www.rfc-editor.org/rfc/rfc9111.html#name-no-store
+    // See: https://www.rfc-editor.org/rfc/rfc9111.html#name-storing-responses-in-caches
 
     // We generate a cache entry from the response.
     const cacheEntry = utils.cloneAndTrimResponse(originResponse)
@@ -640,11 +658,11 @@ export default async function (server, opts) {
 
   // See: https://www.rfc-editor.org/rfc/rfc9111.html#name-storing-responses-in-caches
   function isCacheable(originResponse, originCacheDirectives) {
-    let isTheResponseCacheable = 
+    let isTheResponseCacheable =
       // The request method is always GET
       // The response status code is final
       originResponse.statusCode >= 200
-        // This cache doesn't understands Partial Content
+      // This cache doesn't understands Partial Content
       && originResponse.statusCode !== 206
       // This cache understands 304 Not Modified
       // && originResponse.statusCode !== 304
@@ -674,18 +692,29 @@ export default async function (server, opts) {
         //  || a cache extension that allows it to be cached
         //  || a status code that is defined as heuristically cacheable
       )
-      return isTheResponseCacheable
+    return isTheResponseCacheable
   }
 
   function cleanUpHeader(entry, cacheDirectives) {
     // See: https://www.rfc-editor.org/rfc/rfc9111.html#name-storing-header-and-trailer-
     let headersToRemove = []
 
+    /*
+     * https://www.rfc-editor.org/rfc/rfc9110#name-connection
+     * Connection        = #connection-option
+     * connection-option = token
+     * https://www.rfc-editor.org/rfc/rfc9110#name-tokens
+     * token = 1*tchar
+     * tchar = "!" / "#" / "$" / "%" / "&" / "'" / "*"
+     *         / "+" / "-" / "." / "^" / "_" / "`" / "|" / "~"
+     *         / DIGIT / ALPHA
+     *         ; any VCHAR, except delimiter
+    */
+    const tokenRE = /[!#$%&'*+`~\-\.\^\|\w]+/g
     if (Object.prototype.hasOwnProperty.call(entry.headers, 'connection')) {
-      headersToRemove = entry.headers['connection']
-        .replace(/ /g, '')
-        .split(',')
       headersToRemove.push('connection')
+      const tokens = entry.headers['connection'].match(tokenRE)
+      if (tokens !== null) { headersToRemove = headersToRemove.concat(tokens) }
     }
 
     headersToRemove.push('proxy-connection')
@@ -697,20 +726,17 @@ export default async function (server, opts) {
     // The qualified form of the no-cache response directive
     if (Object.prototype.hasOwnProperty.call(cacheDirectives, 'no-cache')
       && cacheDirectives['no-cache'] !== null) {
-      headersToRemove = headersToRemove.concat(
-        cacheDirectives['no-cache']
-          .replace(/ /g, '')
-          .split(',')
-      )
+      let aux = cacheDirectives['no-cache']
+      if (aux.startsWith('"') && aux.endsWith('"')) aux = aux.slice(1, -1).replace(/ /g, '')
+      headersToRemove = headersToRemove.concat(aux.split(','))
     }
+
     // The qualified form of the private response directive
     if (Object.prototype.hasOwnProperty.call(cacheDirectives, 'private')
       && cacheDirectives['private'] !== null) {
-      headersToRemove = headersToRemove.concat(
-        cacheDirectives['private']
-          .replace(/ /g, '')
-          .split(',')
-      )
+      let aux = cacheDirectives['private']
+      if (aux.startsWith('"') && aux.endsWith('"')) aux = aux.slice(1, -1).replace(/ /g, '')
+      headersToRemove = headersToRemove.concat(aux.split(','))
     }
 
     headersToRemove.push('proxy-authenticate')

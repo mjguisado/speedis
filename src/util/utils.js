@@ -12,18 +12,54 @@ export function cloneAndTrimResponse(response) {
 }
 
 // We parse the Cache-Control header to extract cache directives.
+/*
+https://www.rfc-editor.org/rfc/rfc9110#name-syntax-notation
+
+https://www.rfc-editor.org/rfc/rfc9111#name-cache-control
+https://www.rfc-editor.org/rfc/rfc9110#name-lists-rule-abnf-extension
+Cache-Control   = #cache-directive
+https://www.rfc-editor.org/rfc/rfc9110#whitespace
+OWS             = *( SP / HTAB )
+cache-directive = token [ "=" ( token / quoted-string ) ]
+https://www.rfc-editor.org/rfc/rfc9110#name-tokens
+token = 1*tchar
+tchar           = "!" / "#" / "$" / "%" / "&" / "'" / "*"
+                / "+" / "-" / "." / "^" / "_" / "`" / "|" / "~"
+                / DIGIT / ALPHA
+                ; any VCHAR, except delimiter
+https://www.rfc-editor.org/rfc/rfc9110#name-quoted-strings
+quoted-string   = DQUOTE *( qdtext / quoted-pair ) DQUOTE
+qdtext          = HTAB / SP / %x21 / %x23-5B / %x5D-7E / obs-text
+quoted-pair     = "\" ( HTAB / SP / VCHAR / obs-text )
+https://www.rfc-editor.org/rfc/rfc5234#appendix-B.1
+ALPHA           =  %x41-5A / %x61-7A
+DIGIT           =  %x30-39
+VCHAR           =  %x21-7E
+DQUOTE          =  %x22
+HTAB            =  %x09
+SP              =  %x20
+https://www.rfc-editor.org/rfc/rfc9110#name-field-values
+obs-text        = %x80-FF
+
+token = [!#$%&'*+`~\-\.\^\|\w]+
+tchar = [!#$%&'*+\-\.\^`\|~\w]
+quoted-string  = \x22(?:[\x09\x20\x21\x23-\x5B\x5D-\x7E\x80-\xFF]|\\[\x09\x20\x21-\x7E\x80-\xFF])*\x22
+qdtext = [\x09\x20\x21\x23-\x5B\x5D-\x7E\x80-\xFF]
+quoted-pair = \\[\x09\x20\x21-\x7E\x80-\xFF]
+*/
+
+// RegExp Named Capture Groups 
+const cacheDirectiveRE = /(?<key>[!#$%&'*+`~\-\.\^\|\w]+)(?:=(?<value>[!#$%&'*+`~\-\.\^\|\w]+|\x22(?:[\x09\x20\x21\x23-\x5B\x5D-\x7E\x80-\xFF]|\\[\x09\x20\x21-\x7E\x80-\xFF])*\x22))?/g
+// response.headers['cache-control']='public,max-age=60,nocache="cabecera1,cabecera2",s-maxage=300,private="cabecera3,cabecera4",must-revalidate'
 export function parseCacheControlHeader(response) {
-  const cacheDirectives = {}
+  let cacheDirectives = {}
   if (!response.headers) return cacheDirectives
-  if ('cache-control' in response.headers) {
-    response.headers['cache-control']
-      .replace(/ /g, '')
-      .split(',')
-      .map((cacheDirective) => {
-        const tokens = cacheDirective.split('=')
-        cacheDirectives[tokens[0].toLowerCase()] = (tokens.length === 1) ? null : tokens[1].toLowerCase()
-        return null
-      })
+  if (!Object.prototype.hasOwnProperty.call(response.headers, 'cache-control')) return cacheDirectives
+  const matches = response.headers['cache-control'].matchAll(cacheDirectiveRE)
+  if (matches === null) return cacheDirectives
+  for (const match of matches) {
+    cacheDirectives[match.groups.key] =
+      (undefined !== match.groups.value) ? match.groups.value : null
   }
   return cacheDirectives
 }
