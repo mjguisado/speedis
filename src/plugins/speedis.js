@@ -7,6 +7,27 @@ import * as utils from '../util/utils.js'
 import * as actionsLib from '../actions/actions.js'
 import Ajv from "ajv"
 
+// TODO: https://www.rfc-editor.org/rfc/rfc9111.html#name-must-understand
+// TODO: https://www.rfc-editor.org/rfc/rfc9111.html#name-no-transform
+// TODO: https://www.rfc-editor.org/rfc/rfc9111.html#name-no-transform-2
+// TODO: https://www.rfc-editor.org/rfc/rfc9111.html#name-public
+// TODO: https://www.rfc-editor.org/rfc/rfc9111#name-storing-incomplete-response
+// TODO: https://www.rfc-editor.org/rfc/rfc9111.html#name-constructing-responses-from
+// TODO: Pensar si expirar las entradas de cache vía TTL o delegar en Redis.
+// TODO: Implementar métricas de Phrometeus
+// https://tohidhaghighi.medium.com/add-prometheus-metrics-in-nodejs-ce0ff5a43b44
+// TODO: Implementar logs (publicación en Kibana). Fluentd or Central Logging (K8s)
+// TODO: Completar validaciones AJV.
+// TODO: Handling Redis reconnections
+// TODO: Explore Node Cluster 
+// https://nodejs.org/api/cluster.html
+// https://medium.com/@mjdrehman/implementing-node-js-cluster-for-improved-performance-f800146e58e1
+// https://medium.com/deno-the-complete-reference/the-benefits-of-clustering-fastify-app-in-node-js-hello-world-case-8a99127b9951
+// TODO: Dockerizar y Kubernetizar
+// TODO: Gestión de configuraciones remotas.
+// TODO: Gestionar Status Code poco habituales
+// TODO: Implementar Brakers
+
 export default async function (server, opts) {
 
   const { id, exposeErrors, origin, redisOptions } = opts
@@ -14,7 +35,6 @@ export default async function (server, opts) {
   server.decorate('id', id)
   server.decorate('exposeErrors', exposeErrors)
 
-  // TODO: Completar validaciones.
   const ajv = new Ajv()
 
   const CLIENT_REQUEST = "ClientRequest"
@@ -123,9 +143,9 @@ export default async function (server, opts) {
     if (validOrigin) {
 
       /*
-     * Initially, we are only going to support GET requests.
-     * The default method is GET
-     */
+       * Initially, we are only going to support GET requests.
+       * The default method is GET
+       */
       if (Object.prototype.hasOwnProperty.call(origin.httpxOptions, 'method') &&
         origin.httpxOptions.method !== 'GET') {
         throw new Error(`Unsupported HTTP method: ${origin.httpxOptions.method}. Only GET is supported. Origin: ${id}`)
@@ -186,7 +206,6 @@ export default async function (server, opts) {
   if (origin.localRequestCoalescing) server.decorate('ongoing', new Map())
 
   // Connecting to Redis
-  // TODO: Handling reconnections
   // See: https://redis.io/docs/latest/develop/clients/nodejs/produsage/#handling-reconnections 
   const client = await createClient(redisOptions)
     .on('error', error => {
@@ -350,13 +369,6 @@ export default async function (server, opts) {
     return cacheKey;
   }
 
-  // TODO: https://www.rfc-editor.org/rfc/rfc9111.html#name-must-understand
-  // TODO: https://www.rfc-editor.org/rfc/rfc9111.html#name-no-transform
-  // TODO: https://www.rfc-editor.org/rfc/rfc9111.html#name-no-transform-2
-  // TODO: https://www.rfc-editor.org/rfc/rfc9111.html#name-public
-  // TODO: https://www.rfc-editor.org/rfc/rfc9111#name-storing-incomplete-response
-  // TODO: https://www.rfc-editor.org/rfc/rfc9111.html#name-constructing-responses-from
-  // TODO: Pensar si expirar las entradas de cache vía TTL o delegar en Redis
   async function _get(server, request, rid) {
 
     const path = generatePath(request)
@@ -548,7 +560,6 @@ export default async function (server, opts) {
 
     // The HTTP 304 status code, “Not Modified,” tells the client that the
     // requested resource hasn't changed since the last access
-    // TODO
     // See: https://www.rfc-editor.org/rfc/rfc9111.html#freshening.responses
     // See: https://www.rfc-editor.org/rfc/rfc9111.html#name-freshening-responses-with-h
     if (originResponse.statusCode === 304) {
