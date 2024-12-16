@@ -339,7 +339,13 @@ export default async function (server, opts) {
   function generateCacheKey(server, request, fieldNames = utils.parseVaryHeader(request)) {
     const path = generatePath(request)
     let cacheKey = server.id + path.replaceAll('/', ':')
-    // https://www.rfc-editor.org/rfc/rfc9111.html#name-calculating-cache-keys-with
+    fieldNames.forEach(fieldName => {
+      if (fieldName === '*') cacheKey += ':*'
+      else if (Object.prototype.hasOwnProperty.call(request.headers, fieldName)) {
+        cacheKey += ':' + fieldName
+          + ':' + ((request.headers[fieldName]) ? request.headers[fieldName] : '')
+      }
+    })
     return cacheKey;
   }
 
@@ -362,8 +368,8 @@ export default async function (server, opts) {
 
     const clientCacheDirectives = utils.parseCacheControlHeader(request)
     const fieldNames = utils.parseVaryHeader(request)
+    let cacheKey = generateCacheKey(server, request, fieldNames);
 
-    let cacheKey = generateCacheKey(server, request);
     let cachedResponse = null
     try {
       cachedResponse = await server.redis.json.get(cacheKey)
