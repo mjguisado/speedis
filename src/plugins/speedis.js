@@ -207,15 +207,10 @@ export default async function (server, opts) {
     url: '/*',
     handler: async function (request, reply) {
 
-      let prefix = request.routeOptions.url.replace("/*", "")
-      let path = request.url.replace(prefix, "")
-
       // We parse the Cache-Control header to extract cache directives.
-      const clientCacheDirectives = utils.parseCacheControlHeader(request)
-
       let response = null;
       try {
-        response = await _get(server, path, clientCacheDirectives, request.id)
+        response = await _get(server, request, request.id)
       } catch (error) {
         const msg =
           "Error requesting to the origin and there is no a valid entry in the cache. " +
@@ -317,9 +312,7 @@ export default async function (server, opts) {
     method: 'DELETE',
     url: '/*',
     handler: async function (request, reply) {
-      let prefix = request.routeOptions.url.replace("/*", "")
-      let path = request.url.replace(prefix, "")
-      const cacheKey = generateCacheKey(server, path)
+      const cacheKey = generateCacheKey(server, request)
       try {
         // See: https://antirez.com/news/93
         let result = await server.redis.unlink(cacheKey)
@@ -338,9 +331,16 @@ export default async function (server, opts) {
     }
   })
 
-  function generateCacheKey(server, path) {
-    // TODO: Vary Header Management
-    return server.id + path.replaceAll('/', ':')
+  function generatePath(request) {
+    const prefix = request.routeOptions.url.replace("/*", "")
+    return request.url.replace(prefix, "")
+  }
+
+  function generateCacheKey(server, request, fieldNames = utils.parseVaryHeader(request)) {
+    const path = generatePath(request)
+    let cacheKey = server.id + path.replaceAll('/', ':')
+    // https://www.rfc-editor.org/rfc/rfc9111.html#name-calculating-cache-keys-with
+    return cacheKey;
   }
 
   // TODO: https://www.rfc-editor.org/rfc/rfc9111.html#name-must-understand
@@ -348,16 +348,22 @@ export default async function (server, opts) {
   // TODO: https://www.rfc-editor.org/rfc/rfc9111.html#name-no-transform-2
   // TODO: https://www.rfc-editor.org/rfc/rfc9111.html#name-public
   // TODO: https://www.rfc-editor.org/rfc/rfc9111#name-storing-incomplete-response
+  // TODO: https://www.rfc-editor.org/rfc/rfc9111.html#name-calculating-cache-keys-with
+  // TODO: https://www.rfc-editor.org/rfc/rfc9111.html#name-constructing-responses-from
+  // TODO: Pensar si expirar las entradas de cache vía TTL o delegar en Redis
+  async function _get(server, request, rid) {
 
-  async function _get(server, path, clientCacheDirectives, rid) {
-
+    const path = generatePath(request)
     // We create options for an HTTP/S request to the required path
     // based on the default ones that must not be modified.
     const options = JSON.parse(JSON.stringify(server.origin.httpxOptions))
     if (server.agent) options.agent = server.agent
     options.path = path
 
-    let cacheKey = generateCacheKey(server, path);
+    const clientCacheDirectives = utils.parseCacheControlHeader(request)
+    const fieldNames = utils.parseVaryHeader(request)
+
+    let cacheKey = generateCacheKey(server, request);
     let cachedResponse = null
     try {
       cachedResponse = await server.redis.json.get(cacheKey)
@@ -416,11 +422,15 @@ export default async function (server, opts) {
       * not apply to the already stored response.
       */
       const cachedCacheDirectives = utils.parseCacheControlHeader(cachedResponse);
+
       if (responseIsFresh
         && !Object.prototype.hasOwnProperty.call(clientCacheDirectives, 'no-cache')
         && (!Object.prototype.hasOwnProperty.call(cachedCacheDirectives, 'no-cache')
           // The qualified form of the no-cache response directive 
-          || cachedCacheDirectives['no-cache'] !== null)) {
+          || cachedCacheDirectives['no-cache'] !== null)
+        // https://www.rfc-editor.org/rfc/rfc9111.html#name-calculating-cache-keys-with
+        // A stored response with a Vary header field value containing a member "*" always fails to match
+        && !fieldNames.includes('*')) {
         utils.memHeader('HIT', cachedResponse)
         cachedResponse.headers['age'] = utils.calculateAge(cachedResponse)
         return cachedResponse

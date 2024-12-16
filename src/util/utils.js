@@ -51,11 +51,11 @@ quoted-pair = \\[\x09\x20\x21-\x7E\x80-\xFF]
 // RegExp Named Capture Groups 
 const cacheDirectiveRE = /(?<key>[!#$%&'*+`~\-\.\^\|\w]+)(?:=(?<value>[!#$%&'*+`~\-\.\^\|\w]+|\x22(?:[\x09\x20\x21\x23-\x5B\x5D-\x7E\x80-\xFF]|\\[\x09\x20\x21-\x7E\x80-\xFF])*\x22))?/g
 
-export function parseCacheControlHeader(response) {
+export function parseCacheControlHeader(entry) {
   let cacheDirectives = {}
-  if (!response.headers) return cacheDirectives
-  if (!Object.prototype.hasOwnProperty.call(response.headers, 'cache-control')) return cacheDirectives
-  const matches = response.headers['cache-control'].matchAll(cacheDirectiveRE)
+  if (!entry.headers) return cacheDirectives
+  if (!Object.prototype.hasOwnProperty.call(entry.headers, 'cache-control')) return cacheDirectives
+  const matches = entry.headers['cache-control'].matchAll(cacheDirectiveRE)
   if (matches === null) return cacheDirectives
   for (const match of matches) {
     cacheDirectives[match.groups.key] =
@@ -63,6 +63,35 @@ export function parseCacheControlHeader(response) {
   }
   return cacheDirectives
 }
+
+/*
+* https://www.rfc-editor.org/rfc/rfc9110#field.vary
+* Vary = #( "*" / field-name )
+* https://www.rfc-editor.org/rfc/rfc9110#name-collected-abnf
+* Vary = [ ( "*" / field-name ) *( OWS "," OWS ( "*" / field-name ) )]
+* https://www.rfc-editor.org/rfc/rfc9110#name-field-names
+* field-name = token
+* https://www.rfc-editor.org/rfc/rfc9110#name-tokens
+* token = 1*tchar
+* tchar           = "!" / "#" / "$" / "%" / "&" / "'" / "*"
+*                 / "+" / "-" / "." / "^" / "_" / "`" / "|" / "~"
+*                 / DIGIT / ALPHA
+*                 ; any VCHAR, except delimiter
+*/
+const varyRE = /(?:\*|[!#$%&'*+`~\-\.\^\|\w]+)((?:" \t")*,(?:" \t")*(?:\*|[!#$%&'*+`~\-\.\^\|\w]+))*/g
+export function parseVaryHeader(entry) {
+  let fieldNames = []
+  if (!entry.headers) return fieldNames
+  if (!Object.prototype.hasOwnProperty.call(entry.headers, 'vary')) return fieldNames
+  const matches = entry.headers['vary'].matchAll(varyRE)
+  if (matches === null) return fieldNames
+  for (const match of matches) {
+    fieldNames.push(match[0])
+  }
+  fieldNames.sort()
+  return fieldNames
+}
+
 
 // https://httpwg.org/specs/rfc9110.html#rfc.section.6.6.1
 export function ensureValidDateHeader(response, responseTime) {
