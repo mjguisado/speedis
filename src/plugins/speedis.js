@@ -339,6 +339,7 @@ export default async function (server, opts) {
   function generateCacheKey(server, request, fieldNames = utils.parseVaryHeader(request)) {
     const path = generatePath(request)
     let cacheKey = server.id + path.replaceAll('/', ':')
+    // See: https://www.rfc-editor.org/rfc/rfc9111.html#name-calculating-cache-keys-with
     fieldNames.forEach(fieldName => {
       if (fieldName === '*') cacheKey += ':*'
       else if (Object.prototype.hasOwnProperty.call(request.headers, fieldName)) {
@@ -354,7 +355,6 @@ export default async function (server, opts) {
   // TODO: https://www.rfc-editor.org/rfc/rfc9111.html#name-no-transform-2
   // TODO: https://www.rfc-editor.org/rfc/rfc9111.html#name-public
   // TODO: https://www.rfc-editor.org/rfc/rfc9111#name-storing-incomplete-response
-  // TODO: https://www.rfc-editor.org/rfc/rfc9111.html#name-calculating-cache-keys-with
   // TODO: https://www.rfc-editor.org/rfc/rfc9111.html#name-constructing-responses-from
   // TODO: Pensar si expirar las entradas de cache vía TTL o delegar en Redis
   async function _get(server, request, rid) {
