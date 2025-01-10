@@ -27,10 +27,12 @@ import Ajv from "ajv"
 // TODO: Gestión de configuraciones remotas.
 // TODO: Gestionar Status Code poco habituales
 // TODO: Implementar Brakers
+// TODO: Implementar remoteRequestCoalescing
+// TODO: Implementar timeout de request
 
 export default async function (server, opts) {
 
-  const { id, exposeErrors, origin, redisOptions } = opts
+  const { id, exposeErrors, origin, redis } = opts
 
   server.decorate('id', id)
   server.decorate('exposeErrors', exposeErrors)
@@ -207,7 +209,7 @@ export default async function (server, opts) {
 
   // Connecting to Redis
   // See: https://redis.io/docs/latest/develop/clients/nodejs/produsage/#handling-reconnections 
-  const client = await createClient(redisOptions)
+  const client = await createClient(redis)
     .on('error', error => {
       throw new Error(`Error connecting to Redis. Origin: ${id}.`, { cause: error })
     })
@@ -392,6 +394,7 @@ export default async function (server, opts) {
     }
 
     let conditionalFetch = false
+    let cachedCacheDirectives = null
 
     if (cachedResponse) {
 
@@ -439,7 +442,7 @@ export default async function (server, opts) {
       * satisfied from a cache, the no-store request directive does 
       * not apply to the already stored response.
       */
-      const cachedCacheDirectives = utils.parseCacheControlHeader(cachedResponse);
+      cachedCacheDirectives = utils.parseCacheControlHeader(cachedResponse);
 
       if (responseIsFresh
         && !Object.prototype.hasOwnProperty.call(clientCacheDirectives, 'no-cache')

@@ -1,0 +1,4 @@
+{
+  "enableCluster": false,
+  "maxCPUAllocationPercentage": 80
+}
