@@ -1,4 +1,4 @@
 {
-  "enableCluster": false,
-  "maxCPUAllocationPercentage": 80
+  "port": 3001,
+  "metricServerPort": 3003
 }
