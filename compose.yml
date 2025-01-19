@@ -1,0 +1,72 @@
+services:
+  prometheus:
+    image: prom/prometheus
+    container_name: prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--web.enable-lifecycle'
+    ports:
+      - 9090:9090
+    restart: unless-stopped
+    volumes:
+      - ./conf/prometheus:/etc/prometheus
+      - prom_data:/prometheus
+  grafana:
+    image: grafana/grafana
+    container_name: grafana
+    ports:
+      - 3000:3000
+    restart: unless-stopped
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=grafana
+    volumes:
+      - ./conf/grafana:/etc/grafana/provisioning/datasources
+  redis:
+    image: redis/redis-stack-server
+    container_name: redis
+    ports:
+      - 6379:6379
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5      
+  mocks:
+    build:
+      context: .
+      dockerfile: Dockerfile.mocks
+    container_name: mocks
+    develop:
+      watch:
+        - action: rebuild
+          path: package*.json
+        - action: sync
+          path: ./mocks
+          target: /usr/src/app/mocks
+    ports:
+      - 3030:3030
+  speedis:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: development
+    container_name: speedis
+    develop:
+      watch:
+        - action: rebuild
+          path: package*.json
+        - action: sync
+          path: ./src
+          target: /usr/src/app/src
+        - action: sync+restart
+          path: ./conf
+          target: /usr/src/app/conf
+#    depends_on:
+#      redis:
+#        condition: service_healthy
+    ports:
+      - 3001:3001
+      - 3003:3001
+volumes:
+  prom_data:
