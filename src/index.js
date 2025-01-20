@@ -11,7 +11,7 @@ const configurationFilename = path.join(process.cwd(), 'conf', 'speedis.json')
 const config = await fs.readFile(configurationFilename, 'utf8')
   .then(jsonString => { return JSON.parse(jsonString) })
   .catch(err => {
-    server.log.error(err, 'Error loading the configuration file ' + configurationFilename)
+    console.log(err, 'Error loading the configuration file ' + configurationFilename)
     throw err
   })
 
@@ -21,8 +21,11 @@ const aggregatorRegistry = new AggregatorRegistry();
 
 if (cluster.isPrimary) {
 
-  const numChildren = os.availableParallelism();
-  for (let i = 0; i < numChildren; i++) {
+  const numWorkers = Math.min(
+    os.availableParallelism(), 
+    config.maxNumberOfWorkers
+  )
+  for (let i = 0; i < numWorkers; i++) {
     cluster.fork();
   }
 

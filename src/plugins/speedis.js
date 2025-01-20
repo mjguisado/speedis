@@ -3,7 +3,7 @@ import http from 'http'
 import https from 'https'
 // import http2 from 'http2'
 import { createClient } from 'redis'
-import * as utils from '../util/utils.js'
+import * as utils from '../utils/utils.js'
 import * as actionsLib from '../actions/actions.js'
 import Ajv from "ajv"
 
@@ -452,7 +452,7 @@ export default async function (server, opts) {
         // https://www.rfc-editor.org/rfc/rfc9111.html#name-calculating-cache-keys-with
         // A stored response with a Vary header field value containing a member "*" always fails to match
         && !fieldNames.includes('*')) {
-        utils.memHeader('HIT', cachedResponse)
+        utils.setCacheStatus('HIT', cachedResponse)
         cachedResponse.headers['age'] = utils.calculateAge(cachedResponse)
         return cachedResponse
       } else {
@@ -532,11 +532,16 @@ export default async function (server, opts) {
           server.log.warn(error,
             "Serving stale content from cache. " +
             `Origin: ${server.id}. Key: ${cacheKey}. RID: ${rid}.`)
-          utils.memHeader('REFRESH_FAIL_HIT', cachedResponse)
+          utils.setCacheStatus('REFRESH_FAIL_HIT', cachedResponse)
           cachedResponse.headers['age'] = utils.calculateAge(cachedResponse)
           return cachedResponse
         } else {
-          return { statusCode: 504, headers: { date: new Date().toUTCString() } }
+          return { 
+            statusCode: 504, 
+            headers: { 
+              'date': new Date().toUTCString() 
+            }
+          }
         }
       } else {
         throw error
@@ -647,14 +652,19 @@ export default async function (server, opts) {
     // See: https://www.rfc-editor.org/rfc/rfc9111.html#cache-request-directive.only-if-cached
     if (Object.prototype.hasOwnProperty.call(clientCacheDirectives, 'only-if-cached')
       && cachedResponse == null) {
-      return { statusCode: 504, headers: { date: new Date().toUTCString() } }
+        return { 
+          statusCode: 504, 
+          headers: { 
+            'date': new Date().toUTCString() 
+          }
+        }
     }
 
     if (originResponse.statusCode === 304) {
-      utils.memHeader('REFRESH_HIT', cachedResponse)
+      utils.setCacheStatus('REFRESH_HIT', cachedResponse)
       return utils.cloneAndTrimResponse(cachedResponse)
     } else {
-      utils.memHeader(conditionalFetch ? 'REFRESH_MISS' : 'MISS', originResponse)
+      utils.setCacheStatus(conditionalFetch ? 'REFRESH_MISS' : 'MISS', originResponse)
       return utils.cloneAndTrimResponse(originResponse)
     }
 

@@ -227,23 +227,39 @@ export function cleanUpHeader(entry, cacheDirectives) {
 }
 
 // See: https://techdocs.akamai.com/edge-diagnostics/docs/pragma-headers
-export function memHeader(trigger, outResponse) {
+export function setCacheStatus(trigger, outResponse) {
   switch (trigger) {
     case 'HIT':
-      outResponse.headers['x-speedis-cache'] = 'TCP_HIT from ' + os.hostname()
+      outResponse.headers['x-speedis-cache-status'] = 'TCP_HIT from ' + os.hostname()
       break
     case 'MISS':
-      outResponse.headers['x-speedis-cache'] = 'TCP_MISS from ' + os.hostname()
+      outResponse.headers['x-speedis-cache-status'] = 'TCP_MISS from ' + os.hostname()
       break
     case 'REFRESH_HIT':
-      outResponse.headers['x-speedis-cache'] = 'TCP_REFRESH_HIT from ' + os.hostname()
+      outResponse.headers['x-speedis-cache-status'] = 'TCP_REFRESH_HIT from ' + os.hostname()
       break
     case 'REFRESH_MISS':
-      outResponse.headers['x-speedis-cache'] = 'TCP_REFRESH_MISS from ' + os.hostname()
+      outResponse.headers['x-speedis-cache-status'] = 'TCP_REFRESH_MISS from ' + os.hostname()
       break
     case 'REFRESH_FAIL_HIT':
-      outResponse.headers['x-speedis-cache'] = 'TCP_REFRESH_FAIL_HIT from ' + os.hostname()
+      outResponse.headers['x-speedis-cache-status'] = 'TCP_REFRESH_FAIL_HIT from ' + os.hostname()
       break
   }
+}
 
+const xSpeedisCacheStatusHeaderRE = /^(TCP_.+) from/
+export function getCacheStatus(response) {
+  let cacheStatus = null
+  if (response.hasHeader('x-speedis-cache-status')) {
+    const matches = response.getHeader('x-speedis-cache-status')
+      .match(xSpeedisCacheStatusHeaderRE)
+    if (matches) cacheStatus = matches[1]
+  }
+  return cacheStatus
+}
+
+const originRE = /^\/([^/]+)/
+export function getOrigin(request) {
+  const matches = request.originalUrl.match(originRE)
+  return matches?matches[1]:null
 }

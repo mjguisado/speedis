@@ -1,5 +1,5 @@
 import { createHash } from "crypto";
-import { calculateFreshnessLifetime } from '../util/utils.js'
+import { calculateFreshnessLifetime } from '../utils/utils.js'
 
 
 export function setHeaders(target, params) {
