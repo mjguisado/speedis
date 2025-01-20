@@ -1,0 +1,8 @@
+{
+    "yaml.schemas": {
+        "https://www.artillery.io/schema.json": [
+            "file:///Users/manuel.guisado/redis/speedis/load-test.yml",
+            "file:///Users/manuel.guisado/redis/speedis/artillery/load-test.yml"
+        ]
+    }
+}

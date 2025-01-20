@@ -25,6 +25,7 @@ if (cluster.isPrimary) {
     os.availableParallelism(), 
     config.maxNumberOfWorkers
   )
+
   for (let i = 0; i < numWorkers; i++) {
     cluster.fork();
   }
@@ -33,10 +34,11 @@ if (cluster.isPrimary) {
     console.log(`worker ${worker.process.pid} died`),
   );
 
-  collectDefaultMetrics();
+  // collectDefaultMetrics();
 
-  const metricsServer = fastify({});
-
+  const metricsServer = fastify({
+    logger: { level: 'info' }
+  });
   metricsServer.get('/metrics', async (req, res) => {
     try {
       const metrics = await aggregatorRegistry.clusterMetrics();

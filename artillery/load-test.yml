@@ -1,0 +1,19 @@
+config:
+  payload:
+    # path is relative to the location of the test script
+    path: 'paths.csv'
+    delimiter: '€' # Just on fields with commas caracters in it.
+    fields:
+      - 'path'
+  # This is a test server run by team Artillery
+  # It's designed to be highly scalable
+  target: http://localhost:3001
+  phases:
+    - duration: '1h'
+      name: "Cruise"
+      arrivalRate: 10
+      maxVusers: 500
+scenarios:
+  - flow:
+    - get:
+        url: '{{ path }}'
