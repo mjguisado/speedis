@@ -10,7 +10,7 @@ const mockServer = fastify({
 await mockServer.register(mocksPlugin, {
     id: "mocks",
     prefix: "/mocks",
-    logLevel: "info"
+    logLevel: "warn"
 })
 
 // await mockServer.register(fastifyCaching, {})

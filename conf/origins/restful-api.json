@@ -1,7 +1,7 @@
 {
     "id": "restful-api",
     "prefix": "/restful-api",
-    "logLevel": "info",
+    "logLevel": "warn",
     "exposeErrors": true,
     "redis": {
         "socket": {
