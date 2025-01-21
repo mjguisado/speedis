@@ -32,13 +32,11 @@ export function setETagHeader(target, params) {
  * 
  * The TTL of an entry should be calculated according to rules established by the standard.
  * See: https://tools.ietf.org/html/rfc7234#section-4.2.1
- * 
- * Speedis allows setting a default value to be applied in case the TTL cannot be calculated.
- * 
- * 
+ *
+ * This function is deprecated and will be removed in future versions.
  * 
  */
-export function setTTL(target, params) {
+function setTTL(target, params) {
    /*
     * To avoid a large set of entries from expiring simultaneously,
     * the TTL can be randomly selected for each entry within a specific interval.

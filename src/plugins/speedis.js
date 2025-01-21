@@ -13,16 +13,10 @@ import Ajv from "ajv"
 // TODO: https://www.rfc-editor.org/rfc/rfc9111.html#name-public
 // TODO: https://www.rfc-editor.org/rfc/rfc9111#name-storing-incomplete-response
 // TODO: https://www.rfc-editor.org/rfc/rfc9111.html#name-constructing-responses-from
-// TODO: Pensar si expirar las entradas de cache vía TTL o delegar en Redis.
-// TODO: Implementar métricas de Phrometeus
 // https://tohidhaghighi.medium.com/add-prometheus-metrics-in-nodejs-ce0ff5a43b44
 // TODO: Implementar logs (publicación en Kibana). Fluentd or Central Logging (K8s)
 // TODO: Completar validaciones AJV.
 // TODO: Handling Redis reconnections
-// TODO: Explore Node Cluster 
-// https://nodejs.org/api/cluster.html
-// https://medium.com/@mjdrehman/implementing-node-js-cluster-for-improved-performance-f800146e58e1
-// https://medium.com/deno-the-complete-reference/the-benefits-of-clustering-fastify-app-in-node-js-hello-world-case-8a99127b9951
 // TODO: Dockerizar y Kubernetizar
 // TODO: Gestión de configuraciones remotas.
 // TODO: Gestionar Status Code poco habituales
@@ -249,16 +243,14 @@ export default async function (server, opts) {
       entity-tag = [ weak ] opaque-tag
       weak       = %s"W/"
       opaque-tag = DQUOTE *etagc DQUOTE
-      etagc      = %x21 / %x23-7E / obs-text
-                ; VCHAR except double quotes, plus obs-text
-
-
+      etagc      = %x21 / %x23-7E / obs-text 
+        ; VCHAR except double quotes, plus obs-text
       entity-tag = (W/)*\x22([\x21\x23-\x7E\x80-\xFF])*\x22
       weak       = W/
       opaque-tag = \x22([\x21\x23-\x7E\x80-\xFF])*\x22
       etag       = [\x21\x23-\x7E\x80-\xFF]
-
       */
+
       const eTagRE = /(?:W\/)*\x22(?:[\x21\x23-\x7E\x80-\xFF])*\x22/g
       let etags = [];
       let lastModified = null;
@@ -536,10 +528,10 @@ export default async function (server, opts) {
           cachedResponse.headers['age'] = utils.calculateAge(cachedResponse)
           return cachedResponse
         } else {
-          return { 
-            statusCode: 504, 
-            headers: { 
-              'date': new Date().toUTCString() 
+          return {
+            statusCode: 504,
+            headers: {
+              'date': new Date().toUTCString()
             }
           }
         }
@@ -652,12 +644,12 @@ export default async function (server, opts) {
     // See: https://www.rfc-editor.org/rfc/rfc9111.html#cache-request-directive.only-if-cached
     if (Object.prototype.hasOwnProperty.call(clientCacheDirectives, 'only-if-cached')
       && cachedResponse == null) {
-        return { 
-          statusCode: 504, 
-          headers: { 
-            'date': new Date().toUTCString() 
-          }
+      return {
+        statusCode: 504,
+        headers: {
+          'date': new Date().toUTCString()
         }
+      }
     }
 
     if (originResponse.statusCode === 304) {

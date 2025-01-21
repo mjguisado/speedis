@@ -12,8 +12,10 @@ config:
     - duration: '1h'
       name: "Cruise"
       arrivalRate: 10
-      maxVusers: 500
+      maxVusers: 1000
 scenarios:
   - flow:
-    - get:
-        url: '{{ path }}'
+      - loop:
+          - get:
+              url: '{{ path }}'
+        count: 100

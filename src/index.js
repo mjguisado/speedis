@@ -19,6 +19,9 @@ const config = await fs.readFile(configurationFilename, 'utf8')
 
 const aggregatorRegistry = new AggregatorRegistry();
 
+// https://medium.com/@mjdrehman/implementing-node-js-cluster-for-improved-performance-f800146e58e1
+// https://medium.com/deno-the-complete-reference/the-benefits-of-clustering-fastify-app-in-node-js-hello-world-case-8a99127b9951
+
 if (cluster.isPrimary) {
 
   const numWorkers = Math.min(
