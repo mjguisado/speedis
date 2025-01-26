@@ -12,8 +12,7 @@
     "origin": {
         "http2": false,
         "fetchTimeout": 2000,
-        "localRequestCoalescing": true,
-        "remoteRequestCoalescing": true,
+        "requestCoalescing": true,
         "httpxOptions": {
             "protocol": "https:",
             "hostname": "api.restful-api.dev",

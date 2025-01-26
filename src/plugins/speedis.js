@@ -5,7 +5,9 @@ import https from 'https'
 import { createClient } from 'redis'
 import * as utils from '../utils/utils.js'
 import * as actionsLib from '../actions/actions.js'
+import CircuitBreaker from 'opossum';
 import Ajv from "ajv"
+import { config } from 'process'
 
 // TODO: https://www.rfc-editor.org/rfc/rfc9111.html#name-must-understand
 // TODO: https://www.rfc-editor.org/rfc/rfc9111.html#name-no-transform
@@ -21,7 +23,7 @@ import Ajv from "ajv"
 // TODO: Gestión de configuraciones remotas.
 // TODO: Gestionar Status Code poco habituales
 // TODO: Implementar Brakers
-// TODO: Implementar remoteRequestCoalescing
+// TODO: ¿Implementar remoteRequestCoalescing?
 // TODO: Implementar timeout de request
 
 export default async function (server, opts) {
@@ -49,8 +51,7 @@ export default async function (server, opts) {
         required: ["httpxOptions"],
         properties: {
           http2: { type: "boolean" },
-          localRequestCoalescing: { type: "boolean" },
-          remoteRequestCoalescing: { type: "boolean" },
+          requestCoalescing: { type: "boolean" },
           fetchTimeout: { type: "integer" },
           // https://nodejs.org/api/http.html#httprequestoptions-callback
           httpxOptions: {
@@ -76,6 +77,44 @@ export default async function (server, opts) {
               socketPath: { type: "string" },
               timeout: { type: "integer" },
               uniqueHeaders: { type: "array" }
+            }
+          },
+          circuitBreaker: { type: "boolean" },
+          // See: https://github.com/nodeshift/opossum/blob/main/lib/circuit.js
+          circuitBreakerOptions: {
+            type: "object",
+            additionalProperties: true,
+            properties: {
+              // status: { type: "Status" }, 
+              timeout: { type: "integer" }, 
+              maxFailures: { type: "integer" }, 
+              resetTimeout: { type: "integer" }, 
+              rollingCountTimeout: { type: "integer" }, 
+              rollingCountBuckets: { type: "integer" }, 
+              name: { type: "string" }, 
+              rollingPercentilesEnabled: { type: "boolean" }, 
+              capacity: { type: "integer" }, 
+              errorThresholdPercentage: { type: "integer" }, 
+              enabled: { type: "boolean" }, 
+              allowWarmUp: { type: "boolean" }, 
+              volumeThreshold: { type: "integer" }, 
+              // errorFilter: { type: "Function" }, 
+              cache: { type: "boolean" }, 
+              cacheTTL: { type: "integer" }, 
+              cacheSize: { type: "integer" }, 
+              // cacheGetKey: { type: "Function" }, 
+              // cacheTransport: { type: "CacheTransport" }, 
+              coalesce: { type: "boolean" }, 
+              coalesceTTL: { type: "integer" }, 
+              coalesceSize: { type: "integer" }, 
+              coalesceResetOn: { 
+                type: "array",
+                items: { enum: ["error", "success", "timeout"] }
+              }, 
+              // abortController: { type: "AbortController" }, 
+              enableSnapshots: { type: "boolean" }, 
+              // rotateBucketController: { type: "EventEmitter" }, 
+              autoRenewAbortController: { type: "boolean" }, 
             }
           },
           // See: https://nodejs.org/api/http.html#new-agentoptions
@@ -172,6 +211,7 @@ export default async function (server, opts) {
         const agent = ('https:' === origin.httpxOptions.protocol ? https : http).Agent(origin.agentOptions)
         server.decorate('agent', agent)
       }
+
       if (Object.prototype.hasOwnProperty.call(origin, 'transformations')) {
         origin.transformations.forEach(transformation => {
           try {
@@ -189,6 +229,29 @@ export default async function (server, opts) {
         })
       }
 
+      let breaker = null;
+      let obOptions = [];
+      if (origin.circuitBreaker) {
+        if (Object.prototype.hasOwnProperty.call(origin, "circuitBreakerOptions")) {
+          obOptions = origin.circuitBreakerOptions;
+          // Speedis implements its own coalescing mechanism so we disable the one from the circuit breaker.
+          obOptions.coalesce = false;
+          // Speedis itself implements a cache mechanism so we disable the one from the circuit breaker.
+          obOptions.cache = false;
+        }
+        breaker = new CircuitBreaker(_fetch, config.circuitBreakerOptions);
+        breaker.on('open', () => {
+          server.log.warn(`Circuit Breaker Open: No requests will be made. Origin ${id}.`)
+        })
+        breaker.on('halfOpen', () => {
+          server.log.info(`Circuit Breaker Half Open: Requests are being tested. Origin ${id}.`)
+        });
+        breaker.on('close', () => {
+          server.log.info(`Circuit closed: Request are being made normally. Origin ${id}.`)
+        });
+        server.decorate('breaker', breaker)
+      }
+
     } else {
       server.log.error(validateOrigin.errors)
       throw new Error(`Origin configuration is invalid. Origin: ${id}`)
@@ -199,7 +262,7 @@ export default async function (server, opts) {
   server.decorate('origin', origin)
 
   // This Map storages the ongoing Fecth Operations
-  if (origin.localRequestCoalescing) server.decorate('ongoing', new Map())
+  if (origin.requestCoalescing) server.decorate('ongoing', new Map())
 
   // Connecting to Redis
   // See: https://redis.io/docs/latest/develop/clients/nodejs/produsage/#handling-reconnections 
@@ -464,7 +527,7 @@ export default async function (server, opts) {
     // Apply transformations to the request before sending it to the origin
     _transform(ORIGIN_REQUEST, options, server);
 
-    // If localRequestCoalescing is enabled, only the first request 
+    // If requestCoalescing is enabled, only the first request 
     // will contact the origin to prevent overloading it.
     let amITheFetcher = false;
 
@@ -477,12 +540,16 @@ export default async function (server, opts) {
 
       // Verify if there is an ongoing fetch operation
       let fetch = null;
-      if (origin.localRequestCoalescing) {
+      if (origin.requestCoalescing) {
         fetch = server.ongoing.get(cacheKey);
       }
       if (!fetch) {
-        fetch = _fetch(server, options)
-        if (origin.localRequestCoalescing) server.ongoing.set(cacheKey, fetch)
+        if (server.breaker) {
+          fetch = server.breaker.fire(server, options)
+        } else {
+          fetch = _fetch(server, options)
+        }
+        if (origin.requestCoalescing) server.ongoing.set(cacheKey, fetch)
         amITheFetcher = true;
       }
       // The current value of the clock at the host at the time the
@@ -539,7 +606,7 @@ export default async function (server, opts) {
         throw error
       }
     } finally {
-      if (origin.localRequestCoalescing) server.ongoing.delete(cacheKey)
+      if (origin.requestCoalescing) server.ongoing.delete(cacheKey)
     }
 
     // Apply transformations to the response received from the origin

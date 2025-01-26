@@ -12,8 +12,8 @@
     "origin": {
         "http2": false,
         "fetchTimeout": 2000,
-        "localRequestCoalescing": true,
-        "remoteRequestCoalescing": true,
+        "requestCoalescing": true,
+        "circuitBreaker": true,
         "httpxOptions": {
             "protocol": "http:",
             "host": "mocks",
@@ -22,6 +22,11 @@
             "method": "GET",
             "headers": {},
             "timeout": 2000
+        },
+        "circuitBreakerOptions": {
+            "timeout": 10000,
+            "maxFailures": 5,
+            "resetTimeout": 30000
         },
         "agentOptions": {
             "keepAlive": true
