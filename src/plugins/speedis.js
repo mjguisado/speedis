@@ -5,9 +5,10 @@ import https from 'https'
 import { createClient } from 'redis'
 import * as utils from '../utils/utils.js'
 import * as actionsLib from '../actions/actions.js'
-import CircuitBreaker from 'opossum';
+import CircuitBreaker from 'opossum'
 import Ajv from "ajv"
 import { config } from 'process'
+import { Counter, Histogram, Summary } from 'prom-client'
 
 // TODO: https://www.rfc-editor.org/rfc/rfc9111.html#name-must-understand
 // TODO: https://www.rfc-editor.org/rfc/rfc9111.html#name-no-transform
@@ -229,27 +230,62 @@ export default async function (server, opts) {
         })
       }
 
-      let breaker = null;
-      let obOptions = [];
       if (origin.circuitBreaker) {
+      
+        let cbOptions = []
         if (Object.prototype.hasOwnProperty.call(origin, "circuitBreakerOptions")) {
-          obOptions = origin.circuitBreakerOptions;
-          // Speedis implements its own coalescing mechanism so we disable the one from the circuit breaker.
-          obOptions.coalesce = false;
-          // Speedis itself implements a cache mechanism so we disable the one from the circuit breaker.
-          obOptions.cache = false;
+          cbOptions = origin.circuitBreakerOptions
         }
-        breaker = new CircuitBreaker(_fetch, config.circuitBreakerOptions);
-        breaker.on('open', () => {
+
+        // FIXME: Quitarlo de las propiedades del circuit breaker
+        // Name of the Circuit Breaker
+        cbOptions['name'] = id
+        // Speedis implements its own coalescing mechanism so we disable the one from the circuit breaker.
+        cbOptions['coalesce'] = false
+        // Speedis itself implements a cache mechanism so we disable the one from the circuit breaker.
+        cbOptions['cache'] = false
+
+        // Circuit Breaker instance
+        const circuit = new CircuitBreaker(_fetch, cbOptions)
+        circuit.on('open', () => {
           server.log.warn(`Circuit Breaker Open: No requests will be made. Origin ${id}.`)
         })
-        breaker.on('halfOpen', () => {
+        circuit.on('halfOpen', () => {
           server.log.info(`Circuit Breaker Half Open: Requests are being tested. Origin ${id}.`)
-        });
-        breaker.on('close', () => {
+        })
+        circuit.on('close', () => {
           server.log.info(`Circuit closed: Request are being made normally. Origin ${id}.`)
-        });
-        server.decorate('breaker', breaker)
+        })
+
+        // Metrics of the Circuit Breaker
+        const circuitBreakersEvents = new Counter({
+          name: 'circuit_brakers_events',
+          help: `A count of all circuit' events`,
+          labelNames: ['origin', 'event']
+        })
+        const circuitBreakersPerformance = new Summary({
+          name: 'circuit_brakers_performance',
+          help: `A summary of all circuit's events`,
+          labelNames: ['origin', 'event']
+        })
+
+        // server.decorate('circuitBreakersEvents', circuitBreakersEvents)
+        // server.decorate('circuitBreakersPerformance', circuitBreakersPerformance)
+
+        for (const eventName of circuit.eventNames()) {
+          circuit.on(eventName, _ => {
+            circuitBreakersEvents.labels(id, eventName).inc()
+          })
+          if (eventName === 'success' || eventName === 'failure') {
+            // Not the timeout event because runtime == timeout
+            circuit.on(eventName, (result, runTime) => {
+              circuitBreakersPerformance.labels(id, eventName).observe(runTime)
+            })
+          }
+        }
+
+        server.decorate('circuit', circuit)
+
       }
 
     } else {
@@ -260,6 +296,7 @@ export default async function (server, opts) {
     throw new Error(`Origin configuration not found. Origin: ${id}`)
   }
   server.decorate('origin', origin)
+
 
   // This Map storages the ongoing Fecth Operations
   if (origin.requestCoalescing) server.decorate('ongoing', new Map())
@@ -285,8 +322,11 @@ export default async function (server, opts) {
     url: '/*',
     handler: async function (request, reply) {
 
-      // We parse the Cache-Control header to extract cache directives.
-      let response = null;
+      server.httpRequestsTotal
+        .labels({origin: id})
+        .inc()
+      
+      let response = null
       try {
         response = await _get(server, request, request.id)
       } catch (error) {
@@ -294,7 +334,7 @@ export default async function (server, opts) {
           "Error requesting to the origin and there is no a valid entry in the cache. " +
           `Origin: ${server.id}. Url: ${request.url}. RID: ${request.id}.`
         if (server.exposeErrors) { throw new Error(msg, { cause: error }) }
-        else throw new Error(msg);
+        else throw new Error(msg)
       }
 
       // Check if we have received a conditional request.
@@ -315,22 +355,22 @@ export default async function (server, opts) {
       */
 
       const eTagRE = /(?:W\/)*\x22(?:[\x21\x23-\x7E\x80-\xFF])*\x22/g
-      let etags = [];
-      let lastModified = null;
+      let etags = []
+      let lastModified = null
       for (let header in request.headers) {
         switch (header) {
           case 'if-none-match':
             etags = request.headers[header].match(eTagRE)
             etags = etags !== null ? etags : []
-            break;
+            break
           case 'if-modified-since':
-            lastModified = request.headers[header];
-            break;
+            lastModified = request.headers[header]
+            break
         }
       }
 
       // See: https://www.rfc-editor.org/rfc/rfc9110.html#section-13.1.2
-      let ifNoneMatchCondition = true;
+      let ifNoneMatchCondition = true
       if (etags.length > 0) {
         if (etags.length === 1 && etags[0] === '"*"') {
           if (response && 200 === response.statusCode) {
@@ -339,13 +379,13 @@ export default async function (server, opts) {
         } else {
           if (Object.prototype.hasOwnProperty.call(response.headers, 'etag')) {
             let weakCacheEtag = response.headers["etag"].startsWith('W/')
-              ? response.headers["etag"].substring(2) : response.headers["etag"];
+              ? response.headers["etag"].substring(2) : response.headers["etag"]
             for (let index = 0; index < etags.length; index++) {
               // A recipient MUST use the weak comparison function when 
               // comparing entity tags for If-None-Match
               // https://www.rfc-editor.org/rfc/rfc9110.html#section-8.8.3.2
               let weakRequestETag = etags[index].startsWith('W/')
-                ? etags[index].substring(2) : etags[index];
+                ? etags[index].substring(2) : etags[index]
               if (weakRequestETag === weakCacheEtag) {
                 ifNoneMatchCondition = false
                 break
@@ -402,7 +442,7 @@ export default async function (server, opts) {
           "Error deleting the cache entry in Redis. " +
           `Origin: ${server.id}. Key: ${cacheKey}. RID: ${rid}.`
         if (server.exposeErrors) { throw new Error(msg, { cause: error }) }
-        else throw new Error(msg);
+        else throw new Error(msg)
       }
     }
   })
@@ -423,7 +463,7 @@ export default async function (server, opts) {
           + ':' + ((request.headers[fieldName]) ? request.headers[fieldName] : '')
       }
     })
-    return cacheKey;
+    return cacheKey
   }
 
   async function _get(server, request, rid) {
@@ -437,7 +477,7 @@ export default async function (server, opts) {
 
     const clientCacheDirectives = utils.parseCacheControlHeader(request)
     const fieldNames = utils.parseVaryHeader(request)
-    let cacheKey = generateCacheKey(server, request, fieldNames);
+    let cacheKey = generateCacheKey(server, request, fieldNames)
 
     let cachedResponse = null
     try {
@@ -463,7 +503,7 @@ export default async function (server, opts) {
       const currentAge = utils.calculateAge(cachedResponse)
 
       // We calculate whether the cache entry is fresh or stale.
-      let responseIsFresh = (currentAge <= freshnessLifetime);
+      let responseIsFresh = (currentAge <= freshnessLifetime)
 
       // See: https://www.rfc-editor.org/rfc/rfc9111.html#cache-request-directive.max-age
       if (Object.prototype.hasOwnProperty.call(clientCacheDirectives, 'max-age')) {
@@ -497,7 +537,7 @@ export default async function (server, opts) {
       * satisfied from a cache, the no-store request directive does 
       * not apply to the already stored response.
       */
-      cachedCacheDirectives = utils.parseCacheControlHeader(cachedResponse);
+      cachedCacheDirectives = utils.parseCacheControlHeader(cachedResponse)
 
       if (responseIsFresh
         && !Object.prototype.hasOwnProperty.call(clientCacheDirectives, 'no-cache')
@@ -525,11 +565,11 @@ export default async function (server, opts) {
     }
 
     // Apply transformations to the request before sending it to the origin
-    _transform(ORIGIN_REQUEST, options, server);
+    _transform(ORIGIN_REQUEST, options, server)
 
     // If requestCoalescing is enabled, only the first request 
     // will contact the origin to prevent overloading it.
-    let amITheFetcher = false;
+    let amITheFetcher = false
 
     // Make the request to the origin
     let originResponse = null
@@ -539,25 +579,25 @@ export default async function (server, opts) {
     try {
 
       // Verify if there is an ongoing fetch operation
-      let fetch = null;
+      let fetch = null
       if (origin.requestCoalescing) {
-        fetch = server.ongoing.get(cacheKey);
+        fetch = server.ongoing.get(cacheKey)
       }
       if (!fetch) {
-        if (server.breaker) {
-          fetch = server.breaker.fire(server, options)
+        if (server.circuit) {
+          fetch = server.circuit.fire(server, options)
         } else {
           fetch = _fetch(server, options)
         }
         if (origin.requestCoalescing) server.ongoing.set(cacheKey, fetch)
-        amITheFetcher = true;
+        amITheFetcher = true
       }
       // The current value of the clock at the host at the time the
       // request resulting in the stored response was made.
       requestTime = Date.now() / 1000 | 0
 
       // Fecth
-      originResponse = await fetch;
+      originResponse = await fetch
 
       // The current value of the clock at the host at the time the
       // response was received.
@@ -610,7 +650,7 @@ export default async function (server, opts) {
     }
 
     // Apply transformations to the response received from the origin
-    _transform(ORIGIN_RESPONSE, originResponse, server);
+    _transform(ORIGIN_RESPONSE, originResponse, server)
 
     // We parse the Cache-Control header to extract cache directives.
     const originCacheDirectives = utils.parseCacheControlHeader(originResponse)

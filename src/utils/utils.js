@@ -259,7 +259,7 @@ export function getCacheStatus(response) {
 }
 
 const originRE = /^\/([^/]+)/
-export function getOrigin(request) {
+export function getOrigin(server, request) {
   const matches = request.originalUrl.match(originRE)
   return matches?matches[1]:null
 }
