@@ -2,7 +2,7 @@ import fastify from 'fastify'
 import path from 'path'
 import fs from 'fs/promises'
 import speedisPlugin from './plugins/speedis.js'
-import { collectDefaultMetrics, Counter, Histogram } from 'prom-client'
+import { collectDefaultMetrics, Counter, Histogram, Summary } from 'prom-client'
 import { getCacheStatus} from './utils/utils.js'
 
 export async function app(opts = {}) {
@@ -27,6 +27,20 @@ export async function app(opts = {}) {
         labelNames: ['origin']
     })
 
+    const circuitBreakersEvents = new Counter({
+        name: 'circuit_brakers_events',
+        help: `A count of all circuit' events`,
+        labelNames: ['origin', 'event']
+    })
+    server.decorate('circuitBreakersEvents', circuitBreakersEvents)
+
+    const circuitBreakersPerformance = new Summary({
+        name: 'circuit_brakers_performance',
+        help: `A summary of all circuit's events`,
+        labelNames: ['origin', 'event']
+    })
+    server.decorate('circuitBreakersPerformance', circuitBreakersPerformance)
+
     const httpResponsesDuration = new Histogram({
         name: 'http_responses_duration',
         help: 'Duration of HTTP responses',
@@ -34,13 +48,11 @@ export async function app(opts = {}) {
     })
 
     // See: https://github.com/siimon/prom-client?tab=readme-ov-file#zeroing-metrics-with-labels
-
     httpResponsesDuration.zero({ cacheStatus: 'TCP_HIT' })
     httpResponsesDuration.zero({ cacheStatus: 'TCP_MISS' })
     httpResponsesDuration.zero({ cacheStatus: 'TCP_REFRESH_HIT' })
     httpResponsesDuration.zero({ cacheStatus: 'TCP_REFRESH_MISS' })
     httpResponsesDuration.zero({ cacheStatus: 'TCP_REFRESH_FAIL_HIT' })
-
 
     // Load the origin's configuration.
     const originsBasedir = path.join(process.cwd(), 'conf', 'origins')

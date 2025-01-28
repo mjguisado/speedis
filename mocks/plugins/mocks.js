@@ -1,10 +1,15 @@
 export default async function (server, opts) {
 
     server.get('/items/:uuid', async (request, reply) => {
-        reply.code(200)     
+        if (request.query['delay']) {
+            let delay = parseInt(request.query['delay'])
+            if (!Number.isNaN(delay) && delay > 0) {
+                await new Promise(resolve => setTimeout(resolve, delay)) 
+            }   
+        }
+        reply.code(200)
         let headers = {}
-        let cc = request.query['cc']
-        if (cc) headers['cache-control'] = cc
+        if (request.query['cc']) headers['cache-control'] = request.query['cc']
         headers['etag'] = `W/"${request.params.uuid}"`
         headers['x-mocks-custom-header-1'] = 'x-mocks-custom-header-1'
         headers['x-mocks-custom-header-2'] = 'x-mocks-custom-header-2'
@@ -17,7 +22,6 @@ export default async function (server, opts) {
             }
         }
         headers['last-modified'] = new Date().toUTCString()
-        reply.code(200)
         reply.headers(headers)
         reply.send({
             id: request.params.uuid,

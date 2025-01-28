@@ -1,4 +1,3 @@
-import os from 'os'
 import http from 'http'
 import https from 'https'
 // import http2 from 'http2'
@@ -7,8 +6,6 @@ import * as utils from '../utils/utils.js'
 import * as actionsLib from '../actions/actions.js'
 import CircuitBreaker from 'opossum'
 import Ajv from "ajv"
-import { config } from 'process'
-import { Counter, Histogram, Summary } from 'prom-client'
 
 // TODO: https://www.rfc-editor.org/rfc/rfc9111.html#name-must-understand
 // TODO: https://www.rfc-editor.org/rfc/rfc9111.html#name-no-transform
@@ -23,9 +20,6 @@ import { Counter, Histogram, Summary } from 'prom-client'
 // TODO: Dockerizar y Kubernetizar
 // TODO: Gestión de configuraciones remotas.
 // TODO: Gestionar Status Code poco habituales
-// TODO: Implementar Brakers
-// TODO: ¿Implementar remoteRequestCoalescing?
-// TODO: Implementar timeout de request
 
 export default async function (server, opts) {
 
@@ -53,6 +47,7 @@ export default async function (server, opts) {
         properties: {
           http2: { type: "boolean" },
           requestCoalescing: { type: "boolean" },
+          circuitBreaker: { type: "boolean" },
           fetchTimeout: { type: "integer" },
           // https://nodejs.org/api/http.html#httprequestoptions-callback
           httpxOptions: {
@@ -80,14 +75,13 @@ export default async function (server, opts) {
               uniqueHeaders: { type: "array" }
             }
           },
-          circuitBreaker: { type: "boolean" },
           // See: https://github.com/nodeshift/opossum/blob/main/lib/circuit.js
           circuitBreakerOptions: {
             type: "object",
             additionalProperties: true,
             properties: {
               // status: { type: "Status" }, 
-              timeout: { type: "integer" }, 
+              // timeout: { type: "integer" }, 
               maxFailures: { type: "integer" }, 
               resetTimeout: { type: "integer" }, 
               rollingCountTimeout: { type: "integer" }, 
@@ -105,13 +99,15 @@ export default async function (server, opts) {
               cacheSize: { type: "integer" }, 
               // cacheGetKey: { type: "Function" }, 
               // cacheTransport: { type: "CacheTransport" }, 
+              /*
               coalesce: { type: "boolean" }, 
               coalesceTTL: { type: "integer" }, 
               coalesceSize: { type: "integer" }, 
               coalesceResetOn: { 
                 type: "array",
                 items: { enum: ["error", "success", "timeout"] }
-              }, 
+              },
+              */ 
               // abortController: { type: "AbortController" }, 
               enableSnapshots: { type: "boolean" }, 
               // rotateBucketController: { type: "EventEmitter" }, 
@@ -232,12 +228,14 @@ export default async function (server, opts) {
 
       if (origin.circuitBreaker) {
       
+        // FIXME: REfinar la validación del objeto circuitBreakerOptions para quitar las 
+        // propiedades que no son necesarias.
+
         let cbOptions = []
         if (Object.prototype.hasOwnProperty.call(origin, "circuitBreakerOptions")) {
           cbOptions = origin.circuitBreakerOptions
         }
 
-        // FIXME: Quitarlo de las propiedades del circuit breaker
         // Name of the Circuit Breaker
         cbOptions['name'] = id
         // Speedis implements its own coalescing mechanism so we disable the one from the circuit breaker.
@@ -245,9 +243,17 @@ export default async function (server, opts) {
         // Speedis itself implements a cache mechanism so we disable the one from the circuit breaker.
         cbOptions['cache'] = false
 
+        if (Object.prototype.hasOwnProperty.call(origin, "fetchTimeout")) {
+          cbOptions['timeout'] = origin.fetchTimeout
+        }
+
         // Circuit Breaker instance
         const circuit = new CircuitBreaker(_fetch, cbOptions)
+
         circuit.on('open', () => {
+          let retryAfter = new Date()
+          retryAfter.setSeconds(retryAfter.getSeconds() + circuit.options.resetTimeout/1000)
+          circuit['retryAfter'] = retryAfter.toUTCString()
           server.log.warn(`Circuit Breaker Open: No requests will be made. Origin ${id}.`)
         })
         circuit.on('halfOpen', () => {
@@ -257,29 +263,14 @@ export default async function (server, opts) {
           server.log.info(`Circuit closed: Request are being made normally. Origin ${id}.`)
         })
 
-        // Metrics of the Circuit Breaker
-        const circuitBreakersEvents = new Counter({
-          name: 'circuit_brakers_events',
-          help: `A count of all circuit' events`,
-          labelNames: ['origin', 'event']
-        })
-        const circuitBreakersPerformance = new Summary({
-          name: 'circuit_brakers_performance',
-          help: `A summary of all circuit's events`,
-          labelNames: ['origin', 'event']
-        })
-
-        // server.decorate('circuitBreakersEvents', circuitBreakersEvents)
-        // server.decorate('circuitBreakersPerformance', circuitBreakersPerformance)
-
         for (const eventName of circuit.eventNames()) {
           circuit.on(eventName, _ => {
-            circuitBreakersEvents.labels(id, eventName).inc()
+            server.circuitBreakersEvents.labels(id, eventName).inc()
           })
           if (eventName === 'success' || eventName === 'failure') {
             // Not the timeout event because runtime == timeout
             circuit.on(eventName, (result, runTime) => {
-              circuitBreakersPerformance.labels(id, eventName).observe(runTime)
+              server.circuitBreakersPerformance.labels(id, eventName).observe(runTime)
             })
           }
         }
@@ -333,6 +324,9 @@ export default async function (server, opts) {
         const msg =
           "Error requesting to the origin and there is no a valid entry in the cache. " +
           `Origin: ${server.id}. Url: ${request.url}. RID: ${request.id}.`
+        if (error.code === 'ETIMEDOUT')
+        
+        
         if (server.exposeErrors) { throw new Error(msg, { cause: error }) }
         else throw new Error(msg)
       }
@@ -615,35 +609,48 @@ export default async function (server, opts) {
       originResponse.responseTime = responseTime
 
     } catch (error) {
+      delete options.agent
+      server.log.error(error,
+        "Error requesting to the origin. " +
+        `Origin: ${server.id}. Options: ` + JSON.stringify(options) + `. RID: ${rid}.`
+      )
       /*
       * If I was trying to refresh a cache entry,
       * I may consider serving the stale content.
       */
-      if (cachedResponse != null) {
-        delete options.agent
-        server.log.error(error,
-          "Error requesting to the origin. " +
-          `Origin: ${server.id}. Options: ` + JSON.stringify(options) + `. RID: ${rid}.`
-        )
-        // https://www.rfc-editor.org/rfc/rfc9111.html#cache-response-directive.must-revalidate
-        if (!Object.prototype.hasOwnProperty.call(cachedCacheDirectives, 'must-revalidate')
-          && !Object.prototype.hasOwnProperty.call(cachedCacheDirectives, 'proxy-revalidate')) {
-          server.log.warn(error,
-            "Serving stale content from cache. " +
-            `Origin: ${server.id}. Key: ${cacheKey}. RID: ${rid}.`)
-          utils.setCacheStatus('REFRESH_FAIL_HIT', cachedResponse)
-          cachedResponse.headers['age'] = utils.calculateAge(cachedResponse)
-          return cachedResponse
-        } else {
-          return {
-            statusCode: 504,
-            headers: {
-              'date': new Date().toUTCString()
-            }
-          }
-        }
+      // https://www.rfc-editor.org/rfc/rfc9111.html#cache-response-directive.must-revalidate
+      if (cachedResponse != null
+        && !Object.prototype.hasOwnProperty.call(cachedCacheDirectives, 'must-revalidate')
+        && !Object.prototype.hasOwnProperty.call(cachedCacheDirectives, 'proxy-revalidate')) {
+        server.log.warn(error,
+          "Serving stale content from cache. " +
+          `Origin: ${server.id}. Key: ${cacheKey}. RID: ${rid}.`)
+        utils.setCacheStatus('REFRESH_FAIL_HIT', cachedResponse)
+        cachedResponse.headers['age'] = utils.calculateAge(cachedResponse)
+        return cachedResponse
       } else {
-        throw error
+        let statusCode = 0
+        let headers = {
+          date: new Date().toUTCString()
+        }
+        switch (error.code) {
+          case 'ETIMEDOUT':
+            statusCode = 504
+            break;
+          case 'EOPENBREAKER':
+            statusCode = 503
+            if (server.circuit.options.resetTimeout) {
+              headers['retry-after'] = server.circuit.retryAfter
+            }
+            break;
+          default:
+            statusCode = 500
+            break;
+        }
+        return {
+          statusCode: statusCode,
+          headers: headers
+        }
       }
     } finally {
       if (origin.requestCoalescing) server.ongoing.delete(cacheKey)
@@ -788,16 +795,40 @@ export default async function (server, opts) {
       if (server.origin.http2) {
         // TODO: Implement HTTP2 support
       } else {
-        // The default protocol is 'http:'
+
+        // If we are using the Circuit Breaker the timeout is managed by it.
+        // In other cases, we has to manage the timeout in the request.
+        let signal, timeoutId = null;       
+        if (Object.prototype.hasOwnProperty.call(origin, "fetchTimeout") &&
+           !Object.prototype.hasOwnProperty.call(options, "signal")) {
+            const abortController = new AbortController()
+            timeoutId = setTimeout(() => {
+              abortController.abort();
+            }, origin.fetchTimeout);
+            signal = abortController.signal
+            options.signal = signal
+        }
+
         const request = (options.protocol === 'https:' ? https : http)
           .get(options, (res) => {
             let rawData = ''
             res.on('data', chunk => { rawData += chunk })
             res.on('end', () => {
+              if (timeoutId) clearTimeout(timeoutId)
               resolve({ statusCode: res.statusCode, headers: res.headers, body: rawData })
             })
-          })
-        request.on('error', reject)
+        })
+
+        request.on('error', (err) => {
+          if (signal && signal.aborted) {
+            const error = new Error(`Timed out after ${origin.fetchTimeout} ms`, { cause: err })
+            error.code = 'ETIMEDOUT'
+            reject(error)
+          } else {
+            reject(err)
+          }
+        })
+
       }
     })
   }

@@ -11,9 +11,9 @@
     },
     "origin": {
         "http2": false,
-        "fetchTimeout": 2000,
         "requestCoalescing": true,
-        "circuitBreaker": true,
+        "circuitBreaker": false,
+        "fetchTimeout": 2000,
         "httpxOptions": {
             "protocol": "http:",
             "host": "mocks",

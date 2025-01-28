@@ -11,8 +11,9 @@
     },
     "origin": {
         "http2": false,
-        "fetchTimeout": 2000,
         "requestCoalescing": true,
+        "circuitBreaker": true,
+        "fetchTimeout": 2000,
         "httpxOptions": {
             "protocol": "https:",
             "hostname": "api.restful-api.dev",
