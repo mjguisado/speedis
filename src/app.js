@@ -21,12 +21,6 @@ export async function app(opts = {}) {
     })
     server.decorate('httpRequestsTotal', httpRequestsTotal)
 
-    const httpResponsesTotal = new Counter({
-        name: 'http_responses_total',
-        help: 'Total number of HTTP responses',
-        labelNames: ['origin']
-    })
-
     const circuitBreakersEvents = new Counter({
         name: 'circuit_brakers_events',
         help: `A count of all circuit' events`,
@@ -41,6 +35,12 @@ export async function app(opts = {}) {
     })
     server.decorate('circuitBreakersPerformance', circuitBreakersPerformance)
 
+    const httpResponsesTotal = new Counter({
+        name: 'http_responses_total',
+        help: 'Total number of HTTP responses',
+        labelNames: ['origin', 'statusCode', 'cacheStatus']
+    })
+    
     const httpResponsesDuration = new Histogram({
         name: 'http_responses_duration',
         help: 'Duration of HTTP responses',
@@ -80,26 +80,30 @@ export async function app(opts = {}) {
     })
 
     server.addHook('onResponse', async (request, reply) => {
-        let origin = null
-        plugins.forEach((prefix, id) => {
-            if (request.url.startsWith(prefix)) {
-                origin = id
+        if (request.originalUrl !== '/metrics') {
+            let origin = 'unknown'
+            plugins.forEach((prefix, id) => {
+                if (request.url.startsWith(prefix)) {
+                    origin = id
+                }
+            })
+            let cacheStatus = getCacheStatus(reply)
+            httpResponsesTotal
+                .labels({
+                    origin: origin,
+                    statusCode: reply.statusCode,
+                    cacheStatus: cacheStatus
+                }).inc()
+            if (typeof reply.elapsedTime === 'number' && !Number.isNaN(reply.elapsedTime)) {
+                httpResponsesDuration.labels({
+                    origin: origin,
+                    statusCode: reply.statusCode,
+                    cacheStatus: cacheStatus
+                }).observe(reply.elapsedTime)
+            } else {
+                server.log.warn('The duration value is not valid: ', reply.elapsedTime)
             }
-        })
-        httpResponsesTotal
-            .labels({origin: origin})
-            .inc()
-
-        if (typeof reply.elapsedTime === 'number' && !Number.isNaN(reply.elapsedTime)) {
-            httpResponsesDuration.labels({
-                origin: origin,
-                statusCode: reply.statusCode,
-                cacheStatus: getCacheStatus(reply)
-            }).observe(reply.elapsedTime)
-        } else {
-            server.log.warn('The duration value is not valid: ', reply.elapsedTime)
         }
-    
     })
 
     server.ready(err => { if (err) console.log(err) })

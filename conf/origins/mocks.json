@@ -1,7 +1,7 @@
 {
     "id": "mocks",
     "prefix": "/mocks",
-    "logLevel": "warn",
+    "logLevel": "info",
     "exposeErrors": true,
     "redis": {
         "socket": {
@@ -12,7 +12,7 @@
     "origin": {
         "http2": false,
         "requestCoalescing": true,
-        "circuitBreaker": false,
+        "circuitBreaker": true,
         "fetchTimeout": 2000,
         "httpxOptions": {
             "protocol": "http:",

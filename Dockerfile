@@ -13,7 +13,7 @@ RUN --mount=type=bind,source=package.json,target=package.json \
     npm ci --include=dev
 USER node
 COPY . .
-CMD  ["nodemon", "--inspect", "src/index.js"]
+CMD  ["nodemon", "src/index.js"]
 
 FROM base AS production
 ENV NODE_ENV=production

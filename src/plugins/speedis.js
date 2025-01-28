@@ -20,6 +20,7 @@ import Ajv from "ajv"
 // TODO: Dockerizar y Kubernetizar
 // TODO: Gestión de configuraciones remotas.
 // TODO: Gestionar Status Code poco habituales
+// Incluir métricas en los delete (label method)
 
 export default async function (server, opts) {
 
@@ -265,12 +266,18 @@ export default async function (server, opts) {
 
         for (const eventName of circuit.eventNames()) {
           circuit.on(eventName, _ => {
-            server.circuitBreakersEvents.labels(id, eventName).inc()
+            server.circuitBreakersEvents.labels({
+              origin: id, 
+              event: eventName
+            }).inc()
           })
           if (eventName === 'success' || eventName === 'failure') {
             // Not the timeout event because runtime == timeout
             circuit.on(eventName, (result, runTime) => {
-              server.circuitBreakersPerformance.labels(id, eventName).observe(runTime)
+              server.circuitBreakersPerformance.labels({
+                origin: id, 
+                event: eventName
+              }).observe(runTime)
             })
           }
         }
@@ -636,16 +643,16 @@ export default async function (server, opts) {
         switch (error.code) {
           case 'ETIMEDOUT':
             statusCode = 504
-            break;
+            break
           case 'EOPENBREAKER':
             statusCode = 503
             if (server.circuit.options.resetTimeout) {
               headers['retry-after'] = server.circuit.retryAfter
             }
-            break;
+            break
           default:
             statusCode = 500
-            break;
+            break
         }
         return {
           statusCode: statusCode,
@@ -798,13 +805,13 @@ export default async function (server, opts) {
 
         // If we are using the Circuit Breaker the timeout is managed by it.
         // In other cases, we has to manage the timeout in the request.
-        let signal, timeoutId = null;       
+        let signal, timeoutId = null       
         if (Object.prototype.hasOwnProperty.call(origin, "fetchTimeout") &&
            !Object.prototype.hasOwnProperty.call(options, "signal")) {
             const abortController = new AbortController()
             timeoutId = setTimeout(() => {
-              abortController.abort();
-            }, origin.fetchTimeout);
+              abortController.abort()
+            }, origin.fetchTimeout)
             signal = abortController.signal
             options.signal = signal
         }

@@ -19,3 +19,12 @@ scrape_configs:
   static_configs:
   - targets:
     - speedis:3003
+- job_name: mocks
+  honor_timestamps: true
+  scrape_interval: 15s
+  scrape_timeout: 10s
+  metrics_path: /metrics
+  scheme: http
+  static_configs:
+  - targets:
+    - mocks:3030

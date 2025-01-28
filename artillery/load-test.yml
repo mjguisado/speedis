@@ -11,11 +11,16 @@ config:
   phases:
     - duration: '1h'
       name: "Cruise"
-      arrivalRate: 10
-      maxVusers: 1000
+      arrivalRate: 20
 scenarios:
   - flow:
-      - loop:
-          - get:
-              url: '{{ path }}'
-        count: 100
+    - get:
+        url: '{{ path }}'
+        capture: 
+          - header: 'last-modified'
+            as: 'lastModified'
+    - get:
+        url: '{{ path }}'
+        headers:
+          'If-Modified-Since': '{{ lastModified }}'
+        ifTrue: 'lastModified'

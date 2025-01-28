@@ -1,35 +1,4 @@
 {
-  "__inputs": [
-    {
-      "name": "DS_PROMETHEUS",
-      "label": "Prometheus",
-      "description": "",
-      "type": "datasource",
-      "pluginId": "prometheus",
-      "pluginName": "Prometheus"
-    }
-  ],
-  "__elements": {},
-  "__requires": [
-    {
-      "type": "grafana",
-      "id": "grafana",
-      "name": "Grafana",
-      "version": "11.4.0"
-    },
-    {
-      "type": "datasource",
-      "id": "prometheus",
-      "name": "Prometheus",
-      "version": "1.0.0"
-    },
-    {
-      "type": "panel",
-      "id": "timeseries",
-      "name": "Time series",
-      "version": ""
-    }
-  ],
   "annotations": {
     "list": [
       {
@@ -49,13 +18,13 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": null,
+  "id": 1,
   "links": [],
   "panels": [
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "PBFA97CFB590B2093"
       },
       "fieldConfig": {
         "defaults": {
@@ -110,40 +79,15 @@
             ]
           }
         },
-        "overrides": [
-          {
-            "__systemRef": "hideSeriesFrom",
-            "matcher": {
-              "id": "byNames",
-              "options": {
-                "mode": "exclude",
-                "names": [
-                  "{instance=\"speedis:3003\", job=\"speedis\", origin=\"mocks\"}"
-                ],
-                "prefix": "All except:",
-                "readOnly": true
-              }
-            },
-            "properties": [
-              {
-                "id": "custom.hideFrom",
-                "value": {
-                  "legend": false,
-                  "tooltip": false,
-                  "viz": true
-                }
-              }
-            ]
-          }
-        ]
+        "overrides": []
       },
       "gridPos": {
-        "h": 8,
-        "w": 12,
+        "h": 11,
+        "w": 10,
         "x": 0,
         "y": 0
       },
-      "id": 2,
+      "id": 3,
       "options": {
         "legend": {
           "calcs": [],
@@ -159,29 +103,82 @@
       "pluginVersion": "11.4.0",
       "targets": [
         {
-          "disableTextWrap": false,
-          "editorMode": "code",
-          "expr": "rate(http_responses_total[$__rate_interval]) ",
-          "fullMetaSearch": false,
-          "includeNullMetadata": true,
-          "legendFormat": "__auto",
-          "range": true,
-          "refId": "A",
-          "useBackend": false,
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
-          }
+            "uid": "PBFA97CFB590B2093"
+          },
+          "disableTextWrap": false,
+          "editorMode": "code",
+          "expr": "rate(http_responses_total{job=\"speedis\",origin=\"mocks\",cacheStatus=\"TCP_HIT\"}[$__rate_interval])",
+          "fullMetaSearch": false,
+          "includeNullMetadata": true,
+          "legendFormat": "{{cacheStatus}}",
+          "range": true,
+          "refId": "TCP_HITS",
+          "useBackend": false
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "expr": "rate(http_responses_total{job=\"speedis\",origin=\"mocks\",cacheStatus=\"TCP_MISS\"}[$__rate_interval])",
+          "hide": false,
+          "instant": false,
+          "legendFormat": "{{cacheStatus}}",
+          "range": true,
+          "refId": "TCP_MISS"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "expr": "rate(http_responses_total{job=\"speedis\",origin=\"mocks\",cacheStatus=\"TCP_REFRESH_HIT\"}[$__rate_interval])",
+          "hide": false,
+          "instant": false,
+          "legendFormat": "{{cacheStatus}}",
+          "range": true,
+          "refId": "TCP_REFRESH_HIT"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "expr": "rate(http_responses_total{job=\"speedis\",origin=\"mocks\",cacheStatus=\"TCP_REFRESH_MISS\"}[$__rate_interval])",
+          "hide": false,
+          "instant": false,
+          "legendFormat": "{{cacheStatus}}",
+          "range": true,
+          "refId": "TCP_REFRESH_MISS"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "rate(http_responses_total{job=\"speedis\",origin=\"mocks\",cacheStatus=\"TCP_REFRESH_FAIL_HIT\"}[$__rate_interval])",
+          "hide": false,
+          "instant": false,
+          "legendFormat": "{{cacheStatus}}",
+          "range": true,
+          "refId": "TCP_REFRESH_FAIL_HIT"
         }
       ],
-      "title": "Total number of Responses",
+      "title": "Total number of responses by Cache Status",
       "transparent": true,
       "type": "timeseries"
     },
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "PBFA97CFB590B2093"
       },
       "fieldConfig": {
         "defaults": {
@@ -236,38 +233,13 @@
             ]
           }
         },
-        "overrides": [
-          {
-            "__systemRef": "hideSeriesFrom",
-            "matcher": {
-              "id": "byNames",
-              "options": {
-                "mode": "exclude",
-                "names": [
-                  "{cacheStatus=\"TCP_REFRESH_MISS\", instance=\"speedis:3003\", job=\"speedis\", origin=\"mocks\", statusCode=\"200\"}"
-                ],
-                "prefix": "All except:",
-                "readOnly": true
-              }
-            },
-            "properties": [
-              {
-                "id": "custom.hideFrom",
-                "value": {
-                  "legend": false,
-                  "tooltip": false,
-                  "viz": true
-                }
-              }
-            ]
-          }
-        ]
+        "overrides": []
       },
       "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 8
+        "h": 11,
+        "w": 7,
+        "x": 10,
+        "y": 0
       },
       "id": 1,
       "options": {
@@ -287,14 +259,14 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "PBFA97CFB590B2093"
           },
           "disableTextWrap": false,
           "editorMode": "code",
-          "expr": "rate(http_responses_duration_sum{origin=\"mocks\",cacheStatus=\"TCP_HIT\"}[$__rate_interval]) / rate(http_responses_duration_count{origin=\"mocks\",cacheStatus=\"TCP_HIT\"}[$__rate_interval])",
+          "expr": "rate(http_responses_duration_sum{job=\"speedis\",origin=\"mocks\",cacheStatus=\"TCP_HIT\"}[$__rate_interval]) / rate(http_responses_duration_count{job=\"speedis\",origin=\"mocks\",cacheStatus=\"TCP_HIT\"}[$__rate_interval])",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
-          "legendFormat": "__auto",
+          "legendFormat": "{{cacheStatus}}",
           "range": true,
           "refId": "TCP_HITS",
           "useBackend": false
@@ -302,52 +274,53 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "PBFA97CFB590B2093"
           },
           "editorMode": "code",
-          "expr": "rate(http_responses_duration_sum{origin=\"mocks\",cacheStatus=\"TCP_MISS\"}[$__rate_interval]) / rate(http_responses_duration_count{origin=\"mocks\",cacheStatus=\"TCP_MISS\"}[$__rate_interval])",
+          "expr": "rate(http_responses_duration_sum{job=\"speedis\",origin=\"mocks\",cacheStatus=\"TCP_MISS\"}[$__rate_interval]) / rate(http_responses_duration_count{job=\"speedis\",origin=\"mocks\",cacheStatus=\"TCP_MISS\"}[$__rate_interval])",
           "hide": false,
           "instant": false,
-          "legendFormat": "__auto",
+          "legendFormat": "{{cacheStatus}}",
           "range": true,
           "refId": "TCP_MISS"
         },
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "PBFA97CFB590B2093"
           },
           "editorMode": "code",
-          "expr": "rate(http_responses_duration_sum{origin=\"mocks\",cacheStatus=\"TCP_REFRESH_HIT\"}[$__rate_interval]) / rate(http_responses_duration_count{origin=\"mocks\",cacheStatus=\"TCP_REFRESH_HIT\"}[$__rate_interval])",
+          "expr": "rate(http_responses_duration_sum{job=\"speedis\",origin=\"mocks\",cacheStatus=\"TCP_REFRESH_HIT\"}[$__rate_interval]) / rate(http_responses_duration_count{job=\"speedis\",origin=\"mocks\",cacheStatus=\"TCP_REFRESH_HIT\"}[$__rate_interval])",
           "hide": false,
           "instant": false,
-          "legendFormat": "__auto",
+          "legendFormat": "{{cacheStatus}}",
           "range": true,
           "refId": "TCP_REFRESH_HIT"
         },
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "PBFA97CFB590B2093"
           },
           "editorMode": "code",
-          "expr": "rate(http_responses_duration_sum{origin=\"mocks\",cacheStatus=\"TCP_REFRESH_MISS\"}[$__rate_interval]) / rate(http_responses_duration_count{origin=\"mocks\",cacheStatus=\"TCP_REFRESH_MISS\"}[$__rate_interval])",
+          "expr": "rate(http_responses_duration_sum{job=\"speedis\",origin=\"mocks\",cacheStatus=\"TCP_REFRESH_MISS\"}[$__rate_interval]) / rate(http_responses_duration_count{job=\"speedis\",origin=\"mocks\",cacheStatus=\"TCP_REFRESH_MISS\"}[$__rate_interval])",
           "hide": false,
           "instant": false,
-          "legendFormat": "__auto",
+          "legendFormat": "{{cacheStatus}}",
           "range": true,
           "refId": "TCP_REFRESH_MISS"
         },
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "PBFA97CFB590B2093"
           },
           "editorMode": "code",
-          "expr": "rate(http_responses_duration_sum{origin=\"mocks\",cacheStatus=\"TCP_REFRESH_FAIL_HIT\"}[$__rate_interval]) / rate(http_responses_duration_count{origin=\"mocks\",cacheStatus=\"TCP_REFRESH_FAIL_HIT\"}[$__rate_interval])",
+          "exemplar": false,
+          "expr": "rate(http_responses_duration_sum{job=\"speedis\",origin=\"mocks\",cacheStatus=\"TCP_REFRESH_FAIL_HIT\"}[$__rate_interval]) / rate(http_responses_duration_count{job=\"speedis\",origin=\"mocks\",cacheStatus=\"TCP_REFRESH_FAIL_HIT\"}[$__rate_interval])",
           "hide": false,
           "instant": false,
-          "legendFormat": "__auto",
+          "legendFormat": "{{cacheStatus}}",
           "range": true,
           "refId": "TCP_REFRESH_FAIL_HIT"
         }
@@ -355,21 +328,149 @@
       "title": "Responses duration by Cache Status",
       "transparent": true,
       "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "__systemRef": "hideSeriesFrom",
+            "matcher": {
+              "id": "byNames",
+              "options": {
+                "mode": "exclude",
+                "names": [
+                  "200",
+                  "304"
+                ],
+                "prefix": "All except:",
+                "readOnly": true
+              }
+            },
+            "properties": [
+              {
+                "id": "custom.hideFrom",
+                "value": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": true
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 11,
+        "w": 7,
+        "x": 10,
+        "y": 11
+      },
+      "id": 4,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.4.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "disableTextWrap": false,
+          "editorMode": "code",
+          "expr": "rate(http_responses_duration_sum{job=\"speedis\",origin=\"mocks\"}[$__rate_interval]) / rate(http_responses_duration_count{job=\"speedis\",origin=\"mocks\"}[$__rate_interval])",
+          "fullMetaSearch": false,
+          "includeNullMetadata": true,
+          "legendFormat": "{{statusCode}}",
+          "range": true,
+          "refId": "TCP_HITS",
+          "useBackend": false
+        }
+      ],
+      "title": "Responses duration by Status Code",
+      "transparent": true,
+      "type": "timeseries"
     }
   ],
+  "preload": false,
   "schemaVersion": 40,
   "tags": [],
   "templating": {
     "list": []
   },
   "time": {
-    "from": "now-5m",
+    "from": "now-30m",
     "to": "now"
   },
   "timepicker": {},
   "timezone": "browser",
   "title": "Speedis",
   "uid": "feamyf5ocs45ca",
-  "version": 5,
+  "version": 8,
   "weekStart": ""
 }

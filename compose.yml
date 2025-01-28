@@ -67,6 +67,6 @@ services:
 #        condition: service_healthy
     ports:
       - 3001:3001
-      - 3003:3001
+      - 3003:3003
 volumes:
   prom_data:
