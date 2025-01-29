@@ -14,6 +14,7 @@
         "requestCoalescing": true,
         "circuitBreaker": true,
         "fetchTimeout": 2000,
+        "ignoredQueryParams": ["cc", "delay"],
         "httpxOptions": {
             "protocol": "http:",
             "host": "mocks",

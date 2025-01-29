@@ -50,6 +50,12 @@ export default async function (server, opts) {
           requestCoalescing: { type: "boolean" },
           circuitBreaker: { type: "boolean" },
           fetchTimeout: { type: "integer" },
+          ignoredQueryParams: {
+            type: "array",
+            items: {
+              type: "string"
+            }
+          },
           // https://nodejs.org/api/http.html#httprequestoptions-callback
           httpxOptions: {
             type: "object",
@@ -455,8 +461,24 @@ export default async function (server, opts) {
   }
 
   function generateCacheKey(server, request, fieldNames = utils.parseVaryHeader(request)) {
-    const path = generatePath(request)
+    let path = generatePath(request)
+    const [base, queryString] = path.split("?");
+    if (queryString) {
+      const params = new URLSearchParams(queryString);
+      if (Object.prototype.hasOwnProperty.call(server.origin, 'ignoredQueryParams')) {
+        server.origin.ignoredQueryParams.forEach(param => params.delete(param));
+      }
+      if (params.size > 0) {
+        const sortedParams = [...params.entries()]
+          .sort(([a], [b]) => a.localeCompare(b))
+          .map(([key, value]) => `${key}=${value}`)
+          .join("&");
+        path = `${base}?${sortedParams.toString()}`
+      }
+    }
+
     let cacheKey = server.id + path.replaceAll('/', ':')
+
     // See: https://www.rfc-editor.org/rfc/rfc9111.html#name-calculating-cache-keys-with
     fieldNames.forEach(fieldName => {
       if (fieldName === '*') cacheKey += ':*'
