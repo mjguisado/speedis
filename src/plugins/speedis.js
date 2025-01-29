@@ -83,21 +83,21 @@ export default async function (server, opts) {
             properties: {
               // status: { type: "Status" }, 
               // timeout: { type: "integer" }, 
-              maxFailures: { type: "integer" }, 
-              resetTimeout: { type: "integer" }, 
-              rollingCountTimeout: { type: "integer" }, 
-              rollingCountBuckets: { type: "integer" }, 
-              name: { type: "string" }, 
-              rollingPercentilesEnabled: { type: "boolean" }, 
-              capacity: { type: "integer" }, 
-              errorThresholdPercentage: { type: "integer" }, 
-              enabled: { type: "boolean" }, 
-              allowWarmUp: { type: "boolean" }, 
-              volumeThreshold: { type: "integer" }, 
+              maxFailures: { type: "integer" },
+              resetTimeout: { type: "integer" },
+              rollingCountTimeout: { type: "integer" },
+              rollingCountBuckets: { type: "integer" },
+              name: { type: "string" },
+              rollingPercentilesEnabled: { type: "boolean" },
+              capacity: { type: "integer" },
+              errorThresholdPercentage: { type: "integer" },
+              enabled: { type: "boolean" },
+              allowWarmUp: { type: "boolean" },
+              volumeThreshold: { type: "integer" },
               // errorFilter: { type: "Function" }, 
-              cache: { type: "boolean" }, 
-              cacheTTL: { type: "integer" }, 
-              cacheSize: { type: "integer" }, 
+              cache: { type: "boolean" },
+              cacheTTL: { type: "integer" },
+              cacheSize: { type: "integer" },
               // cacheGetKey: { type: "Function" }, 
               // cacheTransport: { type: "CacheTransport" }, 
               /*
@@ -108,11 +108,11 @@ export default async function (server, opts) {
                 type: "array",
                 items: { enum: ["error", "success", "timeout"] }
               },
-              */ 
+              */
               // abortController: { type: "AbortController" }, 
-              enableSnapshots: { type: "boolean" }, 
+              enableSnapshots: { type: "boolean" },
               // rotateBucketController: { type: "EventEmitter" }, 
-              autoRenewAbortController: { type: "boolean" }, 
+              autoRenewAbortController: { type: "boolean" },
             }
           },
           // See: https://nodejs.org/api/http.html#new-agentoptions
@@ -228,7 +228,7 @@ export default async function (server, opts) {
       }
 
       if (origin.circuitBreaker) {
-      
+
         // FIXME: REfinar la validación del objeto circuitBreakerOptions para quitar las 
         // propiedades que no son necesarias.
 
@@ -253,7 +253,7 @@ export default async function (server, opts) {
 
         circuit.on('open', () => {
           let retryAfter = new Date()
-          retryAfter.setSeconds(retryAfter.getSeconds() + circuit.options.resetTimeout/1000)
+          retryAfter.setSeconds(retryAfter.getSeconds() + circuit.options.resetTimeout / 1000)
           circuit['retryAfter'] = retryAfter.toUTCString()
           server.log.warn(`Circuit Breaker Open: No requests will be made. Origin ${id}.`)
         })
@@ -267,7 +267,7 @@ export default async function (server, opts) {
         for (const eventName of circuit.eventNames()) {
           circuit.on(eventName, _ => {
             server.circuitBreakersEvents.labels({
-              origin: id, 
+              origin: id,
               event: eventName
             }).inc()
           })
@@ -275,7 +275,7 @@ export default async function (server, opts) {
             // Not the timeout event because runtime == timeout
             circuit.on(eventName, (result, runTime) => {
               server.circuitBreakersPerformance.labels({
-                origin: id, 
+                origin: id,
                 event: eventName
               }).observe(runTime)
             })
@@ -321,19 +321,17 @@ export default async function (server, opts) {
     handler: async function (request, reply) {
 
       server.httpRequestsTotal
-        .labels({origin: id})
+        .labels({ origin: id })
         .inc()
-      
+
       let response = null
       try {
         response = await _get(server, request, request.id)
       } catch (error) {
+        // FIXME: Reaffirm that we want to use the default error handling.
         const msg =
-          "Error requesting to the origin and there is no a valid entry in the cache. " +
+          "Error requesting to the origin. " +
           `Origin: ${server.id}. Url: ${request.url}. RID: ${request.id}.`
-        if (error.code === 'ETIMEDOUT')
-        
-        
         if (server.exposeErrors) { throw new Error(msg, { cause: error }) }
         else throw new Error(msg)
       }
@@ -396,10 +394,13 @@ export default async function (server, opts) {
         }
       }
 
-      const now = new Date().toUTCString()
+      const headers = {
+        date: new Date().toUTCString()
+      }
+      headers['x-speedis-cache-status'] = response.headers['x-speedis-cache-status']
       if (!ifNoneMatchCondition) {
         reply.code(304)
-        reply.headers({ date: now })
+        reply.headers(headers)
       } else {
         // See: https://www.rfc-editor.org/rfc/rfc9110.html#section-13.1.3
         let ifModifiedSinceCondition = true
@@ -414,10 +415,10 @@ export default async function (server, opts) {
         }
         if (!ifModifiedSinceCondition) {
           reply.code(304)
-          reply.headers({ date: now })
+          reply.headers(headers)
         } else {
           reply.code(response.statusCode)
-          response.headers['date'] = now
+          response.headers['date'] = headers['date']
           reply.headers(response.headers)
           reply.send(response.body)
         }
@@ -548,7 +549,7 @@ export default async function (server, opts) {
         // https://www.rfc-editor.org/rfc/rfc9111.html#name-calculating-cache-keys-with
         // A stored response with a Vary header field value containing a member "*" always fails to match
         && !fieldNames.includes('*')) {
-        utils.setCacheStatus('HIT', cachedResponse)
+        utils.setCacheStatus('CACHE_HIT', cachedResponse)
         cachedResponse.headers['age'] = utils.calculateAge(cachedResponse)
         return cachedResponse
       } else {
@@ -626,38 +627,40 @@ export default async function (server, opts) {
       * I may consider serving the stale content.
       */
       // https://www.rfc-editor.org/rfc/rfc9111.html#cache-response-directive.must-revalidate
-      if (cachedResponse != null
+      if (cachedResponse
         && !Object.prototype.hasOwnProperty.call(cachedCacheDirectives, 'must-revalidate')
         && !Object.prototype.hasOwnProperty.call(cachedCacheDirectives, 'proxy-revalidate')) {
         server.log.warn(error,
           "Serving stale content from cache. " +
           `Origin: ${server.id}. Key: ${cacheKey}. RID: ${rid}.`)
-        utils.setCacheStatus('REFRESH_FAIL_HIT', cachedResponse)
+        utils.setCacheStatus('CACHE_HIT_NOT_REVALIDATED_STALE', cachedResponse)
         cachedResponse.headers['age'] = utils.calculateAge(cachedResponse)
         return cachedResponse
       } else {
-        let statusCode = 0
-        let headers = {
-          date: new Date().toUTCString()
+        const generatedResponse = {
+          headers: {
+            date: new Date().toUTCString()
+          }
         }
+        utils.setCacheStatus(
+          cachedResponse?'CACHE_HIT_NOT_REVALIDATED':'CACHE_FAILED_MISS',
+          generatedResponse
+        )
         switch (error.code) {
           case 'ETIMEDOUT':
-            statusCode = 504
+            generatedResponse.statusCode = 504
             break
           case 'EOPENBREAKER':
-            statusCode = 503
+            generatedResponse.statusCode = 503
             if (server.circuit.options.resetTimeout) {
-              headers['retry-after'] = server.circuit.retryAfter
+              generatedResponse.headers['retry-after'] = server.circuit.retryAfter
             }
             break
           default:
-            statusCode = 500
+            generatedResponse.statusCode = 500
             break
         }
-        return {
-          statusCode: statusCode,
-          headers: headers
-        }
+        return generatedResponse
       }
     } finally {
       if (origin.requestCoalescing) server.ongoing.delete(cacheKey)
@@ -765,19 +768,23 @@ export default async function (server, opts) {
     // See: https://www.rfc-editor.org/rfc/rfc9111.html#cache-request-directive.only-if-cached
     if (Object.prototype.hasOwnProperty.call(clientCacheDirectives, 'only-if-cached')
       && cachedResponse == null) {
-      return {
+      const generatedResponse = {
         statusCode: 504,
         headers: {
           'date': new Date().toUTCString()
         }
       }
+      utils.setCacheStatus('CACHE_MISS', generatedResponse)
+      return generatedResponse
     }
 
     if (originResponse.statusCode === 304) {
-      utils.setCacheStatus('REFRESH_HIT', cachedResponse)
+      utils.setCacheStatus('CACHE_HIT_REVALIDATED_304', cachedResponse)
       return utils.cloneAndTrimResponse(cachedResponse)
     } else {
-      utils.setCacheStatus(conditionalFetch ? 'REFRESH_MISS' : 'MISS', originResponse)
+      utils.setCacheStatus(
+        cachedResponse?'CACHE_HIT_REVALIDATED':'CACHE_MISS', originResponse
+      )
       return utils.cloneAndTrimResponse(originResponse)
     }
 
@@ -805,15 +812,15 @@ export default async function (server, opts) {
 
         // If we are using the Circuit Breaker the timeout is managed by it.
         // In other cases, we has to manage the timeout in the request.
-        let signal, timeoutId = null       
+        let signal, timeoutId = null
         if (Object.prototype.hasOwnProperty.call(origin, "fetchTimeout") &&
-           !Object.prototype.hasOwnProperty.call(options, "signal")) {
-            const abortController = new AbortController()
-            timeoutId = setTimeout(() => {
-              abortController.abort()
-            }, origin.fetchTimeout)
-            signal = abortController.signal
-            options.signal = signal
+          !Object.prototype.hasOwnProperty.call(options, "signal")) {
+          const abortController = new AbortController()
+          timeoutId = setTimeout(() => {
+            abortController.abort()
+          }, origin.fetchTimeout)
+          signal = abortController.signal
+          options.signal = signal
         }
 
         const request = (options.protocol === 'https:' ? https : http)
@@ -824,7 +831,7 @@ export default async function (server, opts) {
               if (timeoutId) clearTimeout(timeoutId)
               resolve({ statusCode: res.statusCode, headers: res.headers, body: rawData })
             })
-        })
+          })
 
         request.on('error', (err) => {
           if (signal && signal.aborted) {

@@ -62,7 +62,7 @@ suite('Speedis', async () => {
             })
             t.assert.strictEqual(response.statusCode, 200)
             t.assert.ok(Object.prototype.hasOwnProperty.call(response.headers, 'x-speedis-cache'))
-            t.assert.match(response.headers['x-speedis-cache'], /^TCP_MISS/)     
+            t.assert.match(response.headers['x-speedis-cache'], /^CACHE_MISS/)     
             t.assert.ok(!Object.prototype.hasOwnProperty.call(response.headers, 'age'))
 
             response = await fastifyServer.inject({
@@ -74,7 +74,7 @@ suite('Speedis', async () => {
             })
             t.assert.strictEqual(response.statusCode, 200)
             t.assert.ok(Object.prototype.hasOwnProperty.call(response.headers, 'x-speedis-cache'))
-            t.assert.match(response.headers['x-speedis-cache'], /^TCP_HIT/)
+            t.assert.match(response.headers['x-speedis-cache'], /^CACHE_HIT/)
             t.assert.ok(Object.prototype.hasOwnProperty.call(response.headers, 'age'))
             t.assert.ok(Number.parseInt(response.headers['age']) <= clientmaxage)
 
@@ -89,7 +89,7 @@ suite('Speedis', async () => {
             })
             t.assert.strictEqual(response.statusCode, 200)
             t.assert.ok(Object.prototype.hasOwnProperty.call(response.headers, 'x-speedis-cache'))
-            t.assert.match(response.headers['x-speedis-cache'], /^TCP_REFRESH_MISS/)
+            t.assert.match(response.headers['x-speedis-cache'], /^CACHE_HIT_REVALIDATED/)
             t.assert.ok(!Object.prototype.hasOwnProperty.call(response.headers, 'age'))
 
             response = await fastifyServer.inject({
@@ -101,7 +101,7 @@ suite('Speedis', async () => {
             })
             t.assert.strictEqual(response.statusCode, 200)
             t.assert.ok(Object.prototype.hasOwnProperty.call(response.headers, 'x-speedis-cache'))
-            t.assert.match(response.headers['x-speedis-cache'], /^TCP_HIT/)            
+            t.assert.match(response.headers['x-speedis-cache'], /^CACHE_HIT/)            
             t.assert.ok(Object.prototype.hasOwnProperty.call(response.headers, 'age'))
             t.assert.ok(Number.parseInt(response.headers['age']) <= clientmaxage)
 
@@ -124,7 +124,7 @@ suite('Speedis', async () => {
             })
             t.assert.strictEqual(response.statusCode, 200)
             t.assert.ok(Object.prototype.hasOwnProperty.call(response.headers, 'x-speedis-cache'))
-            t.assert.match(response.headers['x-speedis-cache'], /^TCP_MISS/)     
+            t.assert.match(response.headers['x-speedis-cache'], /^CACHE_MISS/)     
             t.assert.ok(!Object.prototype.hasOwnProperty.call(response.headers, 'age'))
 
             response = await fastifyServer.inject({
@@ -136,7 +136,7 @@ suite('Speedis', async () => {
             })
             t.assert.strictEqual(response.statusCode, 200)
             t.assert.ok(Object.prototype.hasOwnProperty.call(response.headers, 'x-speedis-cache'))
-            t.assert.match(response.headers['x-speedis-cache'], /^TCP_HIT/)
+            t.assert.match(response.headers['x-speedis-cache'], /^CACHE_HIT/)
             t.assert.ok(Object.prototype.hasOwnProperty.call(response.headers, 'age'))
             t.assert.ok(Number.parseInt(originmaxage - response.headers['age']) >= clientminfresh)
 
@@ -151,7 +151,7 @@ suite('Speedis', async () => {
             })
             t.assert.strictEqual(response.statusCode, 200)
             t.assert.ok(Object.prototype.hasOwnProperty.call(response.headers, 'x-speedis-cache'))
-            t.assert.match(response.headers['x-speedis-cache'], /^TCP_REFRESH_MISS/)
+            t.assert.match(response.headers['x-speedis-cache'], /^CACHE_HIT_REVALIDATED/)
             t.assert.ok(!Object.prototype.hasOwnProperty.call(response.headers, 'age'))
 
             response = await fastifyServer.inject({
@@ -163,7 +163,7 @@ suite('Speedis', async () => {
             })
             t.assert.strictEqual(response.statusCode, 200)
             t.assert.ok(Object.prototype.hasOwnProperty.call(response.headers, 'x-speedis-cache'))
-            t.assert.match(response.headers['x-speedis-cache'], /^TCP_HIT/)            
+            t.assert.match(response.headers['x-speedis-cache'], /^CACHE_HIT/)            
             t.assert.ok(Object.prototype.hasOwnProperty.call(response.headers, 'age'))
             t.assert.ok(Number.parseInt(originmaxage - response.headers['age']) >= clientminfresh)
 
@@ -186,7 +186,7 @@ suite('Speedis', async () => {
             })
             t.assert.strictEqual(response.statusCode, 200)
             t.assert.ok(Object.prototype.hasOwnProperty.call(response.headers, 'x-speedis-cache'))
-            t.assert.match(response.headers['x-speedis-cache'], /^TCP_MISS/)     
+            t.assert.match(response.headers['x-speedis-cache'], /^CACHE_MISS/)     
             t.assert.ok(!Object.prototype.hasOwnProperty.call(response.headers, 'age'))
 
             response = await fastifyServer.inject({
@@ -198,7 +198,7 @@ suite('Speedis', async () => {
             })
             t.assert.strictEqual(response.statusCode, 200)
             t.assert.ok(Object.prototype.hasOwnProperty.call(response.headers, 'x-speedis-cache'))
-            t.assert.match(response.headers['x-speedis-cache'], /^TCP_HIT/)
+            t.assert.match(response.headers['x-speedis-cache'], /^CACHE_HIT/)
             t.assert.ok(Object.prototype.hasOwnProperty.call(response.headers, 'age'))
             t.assert.ok(Number.parseInt(response.headers['age']) <= originmaxage)
             
@@ -213,7 +213,7 @@ suite('Speedis', async () => {
             })
             t.assert.strictEqual(response.statusCode, 200)
             t.assert.ok(Object.prototype.hasOwnProperty.call(response.headers, 'x-speedis-cache'))
-            t.assert.match(response.headers['x-speedis-cache'], /^TCP_HIT/)
+            t.assert.match(response.headers['x-speedis-cache'], /^CACHE_HIT/)
             t.assert.ok(Object.prototype.hasOwnProperty.call(response.headers, 'age'))
             t.assert.ok(Number.parseInt(response.headers['age']) > originmaxage)
             t.assert.ok(Number.parseInt(response.headers['age']) <= originmaxage + clientmaxstale)
@@ -229,7 +229,7 @@ suite('Speedis', async () => {
             })
             t.assert.strictEqual(response.statusCode, 200)
             t.assert.ok(Object.prototype.hasOwnProperty.call(response.headers, 'x-speedis-cache'))
-            t.assert.match(response.headers['x-speedis-cache'], /^TCP_REFRESH_MISS/)
+            t.assert.match(response.headers['x-speedis-cache'], /^CACHE_HIT_REVALIDATED/)
             t.assert.ok(!Object.prototype.hasOwnProperty.call(response.headers, 'age'))
 
             response = await fastifyServer.inject({
@@ -241,7 +241,7 @@ suite('Speedis', async () => {
             })
             t.assert.strictEqual(response.statusCode, 200)
             t.assert.ok(Object.prototype.hasOwnProperty.call(response.headers, 'x-speedis-cache'))
-            t.assert.match(response.headers['x-speedis-cache'], /^TCP_HIT/)
+            t.assert.match(response.headers['x-speedis-cache'], /^CACHE_HIT/)
             t.assert.ok(Object.prototype.hasOwnProperty.call(response.headers, 'age'))
             t.assert.ok(Number.parseInt(response.headers['age']) <= originmaxage)
     
@@ -260,7 +260,7 @@ suite('Speedis', async () => {
             })
             t.assert.strictEqual(response.statusCode, 200)
             t.assert.ok(Object.prototype.hasOwnProperty.call(response.headers, 'x-speedis-cache'))
-            t.assert.match(response.headers['x-speedis-cache'], /^TCP_MISS/)     
+            t.assert.match(response.headers['x-speedis-cache'], /^CACHE_MISS/)     
             t.assert.ok(!Object.prototype.hasOwnProperty.call(response.headers, 'age'))
 
             response = await fastifyServer.inject({
@@ -272,7 +272,7 @@ suite('Speedis', async () => {
             })
             t.assert.strictEqual(response.statusCode, 200)
             t.assert.ok(Object.prototype.hasOwnProperty.call(response.headers, 'x-speedis-cache'))
-            t.assert.match(response.headers['x-speedis-cache'], /^TCP_REFRESH_MISS/)
+            t.assert.match(response.headers['x-speedis-cache'], /^CACHE_HIT_REVALIDATED/)
             t.assert.ok(!Object.prototype.hasOwnProperty.call(response.headers, 'age'))
 
             response = await fastifyServer.inject({
@@ -282,7 +282,7 @@ suite('Speedis', async () => {
             })
             t.assert.strictEqual(response.statusCode, 200)
             t.assert.ok(Object.prototype.hasOwnProperty.call(response.headers, 'x-speedis-cache'))
-            t.assert.match(response.headers['x-speedis-cache'], /^TCP_HIT/)
+            t.assert.match(response.headers['x-speedis-cache'], /^CACHE_HIT/)
             t.assert.ok(Object.prototype.hasOwnProperty.call(response.headers, 'age'))
             t.assert.ok(Number.parseInt(response.headers['age']) <= originmaxage)
 
@@ -301,7 +301,7 @@ suite('Speedis', async () => {
             })
             t.assert.strictEqual(response.statusCode, 200)
             t.assert.ok(Object.prototype.hasOwnProperty.call(response.headers, 'x-speedis-cache'))
-            t.assert.match(response.headers['x-speedis-cache'], /^TCP_MISS/)     
+            t.assert.match(response.headers['x-speedis-cache'], /^CACHE_MISS/)     
             t.assert.ok(!Object.prototype.hasOwnProperty.call(response.headers, 'age'))
 
             await sleep((originmaxage + 1)  * 1000)
@@ -312,7 +312,7 @@ suite('Speedis', async () => {
             })
             t.assert.strictEqual(response.statusCode, 200)
             t.assert.ok(Object.prototype.hasOwnProperty.call(response.headers, 'x-speedis-cache'))
-            t.assert.match(response.headers['x-speedis-cache'], /^TCP_REFRESH_MISS/)
+            t.assert.match(response.headers['x-speedis-cache'], /^CACHE_HIT_REVALIDATED/)
             t.assert.ok(!Object.prototype.hasOwnProperty.call(response.headers, 'age'))
 
         })
@@ -330,7 +330,7 @@ suite('Speedis', async () => {
             })
             t.assert.strictEqual(response.statusCode, 200)
             t.assert.ok(Object.prototype.hasOwnProperty.call(response.headers, 'x-speedis-cache'))
-            t.assert.match(response.headers['x-speedis-cache'], /^TCP_MISS/)     
+            t.assert.match(response.headers['x-speedis-cache'], /^CACHE_MISS/)     
             t.assert.ok(!Object.prototype.hasOwnProperty.call(response.headers, 'age'))
 
             response = await fastifyServer.inject({
@@ -339,7 +339,7 @@ suite('Speedis', async () => {
             })
             t.assert.strictEqual(response.statusCode, 200)
             t.assert.ok(Object.prototype.hasOwnProperty.call(response.headers, 'x-speedis-cache'))
-            t.assert.match(response.headers['x-speedis-cache'], /^TCP_REFRESH_MISS/)
+            t.assert.match(response.headers['x-speedis-cache'], /^CACHE_HIT_REVALIDATED/)
             t.assert.ok(!Object.prototype.hasOwnProperty.call(response.headers, 'age'))
 
         })
@@ -357,7 +357,7 @@ suite('Speedis', async () => {
             })
             t.assert.strictEqual(response.statusCode, 200)
             t.assert.ok(Object.prototype.hasOwnProperty.call(response.headers, 'x-speedis-cache'))
-            t.assert.match(response.headers['x-speedis-cache'], /^TCP_MISS/)     
+            t.assert.match(response.headers['x-speedis-cache'], /^CACHE_MISS/)     
             t.assert.ok(!Object.prototype.hasOwnProperty.call(response.headers, 'age'))
 
             response = await fastifyServer.inject({
@@ -366,7 +366,7 @@ suite('Speedis', async () => {
             })
             t.assert.strictEqual(response.statusCode, 200)
             t.assert.ok(Object.prototype.hasOwnProperty.call(response.headers, 'x-speedis-cache'))
-            t.assert.match(response.headers['x-speedis-cache'], /^TCP_MISS/)
+            t.assert.match(response.headers['x-speedis-cache'], /^CACHE_MISS/)
             t.assert.ok(!Object.prototype.hasOwnProperty.call(response.headers, 'age'))
 
         })
@@ -384,7 +384,7 @@ suite('Speedis', async () => {
             })
             t.assert.strictEqual(response.statusCode, 200)
             t.assert.ok(Object.prototype.hasOwnProperty.call(response.headers, 'x-speedis-cache'))
-            t.assert.match(response.headers['x-speedis-cache'], /^TCP_MISS/)     
+            t.assert.match(response.headers['x-speedis-cache'], /^CACHE_MISS/)     
             t.assert.ok(!Object.prototype.hasOwnProperty.call(response.headers, 'age'))
             t.assert.ok(Object.prototype.hasOwnProperty.call(response.headers, 'x-mocks-custom-header-1'))
             t.assert.ok(Object.prototype.hasOwnProperty.call(response.headers, 'x-mocks-custom-header-2'))
@@ -396,7 +396,7 @@ suite('Speedis', async () => {
             })
             t.assert.strictEqual(response.statusCode, 200)
             t.assert.ok(Object.prototype.hasOwnProperty.call(response.headers, 'x-speedis-cache'))
-            t.assert.match(response.headers['x-speedis-cache'], /^TCP_HIT/)
+            t.assert.match(response.headers['x-speedis-cache'], /^CACHE_HIT/)
             t.assert.ok(Object.prototype.hasOwnProperty.call(response.headers, 'age'))
             t.assert.ok(Number.parseInt(response.headers['age']) <= originmaxage)
             t.assert.ok(!Object.prototype.hasOwnProperty.call(response.headers, 'x-mocks-custom-header-1'))
@@ -418,7 +418,7 @@ suite('Speedis', async () => {
             })
             t.assert.strictEqual(response.statusCode, 200)
             t.assert.ok(Object.prototype.hasOwnProperty.call(response.headers, 'x-speedis-cache'))
-            t.assert.match(response.headers['x-speedis-cache'], /^TCP_MISS/)     
+            t.assert.match(response.headers['x-speedis-cache'], /^CACHE_MISS/)     
             t.assert.ok(!Object.prototype.hasOwnProperty.call(response.headers, 'age'))
             t.assert.ok(Object.prototype.hasOwnProperty.call(response.headers, 'x-mocks-custom-header-1'))
             t.assert.ok(Object.prototype.hasOwnProperty.call(response.headers, 'x-mocks-custom-header-2'))
@@ -430,7 +430,7 @@ suite('Speedis', async () => {
             })
             t.assert.strictEqual(response.statusCode, 200)
             t.assert.ok(Object.prototype.hasOwnProperty.call(response.headers, 'x-speedis-cache'))
-            t.assert.match(response.headers['x-speedis-cache'], /^TCP_HIT/)
+            t.assert.match(response.headers['x-speedis-cache'], /^CACHE_HIT/)
             t.assert.ok(Object.prototype.hasOwnProperty.call(response.headers, 'age'))
             t.assert.ok(Number.parseInt(response.headers['age']) <= originmaxage)
             t.assert.ok(!Object.prototype.hasOwnProperty.call(response.headers, 'x-mocks-custom-header-1'))
@@ -456,7 +456,7 @@ suite('Speedis', async () => {
         })
 
         /*
-        test('GET Sequence - TCP_REFRESH_MISS', async (t) => {
+        test('GET Sequence - CACHE_HIT_REVALIDATED', async (t) => {
             t.plan(13)
 
             let maxage = 3
@@ -469,7 +469,7 @@ suite('Speedis', async () => {
             })
             t.assert.strictEqual(response.statusCode, 200)
             t.assert.ok(Object.prototype.hasOwnProperty.call(response.headers, 'x-speedis-cache'))
-            t.assert.match(response.headers['x-speedis-cache'], /^TCP_MISS/)           
+            t.assert.match(response.headers['x-speedis-cache'], /^CACHE_MISS/)           
 
             response = await fastifyServer.inject({
                 method: 'GET',
@@ -477,7 +477,7 @@ suite('Speedis', async () => {
             })
             t.assert.strictEqual(response.statusCode, 200)
             t.assert.ok(Object.prototype.hasOwnProperty.call(response.headers, 'x-speedis-cache'))
-            t.assert.match(response.headers['x-speedis-cache'], /^TCP_HIT/)           
+            t.assert.match(response.headers['x-speedis-cache'], /^CACHE_HIT/)           
 
             await sleep((maxage + 1)  * 1000)
 
@@ -487,7 +487,7 @@ suite('Speedis', async () => {
             })
             t.assert.strictEqual(response.statusCode, 200)
             t.assert.ok(Object.prototype.hasOwnProperty.call(response.headers, 'x-speedis-cache'))
-            t.assert.match(response.headers['x-speedis-cache'], /^TCP_REFRESH_MISS/)           
+            t.assert.match(response.headers['x-speedis-cache'], /^CACHE_HIT_REVALIDATED/)           
 
             response = await fastifyServer.inject({
                 method: 'GET',
@@ -495,7 +495,7 @@ suite('Speedis', async () => {
             })
             t.assert.strictEqual(response.statusCode, 200)
             t.assert.ok(Object.prototype.hasOwnProperty.call(response.headers, 'x-speedis-cache'))
-            t.assert.match(response.headers['x-speedis-cache'], /^TCP_HIT/)
+            t.assert.match(response.headers['x-speedis-cache'], /^CACHE_HIT/)
 
             response = await fastifyServer.inject({
                 method: 'DELETE',

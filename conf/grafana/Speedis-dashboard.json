@@ -82,12 +82,12 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 11,
-        "w": 10,
+        "h": 8,
+        "w": 12,
         "x": 0,
         "y": 0
       },
-      "id": 3,
+      "id": 5,
       "options": {
         "legend": {
           "calcs": [],
@@ -103,76 +103,14 @@
       "pluginVersion": "11.4.0",
       "targets": [
         {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "PBFA97CFB590B2093"
-          },
-          "disableTextWrap": false,
           "editorMode": "code",
-          "expr": "rate(http_responses_total{job=\"speedis\",origin=\"mocks\",cacheStatus=\"TCP_HIT\"}[$__rate_interval])",
-          "fullMetaSearch": false,
-          "includeNullMetadata": true,
-          "legendFormat": "{{cacheStatus}}",
+          "expr": "sum(rate(http_responses_total{job=\"speedis\",origin=\"mocks\"}[$__rate_interval])) by (cacheStatus)",
+          "legendFormat": "__auto",
           "range": true,
-          "refId": "TCP_HITS",
-          "useBackend": false
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "PBFA97CFB590B2093"
-          },
-          "editorMode": "code",
-          "expr": "rate(http_responses_total{job=\"speedis\",origin=\"mocks\",cacheStatus=\"TCP_MISS\"}[$__rate_interval])",
-          "hide": false,
-          "instant": false,
-          "legendFormat": "{{cacheStatus}}",
-          "range": true,
-          "refId": "TCP_MISS"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "PBFA97CFB590B2093"
-          },
-          "editorMode": "code",
-          "expr": "rate(http_responses_total{job=\"speedis\",origin=\"mocks\",cacheStatus=\"TCP_REFRESH_HIT\"}[$__rate_interval])",
-          "hide": false,
-          "instant": false,
-          "legendFormat": "{{cacheStatus}}",
-          "range": true,
-          "refId": "TCP_REFRESH_HIT"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "PBFA97CFB590B2093"
-          },
-          "editorMode": "code",
-          "expr": "rate(http_responses_total{job=\"speedis\",origin=\"mocks\",cacheStatus=\"TCP_REFRESH_MISS\"}[$__rate_interval])",
-          "hide": false,
-          "instant": false,
-          "legendFormat": "{{cacheStatus}}",
-          "range": true,
-          "refId": "TCP_REFRESH_MISS"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "PBFA97CFB590B2093"
-          },
-          "editorMode": "code",
-          "exemplar": false,
-          "expr": "rate(http_responses_total{job=\"speedis\",origin=\"mocks\",cacheStatus=\"TCP_REFRESH_FAIL_HIT\"}[$__rate_interval])",
-          "hide": false,
-          "instant": false,
-          "legendFormat": "{{cacheStatus}}",
-          "range": true,
-          "refId": "TCP_REFRESH_FAIL_HIT"
+          "refId": "A"
         }
       ],
       "title": "Total number of responses by Cache Status",
-      "transparent": true,
       "type": "timeseries"
     },
     {
@@ -238,7 +176,7 @@
       "gridPos": {
         "h": 11,
         "w": 7,
-        "x": 10,
+        "x": 12,
         "y": 0
       },
       "id": 1,
@@ -263,70 +201,109 @@
           },
           "disableTextWrap": false,
           "editorMode": "code",
-          "expr": "rate(http_responses_duration_sum{job=\"speedis\",origin=\"mocks\",cacheStatus=\"TCP_HIT\"}[$__rate_interval]) / rate(http_responses_duration_count{job=\"speedis\",origin=\"mocks\",cacheStatus=\"TCP_HIT\"}[$__rate_interval])",
+          "expr": "avg(rate(http_responses_duration_sum{job=\"speedis\",origin=\"mocks\"}[$__rate_interval])/rate(http_responses_duration_count{job=\"speedis\",origin=\"mocks\"}[$__rate_interval])) by (cacheStatus)",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "legendFormat": "{{cacheStatus}}",
           "range": true,
-          "refId": "TCP_HITS",
+          "refId": "CACHE_HITS",
           "useBackend": false
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "PBFA97CFB590B2093"
-          },
-          "editorMode": "code",
-          "expr": "rate(http_responses_duration_sum{job=\"speedis\",origin=\"mocks\",cacheStatus=\"TCP_MISS\"}[$__rate_interval]) / rate(http_responses_duration_count{job=\"speedis\",origin=\"mocks\",cacheStatus=\"TCP_MISS\"}[$__rate_interval])",
-          "hide": false,
-          "instant": false,
-          "legendFormat": "{{cacheStatus}}",
-          "range": true,
-          "refId": "TCP_MISS"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "PBFA97CFB590B2093"
-          },
-          "editorMode": "code",
-          "expr": "rate(http_responses_duration_sum{job=\"speedis\",origin=\"mocks\",cacheStatus=\"TCP_REFRESH_HIT\"}[$__rate_interval]) / rate(http_responses_duration_count{job=\"speedis\",origin=\"mocks\",cacheStatus=\"TCP_REFRESH_HIT\"}[$__rate_interval])",
-          "hide": false,
-          "instant": false,
-          "legendFormat": "{{cacheStatus}}",
-          "range": true,
-          "refId": "TCP_REFRESH_HIT"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "PBFA97CFB590B2093"
-          },
-          "editorMode": "code",
-          "expr": "rate(http_responses_duration_sum{job=\"speedis\",origin=\"mocks\",cacheStatus=\"TCP_REFRESH_MISS\"}[$__rate_interval]) / rate(http_responses_duration_count{job=\"speedis\",origin=\"mocks\",cacheStatus=\"TCP_REFRESH_MISS\"}[$__rate_interval])",
-          "hide": false,
-          "instant": false,
-          "legendFormat": "{{cacheStatus}}",
-          "range": true,
-          "refId": "TCP_REFRESH_MISS"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "PBFA97CFB590B2093"
-          },
-          "editorMode": "code",
-          "exemplar": false,
-          "expr": "rate(http_responses_duration_sum{job=\"speedis\",origin=\"mocks\",cacheStatus=\"TCP_REFRESH_FAIL_HIT\"}[$__rate_interval]) / rate(http_responses_duration_count{job=\"speedis\",origin=\"mocks\",cacheStatus=\"TCP_REFRESH_FAIL_HIT\"}[$__rate_interval])",
-          "hide": false,
-          "instant": false,
-          "legendFormat": "{{cacheStatus}}",
-          "range": true,
-          "refId": "TCP_REFRESH_FAIL_HIT"
         }
       ],
       "title": "Responses duration by Cache Status",
       "transparent": true,
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 8
+      },
+      "id": 6,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.4.0",
+      "targets": [
+        {
+          "editorMode": "code",
+          "expr": "sum(rate(http_responses_total{job=\"speedis\",origin=\"mocks\"}[$__rate_interval])) by (statusCode)",
+          "legendFormat": "{{statusCode}}",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Total number of responses by Status Code",
       "type": "timeseries"
     },
     {
@@ -418,7 +395,7 @@
       "gridPos": {
         "h": 11,
         "w": 7,
-        "x": 10,
+        "x": 12,
         "y": 11
       },
       "id": 4,
@@ -443,12 +420,12 @@
           },
           "disableTextWrap": false,
           "editorMode": "code",
-          "expr": "rate(http_responses_duration_sum{job=\"speedis\",origin=\"mocks\"}[$__rate_interval]) / rate(http_responses_duration_count{job=\"speedis\",origin=\"mocks\"}[$__rate_interval])",
+          "expr": "avg(rate(http_responses_duration_sum{job=\"speedis\",origin=\"mocks\"}[$__rate_interval]) / rate(http_responses_duration_count{job=\"speedis\",origin=\"mocks\"}[$__rate_interval])) by (statusCode)",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "legendFormat": "{{statusCode}}",
           "range": true,
-          "refId": "TCP_HITS",
+          "refId": "CACHE_HITS",
           "useBackend": false
         }
       ],
@@ -458,6 +435,7 @@
     }
   ],
   "preload": false,
+  "refresh": "auto",
   "schemaVersion": 40,
   "tags": [],
   "templating": {
@@ -471,6 +449,6 @@
   "timezone": "browser",
   "title": "Speedis",
   "uid": "feamyf5ocs45ca",
-  "version": 8,
+  "version": 2,
   "weekStart": ""
 }
