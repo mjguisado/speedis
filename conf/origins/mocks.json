@@ -15,6 +15,7 @@
         "circuitBreaker": true,
         "fetchTimeout": 2000,
         "ignoredQueryParams": ["cc", "delay"],
+        "sortQueryParams": true,
         "httpxOptions": {
             "protocol": "http:",
             "host": "mocks",

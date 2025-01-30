@@ -56,6 +56,7 @@ export default async function (server, opts) {
               type: "string"
             }
           },
+          sortQueryParams: { type: "boolean" },
           // https://nodejs.org/api/http.html#httprequestoptions-callback
           httpxOptions: {
             type: "object",
@@ -436,7 +437,8 @@ export default async function (server, opts) {
     method: 'DELETE',
     url: '/*',
     handler: async function (request, reply) {
-      const cacheKey = generateCacheKey(server, request)
+      const fieldNames = utils.parseVaryHeader(request)
+      let cacheKey = generateCacheKey(server, request, fieldNames)      
       try {
         // See: https://antirez.com/news/93
         let result = await server.redis.unlink(cacheKey)
@@ -469,11 +471,15 @@ export default async function (server, opts) {
         server.origin.ignoredQueryParams.forEach(param => params.delete(param));
       }
       if (params.size > 0) {
-        const sortedParams = [...params.entries()]
-          .sort(([a], [b]) => a.localeCompare(b))
-          .map(([key, value]) => `${key}=${value}`)
-          .join("&");
-        path = `${base}?${sortedParams.toString()}`
+        if (server.origin.sortQueryParams) {
+          const sortedParams = [...params.entries()]
+            .sort(([a], [b]) => a.localeCompare(b))
+            .map(([key, value]) => `${key}=${value}`)
+            .join("&");
+          path = `${base}?${sortedParams.toString()}`
+        } else {
+          path = `${base}?${params.toString()}`
+        }
       } else {
         path = base
       }
