@@ -474,9 +474,11 @@ export default async function (server, opts) {
           .map(([key, value]) => `${key}=${value}`)
           .join("&");
         path = `${base}?${sortedParams.toString()}`
+      } else {
+        path = base
       }
     }
-
+    
     let cacheKey = server.id + path.replaceAll('/', ':')
 
     // See: https://www.rfc-editor.org/rfc/rfc9111.html#name-calculating-cache-keys-with
