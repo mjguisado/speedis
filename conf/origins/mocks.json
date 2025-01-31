@@ -2,20 +2,11 @@
     "id": "mocks",
     "prefix": "/mocks",
     "logLevel": "warn",
-    "exposeErrors": true,
+    "exposeErrors": false,
     "redis": {
-        "socket": {
-            "host": "redis",
-            "port": 6379
-        }
+        "url": "redis://127.0.0.1:6379"
     },
     "origin": {
-        "http2": false,
-        "requestCoalescing": true,
-        "circuitBreaker": true,
-        "fetchTimeout": 2000,
-        "ignoredQueryParams": ["cc", "delay"],
-        "sortQueryParams": true,
         "httpxOptions": {
             "protocol": "http:",
             "host": "mocks",
@@ -28,6 +19,18 @@
         "agentOptions": {
             "keepAlive": true
         },
+        "fetchTimeout": 2000,
+        "ignoredQueryParams": ["cc", "delay"],
+        "sortQueryParams": true,
+        "requestCoalescing": true,
+        "lock": true,
+        "lockOptions": {
+            "lockTTL": 2500,
+            "retryCount": 3,
+            "retryDelay": 500,
+            "retryJitter": 100
+        },
+        "circuitBreaker": true,
         "circuitBreakerOptions": {
             "errorThresholdPercentage": 10,
             "resetTimeout": 15000

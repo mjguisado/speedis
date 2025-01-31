@@ -1,11 +1,14 @@
 import http from 'http'
 import https from 'https'
-// import http2 from 'http2'
 import { createClient } from 'redis'
 import * as utils from '../utils/utils.js'
 import * as actionsLib from '../actions/actions.js'
 import CircuitBreaker from 'opossum'
+import { randomBytes } from "crypto";
+import * as crypto from 'crypto'
 import Ajv from "ajv"
+
+
 
 // TODO: https://www.rfc-editor.org/rfc/rfc9111.html#name-must-understand
 // TODO: https://www.rfc-editor.org/rfc/rfc9111.html#name-no-transform
@@ -44,19 +47,12 @@ export default async function (server, opts) {
       {
         type: "object",
         additionalProperties: false,
-        required: ["httpxOptions"],
+        required: ["httpxOptions", "lock", "circuitBreaker"],
+        if: { properties: { lock: { const: true } } },
+        then: { required: ["lockOptions"] },
+        if: { properties: { circuitBreaker: { const: true } } },
+        then: { required: ["circuitBreakerOptions"] },
         properties: {
-          http2: { type: "boolean" },
-          requestCoalescing: { type: "boolean" },
-          circuitBreaker: { type: "boolean" },
-          fetchTimeout: { type: "integer" },
-          ignoredQueryParams: {
-            type: "array",
-            items: {
-              type: "string"
-            }
-          },
-          sortQueryParams: { type: "boolean" },
           // https://nodejs.org/api/http.html#httprequestoptions-callback
           httpxOptions: {
             type: "object",
@@ -83,48 +79,8 @@ export default async function (server, opts) {
               uniqueHeaders: { type: "array" }
             }
           },
-          // See: https://github.com/nodeshift/opossum/blob/main/lib/circuit.js
-          circuitBreakerOptions: {
-            type: "object",
-            additionalProperties: true,
-            properties: {
-              // status: { type: "Status" }, 
-              // timeout: { type: "integer" }, 
-              maxFailures: { type: "integer" },
-              resetTimeout: { type: "integer" },
-              rollingCountTimeout: { type: "integer" },
-              rollingCountBuckets: { type: "integer" },
-              name: { type: "string" },
-              rollingPercentilesEnabled: { type: "boolean" },
-              capacity: { type: "integer" },
-              errorThresholdPercentage: { type: "integer" },
-              enabled: { type: "boolean" },
-              allowWarmUp: { type: "boolean" },
-              volumeThreshold: { type: "integer" },
-              // errorFilter: { type: "Function" }, 
-              cache: { type: "boolean" },
-              cacheTTL: { type: "integer" },
-              cacheSize: { type: "integer" },
-              // cacheGetKey: { type: "Function" }, 
-              // cacheTransport: { type: "CacheTransport" }, 
-              /*
-              coalesce: { type: "boolean" }, 
-              coalesceTTL: { type: "integer" }, 
-              coalesceSize: { type: "integer" }, 
-              coalesceResetOn: { 
-                type: "array",
-                items: { enum: ["error", "success", "timeout"] }
-              },
-              */
-              // abortController: { type: "AbortController" }, 
-              enableSnapshots: { type: "boolean" },
-              // rotateBucketController: { type: "EventEmitter" }, 
-              autoRenewAbortController: { type: "boolean" },
-            }
-          },
           // See: https://nodejs.org/api/http.html#new-agentoptions
-          agentOptions:
-          {
+          agentOptions: {
             type: "object",
             additionalProperties: false,
             properties: {
@@ -136,9 +92,70 @@ export default async function (server, opts) {
               scheduling: { type: "string" },
               timeout: { type: "integer" }
             }
+          },          
+          fetchTimeout: { type: "integer" },
+          ignoredQueryParams: {
+            type: "array",
+            items: {
+              type: "string"
+            }
           },
-          transformations:
+          sortQueryParams: { type: "boolean" },
+          requestCoalescing: { type: "boolean" },
+          lock: { type: "boolean" },
+          lockOptions:
           {
+            type: "object",
+            required: ["lockTTL", "retryCount", "retryDelay", "retryJitter"],
+            additionalProperties: false,
+            properties: {
+              lockTTL: { type: "integer" },
+              retryCount: { type: "integer" },
+              retryDelay: { type: "integer" },
+              retryJitter: { type: "integer" }
+            }
+          },
+          circuitBreaker: { type: "boolean" },
+          // See: https://github.com/nodeshift/opossum/blob/main/lib/circuit.js
+          circuitBreakerOptions: {
+            type: "object",
+            additionalProperties: true,
+            properties: {
+              // status: { type: "Status" }, 
+              // timeout: { type: "integer" }, 
+              maxFailures: { type: "integer" },
+              resetTimeout: { type: "integer" },
+              rollingCountTimeout: { type: "integer" },
+              rollingCountBuckets: { type: "integer" },
+              // name: { type: "string" },
+              rollingPercentilesEnabled: { type: "boolean" },
+              capacity: { type: "integer" },
+              errorThresholdPercentage: { type: "integer" },
+              enabled: { type: "boolean" },
+              allowWarmUp: { type: "boolean" },
+              volumeThreshold: { type: "integer" },
+              // errorFilter: { type: "Function" }, 
+              /*
+              cache: { type: "boolean" },
+              cacheTTL: { type: "integer" },
+              cacheSize: { type: "integer" },
+              cacheGetKey: { type: "Function" }, 
+              cacheTransport: { type: "CacheTransport" }, 
+              coalesce: { type: "boolean" }, 
+              coalesceTTL: { type: "integer" }, 
+              coalesceSize: { type: "integer" }, 
+              coalesceResetOn: { 
+                type: "array",
+                items: { enum: ["error", "success", "timeout"] }
+              },
+              */
+              // abortController: { type: "AbortController" }, 
+              enableSnapshots: { type: "boolean" },
+              // rotateBucketController: { type: "EventEmitter" }, 
+              autoRenewAbortController: { type: "boolean" }
+            }
+          },
+          transformations: {
             type: "array",
             items: {
               type: "object",
@@ -209,29 +226,11 @@ export default async function (server, opts) {
       }
 
       // Agents are responsible for managing connections.
-      // For HTTP/2, you don’t need an agent per se, but you can maintain reusable
-      // connections by configuring the HTTP/2 client instance.
-      if (!origin.http2 && Object.prototype.hasOwnProperty.call(origin, 'agentOptions')) {
+      if (Object.prototype.hasOwnProperty.call(origin, 'agentOptions')) {
         // The default protocol is 'http:'
-        const agent = ('https:' === origin.httpxOptions.protocol ? https : http).Agent(origin.agentOptions)
+        const agent = ('https:' === origin.httpxOptions.protocol ? https : http)
+          .Agent(origin.agentOptions)
         server.decorate('agent', agent)
-      }
-
-      if (Object.prototype.hasOwnProperty.call(origin, 'transformations')) {
-        origin.transformations.forEach(transformation => {
-          try {
-            transformation.re = new RegExp(transformation.urlPattern)
-          } catch (error) {
-            server.log.error(`urlPattern ${transformation.urlPattern} is not a valid regular expresion. Origin: ${id}`)
-            throw new Error(`The transformation configuration is invalid. Origin: ${id}`)
-          }
-          transformation.actions.forEach(action => {
-            if (!Object.prototype.hasOwnProperty.call(actionsLib, action.uses)) {
-              server.log.error(`Function ${action.uses} was not found among the available actions. Origin: ${id}`)
-              throw new Error(`The transformation configuration is invalid. Origin: ${id}`)
-            }
-          })
-        })
       }
 
       if (origin.circuitBreaker) {
@@ -288,9 +287,24 @@ export default async function (server, opts) {
             })
           }
         }
-
         server.decorate('circuit', circuit)
+      }
 
+      if (Object.prototype.hasOwnProperty.call(origin, 'transformations')) {
+        origin.transformations.forEach(transformation => {
+          try {
+            transformation.re = new RegExp(transformation.urlPattern)
+          } catch (error) {
+            server.log.error(`urlPattern ${transformation.urlPattern} is not a valid regular expresion. Origin: ${id}`)
+            throw new Error(`The transformation configuration is invalid. Origin: ${id}`)
+          }
+          transformation.actions.forEach(action => {
+            if (!Object.prototype.hasOwnProperty.call(actionsLib, action.uses)) {
+              server.log.error(`Function ${action.uses} was not found among the available actions. Origin: ${id}`)
+              throw new Error(`The transformation configuration is invalid. Origin: ${id}`)
+            }
+          })
+        })
       }
 
     } else {
@@ -333,7 +347,32 @@ export default async function (server, opts) {
 
       let response = null
       try {
+        let tries = 1
         response = await _get(server, request, request.id)
+        // If the previous _get execution returned -1, it means
+        // that it couldn't acquire the lock to make a request to the
+        // origin. Therefore, the origin has a lock mechanism enabled,
+        // and the origin.lockOptions should exist, with all its
+        // attributes being mandatory.
+        while (response === -1 && tries < server.origin.lockOptions.retryCount) {
+          let delay = server.origin.lockOptions.retryDelay +
+            Math.round(Math.random() * server.origin.lockOptions.retryJitter)
+          await new Promise(resolve => setTimeout(resolve, delay))
+          response = await _get(server, request, request.id)
+          tries ++
+        }
+        if (response === -1) {
+          response = {
+            statusCode: 503,
+            headers: {
+              date: new Date().toUTCString()
+            },
+            body: server.exposeErrors?
+              'Cache is temporarily unavailable due to lock acquisition failure'
+              :''
+          }
+          utils.setCacheStatus('CACHE_NO_LOCK', response)
+        }      
       } catch (error) {
         // FIXME: Reaffirm that we want to use the default error handling.
         const msg =
@@ -438,7 +477,7 @@ export default async function (server, opts) {
     url: '/*',
     handler: async function (request, reply) {
       const fieldNames = utils.parseVaryHeader(request)
-      let cacheKey = generateCacheKey(server, request, fieldNames)      
+      let cacheKey = generateCacheKey(server, request, fieldNames)
       try {
         // See: https://antirez.com/news/93
         let result = await server.redis.unlink(cacheKey)
@@ -484,7 +523,7 @@ export default async function (server, opts) {
         path = base
       }
     }
-    
+
     let cacheKey = server.id + path.replaceAll('/', ':')
 
     // See: https://www.rfc-editor.org/rfc/rfc9111.html#name-calculating-cache-keys-with
@@ -520,7 +559,6 @@ export default async function (server, opts) {
         `Origin: ${server.id}. Key: ${cacheKey}. RID: ${rid}.`)
     }
 
-    let conditionalFetch = false
     let cachedCacheDirectives = null
 
     if (cachedResponse) {
@@ -586,11 +624,9 @@ export default async function (server, opts) {
         // We need to revalidate the response.
         if (Object.prototype.hasOwnProperty.call(cachedResponse.headers, 'etag')) {
           options.headers['if-none-match'] = cachedResponse.headers['etag']
-          conditionalFetch = true
         }
         if (Object.prototype.hasOwnProperty.call(cachedResponse.headers, 'last-modified')) {
           options.headers['if-modified-since'] = cachedResponse.headers['last-modified']
-          conditionalFetch = true
         }
       }
 
@@ -607,15 +643,33 @@ export default async function (server, opts) {
     let originResponse = null
     let requestTime = null
     let responseTime = null
+    let lockKey, lockValue
+    let locked = false
 
     try {
 
       // Verify if there is an ongoing fetch operation
-      let fetch = null
+      let fetch = null  
       if (origin.requestCoalescing) {
         fetch = server.ongoing.get(cacheKey)
       }
+
       if (!fetch) {
+        // https://redis.io/docs/latest/develop/use/patterns/distributed-locks/#correct-implementation-with-a-single-instance
+        if (server.origin.lock) {
+          lockKey = `${cacheKey}.lock`
+          lockValue = `${process.pid}:${server.id}:${rid}:` + randomBytes(4).toString("hex")
+          locked = await _adquireLock(server, lockKey, lockValue)
+        }
+
+        if (server.origin.lock && !locked) {
+          // At this point, we should have acquired a lock to make a request to 
+          // the origin, but we haven’t. So, we return -1 to indicate that the 
+          // entire function should be retried, as another thread could have
+          // modified the cache entry in the meantime.
+          return -1
+        }
+
         if (server.circuit) {
           fetch = server.circuit.fire(server, options)
         } else {
@@ -623,7 +677,9 @@ export default async function (server, opts) {
         }
         if (origin.requestCoalescing) server.ongoing.set(cacheKey, fetch)
         amITheFetcher = true
+
       }
+
       // The current value of the clock at the host at the time the
       // request resulting in the stored response was made.
       requestTime = Date.now() / 1000 | 0
@@ -647,6 +703,10 @@ export default async function (server, opts) {
       originResponse.responseTime = responseTime
 
     } catch (error) {
+
+      if (server.origin.lock && locked) await _releaseLock(server, lockKey, lockValue)
+      if (amITheFetcher && origin.requestCoalescing) server.ongoing.delete(cacheKey)
+
       delete options.agent
       server.log.error(error,
         "Error requesting to the origin. " +
@@ -673,7 +733,7 @@ export default async function (server, opts) {
           }
         }
         utils.setCacheStatus(
-          cachedResponse?'CACHE_HIT_NOT_REVALIDATED':'CACHE_FAILED_MISS',
+          cachedResponse ? 'CACHE_HIT_NOT_REVALIDATED' : 'CACHE_FAILED_MISS',
           generatedResponse
         )
         switch (error.code) {
@@ -692,9 +752,9 @@ export default async function (server, opts) {
         }
         return generatedResponse
       }
-    } finally {
-      if (origin.requestCoalescing) server.ongoing.delete(cacheKey)
     }
+
+    if (amITheFetcher && origin.requestCoalescing) server.ongoing.delete(cacheKey)
 
     // Apply transformations to the response received from the origin
     _transform(ORIGIN_RESPONSE, originResponse, server)
@@ -734,6 +794,7 @@ export default async function (server, opts) {
           _transform(CACHE_REQUEST, cachedResponse, server)
 
           // Update the cache
+          const ttl = parseInt(cachedResponse.ttl)
           await server.redis.json.merge(cacheKey, '$',
             {
               requestTime: cachedResponse.requestTime,
@@ -741,6 +802,8 @@ export default async function (server, opts) {
               headers: cachedResponse.headers
             }
           )
+          if (!Number.isNaN(ttl) && ttl > 0) server.redis.expire(cacheKey, ttl)
+
         } catch (error) {
           server.log.warn(error,
             "Error while updating the cache. " +
@@ -754,13 +817,10 @@ export default async function (server, opts) {
       if (writeCache) {
         // Apply transformations to the cache entry before storing it in the cache.
         _transform(CACHE_REQUEST, cacheEntry, server)
-
-        const multi = server.redis.multi()
-        multi.json.set(cacheKey, '$', cacheEntry)
         const ttl = parseInt(cacheEntry.ttl)
-        if (!Number.isNaN(ttl) && ttl > 0) multi.expire(cacheKey, ttl)
         try {
-          await multi.exec()
+          await server.redis.json.set(cacheKey, '$', cacheEntry)
+          if (!Number.isNaN(ttl) && ttl > 0) server.redis.expire(cacheKey, ttl)
         } catch (error) {
           server.log.warn(error,
             "Error while storing in the cache. " +
@@ -795,6 +855,9 @@ export default async function (server, opts) {
       }
     }
 
+    // In this point the Cache Entry has been updated or deleted in Redis.
+    if (server.origin.lock && locked) await _releaseLock(server, lockKey, lockValue)
+
     // See: https://www.rfc-editor.org/rfc/rfc9111.html#cache-request-directive.only-if-cached
     if (Object.prototype.hasOwnProperty.call(clientCacheDirectives, 'only-if-cached')
       && cachedResponse == null) {
@@ -813,11 +876,47 @@ export default async function (server, opts) {
       return utils.cloneAndTrimResponse(cachedResponse)
     } else {
       utils.setCacheStatus(
-        cachedResponse?'CACHE_HIT_REVALIDATED':'CACHE_MISS', originResponse
+        cachedResponse ? 'CACHE_HIT_REVALIDATED' : 'CACHE_MISS', originResponse
       )
       return utils.cloneAndTrimResponse(originResponse)
     }
 
+  }
+
+  async function _adquireLock(server, lockKey, lockValue) {
+    let lockTTL
+    if (Object.prototype.hasOwnProperty.call(server.origin, 'lockOptions')
+      && Object.prototype.hasOwnProperty.call(server.origin.lockOptions, 'lockTTL')
+      && server.origin.lockOptions.lockTTL > 0) {
+      lockTTL = server.origin.lockOptions.lockTTL;
+    } else if (server.origin.fetchTimeout && server.origin.fetchTimeout > 0) {
+      lockTTL = Math.round(server.origin.fetchTimeout * 1.2)
+    } else {
+      lockTTL = Math.round(Math.random() * 10000);
+    }
+    return 'OK' === await server.redis.set(lockKey, lockValue, { NX: true, PX: lockTTL })
+  }
+
+  // Remove the key only if it exists and the value stored at the  key 
+  // is exactly the one I expect to be
+  const releaseLockScript = `
+    if redis.call("get",KEYS[1]) == ARGV[1] then
+      return redis.call("unlink",KEYS[1])
+    else
+      return 0
+    end
+  `
+  const releaseLockScriptSHA1 = crypto.createHash('sha1').update(releaseLockScript).digest('hex')
+  async function _releaseLock(server, lockKey, lockValue) {
+    try {
+      const exists = await server.redis.sendCommand(['SCRIPT', 'EXISTS', releaseLockScriptSHA1])
+      if (exists[0] === 0) {
+        await server.redis.sendCommand(['SCRIPT', 'LOAD', releaseLockScript])
+      }
+      await server.redis.sendCommand(['EVALSHA', releaseLockScriptSHA1, '1', lockKey, lockValue])
+    } catch (err) {
+      server.log.warn(err, `Releasing lock. Key: ${lockKey} - Value: ${lockValue}`)
+    }
   }
 
   function _transform(type, target, server) {
@@ -836,10 +935,6 @@ export default async function (server, opts) {
 
   function _fetch(server, options) {
     return new Promise((resolve, reject) => {
-      if (server.origin.http2) {
-        // TODO: Implement HTTP2 support
-      } else {
-
         // If we are using the Circuit Breaker the timeout is managed by it.
         // In other cases, we has to manage the timeout in the request.
         let signal, timeoutId = null
@@ -872,8 +967,6 @@ export default async function (server, opts) {
             reject(err)
           }
         })
-
-      }
     })
   }
 

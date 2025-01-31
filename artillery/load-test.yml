@@ -10,10 +10,11 @@ config:
   target: http://localhost:3001
   phases:
     - duration: '5m'
-      name: "Cruise"
-      arrivalRate: 20
+      arrivalRate: 10
+      rampTo: 500
 scenarios:
-  - flow:
+  - name: '304'
+    flow:
     - get:
         url: '/mocks/mocks/items/{{ uuid }}?cc=public,max-age={{ $randomNumber(1,300) }}'
         capture:
@@ -25,3 +26,7 @@ scenarios:
         headers:
           'If-Modified-Since': '{{ lastModified }}'
         ifTrue: 'lastModified'
+  - name: 'overflow'
+    flow:
+    - get:
+        url: '/mocks/mocks/items/overflow?cc=public,max-age=10'

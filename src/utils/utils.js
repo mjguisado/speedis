@@ -242,6 +242,10 @@ export function setCacheStatus(trigger, outResponse) {
       // to the origin, which failed.  
       outResponse.headers['x-speedis-cache-status'] = 'CACHE_FAILED_MISS from ' + os.hostname()
       break
+    case 'CACHE_NO_LOCK':
+      // it couldn't acquire the lock to make a request to the origin
+      outResponse.headers['x-speedis-cache-status'] = 'CACHE_NO_LOCK from ' + os.hostname()
+      break
     case 'CACHE_HIT_REVALIDATED_304':
       // There is a response stored in the cache, and it has been refreshed 
       // using a conditional request to the origin, which replied with a 304.
