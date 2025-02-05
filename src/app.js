@@ -46,15 +46,6 @@ export async function app(opts = {}) {
     labelNames: ['origin', 'statusCode', 'cacheStatus']
   })
 
-  // See: https://github.com/siimon/prom-client?tab=readme-ov-file#zeroing-metrics-with-labels
-  httpResponsesDuration.zero({ cacheStatus: 'CACHE_HIT' })
-  httpResponsesDuration.zero({ cacheStatus: 'CACHE_MISS' })
-  httpResponsesDuration.zero({ cacheStatus: 'CACHE_FAILED_MISS' })
-  httpResponsesDuration.zero({ cacheStatus: 'CACHE_HIT_REVALIDATED_304' })
-  httpResponsesDuration.zero({ cacheStatus: 'CACHE_HIT_REVALIDATED' })
-  httpResponsesDuration.zero({ cacheStatus: 'CACHE_HIT_NOT_REVALIDATED_STALE' })
-  httpResponsesDuration.zero({ cacheStatus: 'CACHE_HIT_NOT_REVALIDATED' })
-
   // Load the origin's configuration.
   const originsBasedir = path.join(process.cwd(), 'conf', 'origins')
   const originFiles = await fs.readdir(originsBasedir)
@@ -76,7 +67,6 @@ export async function app(opts = {}) {
       server.register(speedisPlugin, origin)
       plugins.set(origin.id, origin.prefix)
       server.after(err => { if (err) console.log(err) })
-      httpResponsesDuration.zero({ origin: origin.id })
     }
   })
 

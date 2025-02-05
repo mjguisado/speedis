@@ -5,7 +5,7 @@ import fastifyETag from '@fastify/etag'
 import { collectDefaultMetrics, register, Counter, Histogram } from 'prom-client'
 
 const mockServer = fastify({
-    logger: { level: 'info' }
+    logger: { level: 'warn' }
 })
 
 const httpRequestsTotal = new Counter({
@@ -53,7 +53,7 @@ mockServer.get('/metrics', async (request, reply) => {
 await mockServer.register(mocksPlugin, {
     id: "mocks",
     prefix: "/mocks",
-    logLevel: "info"
+    logLevel: "warn"
 })
 
 // await mockServer.register(fastifyCaching, {})

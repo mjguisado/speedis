@@ -9,20 +9,19 @@ config:
   # It's designed to be highly scalable
   target: http://localhost:3001
   phases:
-    - duration: '5m'
-      arrivalRate: 10
-      rampTo: 500
+    - duration: 15m
+      arrivalRate: 500
 scenarios:
   - name: '304'
     flow:
     - get:
-        url: '/mocks/mocks/items/{{ uuid }}?cc=public,max-age={{ $randomNumber(1,300) }}'
+        url: '/mocks/mocks/items/{{ uuid }}?cc=public,max-age={{ $randomNumber(1,60) }}'
         capture:
           - header: 'last-modified'
             as: 'lastModified'
-    - think: '{{ $randomNumber(1,300) }}s'
+    - think: '{{ $randomNumber(1,60) }}s'
     - get:
-        url: '/mocks/mocks/items/{{  uuid }}?cc=public,max-age={{ $randomNumber(1,300) }}'
+        url: '/mocks/mocks/items/{{  uuid }}?cc=public,max-age={{ $randomNumber(1,60) }}'
         headers:
           'If-Modified-Since': '{{ lastModified }}'
         ifTrue: 'lastModified'
