@@ -20,6 +20,8 @@ services:
       - GF_SECURITY_ADMIN_PASSWORD=grafana
     volumes:
       - ./conf/grafana:/etc/grafana/provisioning/datasources
+    depends_on:
+      - prometheus      
   redis:
     image: redis/redis-stack-server
     container_name: redis
@@ -46,7 +48,7 @@ services:
     ports:
       - 3030:3030
   speedis:
-    build:
+    build:  
       context: .
       dockerfile: Dockerfile
       target: development
@@ -65,5 +67,19 @@ services:
     ports:
       - 3001:3001
       - 3003:3003
+    depends_on:
+      - redis
+  haproxy:
+    image: haproxy:latest
+    container_name: haproxy
+    restart: always
+    ports:
+      - 80:80
+      - 443:443
+    volumes:
+      - ./conf/haproxy/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg
+      - ./conf/haproxy/certs:/usr/local/etc/haproxy/certs:ro
+    depends_on:
+      - speedis
 volumes:
   prom_data:

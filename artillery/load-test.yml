@@ -7,7 +7,9 @@ config:
       - 'uuid'
   # This is a test server run by team Artillery
   # It's designed to be highly scalable
-  target: http://localhost:3001
+  target: https://localhost
+  tls:
+    rejectUnauthorized: false
   phases:
     - duration: 15m
       arrivalRate: 500

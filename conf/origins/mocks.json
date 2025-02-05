@@ -35,6 +35,19 @@
             "errorThresholdPercentage": 20,
             "resetTimeout": 15000
         },
-        "transformations": []
+        "transformations": [
+            {
+                "urlPattern": ".*",
+                "actions": [
+                    {
+                        "phase": "OriginRequest",
+                        "uses":  "setHeaders",
+                        "with": {
+                            "x-header": "example of transformation"
+                        }         
+                    }
+                ]  
+            } 
+        ]
     }
 }

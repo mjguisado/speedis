@@ -7,6 +7,11 @@ yarn-error.log*
 lerna-debug.log*
 .pnpm-debug.log*
 
+conf/haproxy/*.crt
+conf/haproxy/*.csr
+conf/haproxy/*.key
+conf/haproxy/certs/*.pem
+
 # Diagnostic reports (https://nodejs.org/api/report.html)
 report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 
