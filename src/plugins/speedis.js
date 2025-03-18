@@ -8,8 +8,6 @@ import { randomBytes } from "crypto";
 import * as crypto from 'crypto'
 import Ajv from "ajv"
 
-
-
 // TODO: https://www.rfc-editor.org/rfc/rfc9111.html#name-must-understand
 // TODO: https://www.rfc-editor.org/rfc/rfc9111.html#name-no-transform
 // TODO: https://www.rfc-editor.org/rfc/rfc9111.html#name-no-transform-2
@@ -90,7 +88,9 @@ export default async function (server, opts) {
               maxTotalSockets: { type: "integer" },
               maxFreeSockets: { type: "integer" },
               scheduling: { type: "string" },
-              timeout: { type: "integer" }
+              timeout: { type: "integer" },
+              maxCachedSessions: { type: "integer" },
+              servername: { type: "string" },
             }
           },          
           fetchTimeout: { type: "integer" },

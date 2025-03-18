@@ -15,9 +15,7 @@ const config = await fs.readFile(configurationFilename, 'utf8')
     throw err
   })
 
-  // TODO: Validate configuration.
-
-
+// TODO: Validate configuration.
 const aggregatorRegistry = new AggregatorRegistry()
 
 // https://medium.com/@mjdrehman/implementing-node-js-cluster-for-improved-performance-f800146e58e1
@@ -38,7 +36,6 @@ if (cluster.isPrimary) {
   const metricsServer = fastify({
     logger: { level: config.metricServerLogLevel?config.metricServerLogLevel:'info' }
   })
-  
 
   // FIXME: Las llamadas a las métricas no se contabilizan en el servidor de métricas.
   metricsServer.get('/metrics', async (req, res) => {

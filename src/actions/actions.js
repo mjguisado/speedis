@@ -25,6 +25,12 @@ export function setETagHeader(target, params) {
     target.headers["etag"] = createHash("md5").update(JSON.stringify(target.body)).digest("hex")
 }
 
+export function replaceAllInBody(target, params) {
+    for (var param in params) {
+        target.body.replace[param] = params[param];
+    }
+}
+
 /*
  * 
  * The `ttl` attribute is used to define the expiration time of a cache entry in Redis.
@@ -60,5 +66,4 @@ function setTTL(target, params) {
     } else {
         target.ttl = calculateFreshnessLifetime(target)
     }
-
 }
