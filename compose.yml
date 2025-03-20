@@ -67,6 +67,7 @@ services:
     ports:
       - 3001:3001
       - 3003:3003
+      - 9229:9229
     depends_on:
       - redis
   haproxy:

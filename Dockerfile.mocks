@@ -1,7 +1,6 @@
 ARG NODE_VERSION=current
 FROM node:${NODE_VERSION}-alpine
 WORKDIR /usr/src/app
-EXPOSE 3030
 ENV NODE_ENV=development
 RUN npm install -g nodemon
 RUN --mount=type=bind,source=package.json,target=package.json \
@@ -9,5 +8,6 @@ RUN --mount=type=bind,source=package.json,target=package.json \
     --mount=type=cache,target=/root/.npm \
     npm ci --include=dev
 USER node
+EXPOSE 3030
 COPY . .
 CMD  ["nodemon", "mocks/index.js"]

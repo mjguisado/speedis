@@ -1,8 +1,6 @@
 ARG NODE_VERSION=current
-
 FROM node:${NODE_VERSION}-alpine AS base
 WORKDIR /usr/src/app
-EXPOSE 3001 3003 9229
 
 FROM base AS development
 ENV NODE_ENV=development
@@ -12,6 +10,7 @@ RUN --mount=type=bind,source=package.json,target=package.json \
     --mount=type=cache,target=/root/.npm \
     npm ci --include=dev
 USER node
+EXPOSE 3001 3003 9229
 COPY . .
 CMD  ["nodemon", "src/index.js"]
 
@@ -22,5 +21,6 @@ RUN --mount=type=bind,source=package.json,target=package.json \
     --mount=type=cache,target=/root/.npm \
     npm ci
 USER node
+EXPOSE 3001 3003
 COPY . .
 CMD  ["node", "src/index.js"]

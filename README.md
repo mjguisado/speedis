@@ -154,7 +154,6 @@ The transformations will be applied according to the order in which they are def
     ]
 ```
 ## Reverse proxy
-
 Incorporating a reverse proxy is a [recommended practice](https://fastify.dev/docs/latest/Guides/Recommendations/#use-a-reverse-proxy).
 In the specific case of Speedis, the main reasons for using it are to facilitate serving multiple domains and to handle TLS termination.
 We propose using HAProxy as the reverse proxy and have included a configuration file example in ./conf/haproxy/haproxy.cfg.
@@ -167,61 +166,84 @@ https://mocks.speedis/v1/items?x=1&y=2 -> http://speedis:3001/mocks/v1/items?x=1
 
 Note: Proper DNS resolution is required for mocks.speedis, speedis, and mocks to function correctly.
 
-## Installation
+## Getting Started
 
+### **Prerequisites**  
+Ensure you have the following installed:  
+- [Docker](https://docs.docker.com/get-docker/)  
+- [Docker Compose](https://docs.docker.com/compose/)
+- [OpenSSL](https://www.openssl.org/)
+
+### **Clone the repository**  
 ```sh
-# Clone the repository
 git clone https://github.com/mjguisado/speedis.git
 cd speedis
-
-# Install dependencies
-npm install
 ```
 
-## Usage
-### Running the server
+### **Generate self signed certificate**
+Generate self signed certificate to test HAProxy TLS termination
+The test domain is mocks.speedis
 ```sh
-npm start
+./conf/haproxy/generate_self_signed_cert.sh
 ```
 
-### Running in development mode
+### **Start the environment**  
+Run the following command to start all services:  
 ```sh
-npm run dev
+docker compose up -d
 ```
+This will start:
+- **Redis**: In-memory shared data storage
+- **HAProxy**: Reverse Proxy
+- **Speedis**: The main caching service
+- **Mocks**: Mocked origin server
+- **Prometheus**: Monitoring system
+- **Grafana**: Visualization tool
 
-### Environment Variables
-|Variable|Description|Default|
-|----------|-------------|---------|
-|`REDIS_URL`|Redis server connection URL|`redis://localhost:6379`|
-
-## API Endpoints
-### Caching a response
-```http
-GET /cache/:key
-```
-Retrieves a cached value by key.
-
-### Storing a response in cache
-```http
-POST /cache/:key
-```
-Stores a new response under the given key.
-
-### Invalidating a cache entry
-```http
-DELETE /cache/:key
-```
-Removes a cache entry by key.
-
-## Docker Support
-You can run Speedis using Docker:
+### **Verify the setup**  
+Check the running containers:  
 ```sh
-docker build -t speedis .
-docker run -p 3000:3000 -e REDIS_URL=redis://your-redis speedis
+docker ps
+```
+You should see all containers (`redis-stack-server`, `speedis`, `haproxy`, etc.) running.
+
+### **Access Services**  
+- **HAProxy** → `http(s)://localhost`  
+- **Speedis** → `http://localhost:3001`
+- **Speedis (Metrics)** → `http://localhost:3003/metrics`
+- **Mocks** → `http://localhost:3030`
+- **Grafana** → `http://localhost:3000` (User: `admin`, Password: `grafana`)  
+- **Prometheus** → `http://localhost:9090`
+
+### **Examples of requests**
+
+#### **Request to the Mocked origin server**
+```sh
+curl -vXGET 'http://127.0.0.1:3030/mocks/items/RealBetis?delay=300&cc=public,max-age=10&a=alfa&b=beta&c='
+```
+#### **Request to Speedis**
+```sh
+curl -vXGET 'http://127.0.0.1:3001/mocks/mocks/items/RealBetis?delay=300&cc=public,max-age=10&a=alfa&b=beta&c='
+```
+Repeat the request several times to observe how the response headers (Age, X-Speedis-Cache-Status) indicate the cache status.
+#### **HTTP Request to Speedis via HAProxy**
+```sh
+curl -vXGET -H 'Host: mocks.speedis' 'http://127.0.0.1/mocks/items/RealBetis?delay=300&cc=public,max-age=10&a=alfa&b=beta&c='
+```
+#### **HTTP Request to Speedis via HAProxy**
+```sh
+curl -vkXGET -H 'Host: mocks.speedis' 'https://127.0.0.1/mocks/items/RealBetis?delay=300&cc=public,max-age=10&a=alfa&b=beta&c='
 ```
 
-## Monitoring with Prometheus
-Speedis exposes metrics at `/metrics`, which can be scraped by Prometheus for performance monitoring.
+### **Stopping the environment**  
+To stop all containers, run:  
+```sh
+docker compose down
+```
+or to stop all containers and delete the Prometheus data volumen, run:  
+```sh
+docker compose down -v
+```
 
 ## Contributing
 Contributions are welcome! Feel free to submit issues or pull requests.
