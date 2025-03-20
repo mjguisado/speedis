@@ -1,8 +1,8 @@
 # Speedis
 
-Speedis is a High-Performance Shared HTTP Cache with Geographical Distribution Capability.<br/>
-In the implementation, the guidelines established in [RFC 9110](https://www.rfc-editor.org/rfc/rfc9111.html) on HTTP Semantics and [RFC 9111](https://www.rfc-editor.org/rfc/rfc9111.html) on HTTP Caching have been followed.<br/>
-In the design of Speedis, special attention has been given to incorporating mechanisms to protect the origin servers against overloading.<br/>
+Speedis is a High-Performance Shared HTTP Cache with Geographical Distribution Capability.
+In the implementation, the guidelines established in [RFC 9110](https://www.rfc-editor.org/rfc/rfc9111.html) on HTTP Semantics and [RFC 9111](https://www.rfc-editor.org/rfc/rfc9111.html) on HTTP Caching have been followed.
+In the design of Speedis, special attention has been given to incorporating mechanisms to protect the origin servers against overloading.
 
 Implementing a shared HTTP cache provides benefits among which the following are highlighted:
 - **Reduced Latency**: A shared cache allows multiple clients or services to access the same cache, reducing the time spent fetching data from the origin server. This leads to faster response times and improved user experience.
@@ -35,11 +35,11 @@ This ensures that all instances can access the same cache data, preventing cold 
 [Cache stampede](https://en.wikipedia.org/wiki/Cache_stampede) is a problem that occurs when multiple clients request the same resource simultaneously, but the cached version is expired or unavailable.
 Since the cache does not contain a valid response, all requests are forwarded to the origin server at the same time, causing a sudden surge in load.
 This can lead to performance degradation, increased latency, and even server overload.
-Speedis implements request coalescing, a mechanism that prevents multiple identical requests from being sent to the origin server simultaneously.<br/>
-When multiple clients request the same resource while it is being fetched, request coalescing ensures that only one request is forwarded to the origin, while the other requests wait for the response to be cached.<br/>
-Once the response is available, all waiting requests reuse the cached result, reducing the load on the origin server and improving performance.<br/>
-Speedis not only coalesces requests arriving at a single instance but also coalesces requests across multiple instances.<br/>
-It achieves this by implementing a [lock](https://en.wikipedia.org/wiki/Cache_stampede#Locking) using a [distributed lock pattern with Redis](https://redis.io/docs/latest/develop/use/patterns/distributed-locks/), ensuring maximum protection for the origin server.<br/>
+Speedis implements request coalescing, a mechanism that prevents multiple identical requests from being sent to the origin server simultaneously.
+When multiple clients request the same resource while it is being fetched, request coalescing ensures that only one request is forwarded to the origin, while the other requests wait for the response to be cached.
+Once the response is available, all waiting requests reuse the cached result, reducing the load on the origin server and improving performance.
+Speedis not only coalesces requests arriving at a single instance but also coalesces requests across multiple instances.
+It achieves this by implementing a [lock](https://en.wikipedia.org/wiki/Cache_stampede#Locking) using a [distributed lock pattern with Redis](https://redis.io/docs/latest/develop/use/patterns/distributed-locks/), ensuring maximum protection for the origin server.
 
 ### Handling Cache Origin Unavailability with Circuit Breaker
 When the origin of the cache becomes unavailable (e.g., due to network failures, server downtime, or high latency), it can lead to several issues:
@@ -48,15 +48,15 @@ When the origin of the cache becomes unavailable (e.g., due to network failures,
 - **Overloading the Origin**: Repeated failed attempts to fetch data from the origin can further burden an already overloaded or down server, exacerbating the problem.
 - **Unreliable User Experience**: The cache’s inability to serve data can result in errors or poor performance, negatively impacting the user experience.
 
-Speedis addresses these challenges by incorporating a Circuit Breaker mechanism.<br/>
-This mechanism acts as a safeguard against repeated failed requests to the origin.<br/>
-When the system detects a failure threshold (e.g., multiple failed requests within a short period), the Circuit Breaker opens and prevents further requests to the origin, thereby avoiding overloading the server.<br/>
+Speedis addresses these challenges by incorporating a Circuit Breaker mechanism.
+This mechanism acts as a safeguard against repeated failed requests to the origin.
+When the system detects a failure threshold (e.g., multiple failed requests within a short period), the Circuit Breaker opens and prevents further requests to the origin, thereby avoiding overloading the server.
 Instead, it can return a default response or serve stale cached data, ensuring a more stable and reliable user experience even when the origin is unavailable.
 
 ### Clustering
-Speedis implements clustering using Node’s built-in cluster module to fully utilize the potential of multi-core systems and enhance the performance of Node.js applications.<br/>
-Clustering enables the creation of multiple worker processes to handle incoming requests, improving performance and optimizing system resource utilization.<br/>
-By default, Speedis uses [os.availableParallelism()](https://nodejs.org/api/os.html#osavailableparallelism) to create as many workers as possible.<br/>
+Speedis implements clustering using Node’s built-in cluster module to fully utilize the potential of multi-core systems and enhance the performance of Node.js applications.
+Clustering enables the creation of multiple worker processes to handle incoming requests, improving performance and optimizing system resource utilization.
+By default, Speedis uses [os.availableParallelism()](https://nodejs.org/api/os.html#osavailableparallelism) to create as many workers as possible.
 
 ###  Geographically Distributed Cache
 When the clients of a cache are geographically distributed, geographically distributing the cache itself provides additional benefits compared to a local cache, among which the following are highlighted:
@@ -78,8 +78,8 @@ Additionally, in case of issues between Speedis instances and Redis, the instanc
 The application exposes operational metrics using Prometheus, a powerful open-source monitoring and alerting toolkit. These metrics provide valuable insights into the performance, health, and resource usage of the application, enabling proactive monitoring and troubleshooting. Prometheus can scrape these metrics at regular intervals, allowing for the collection, storage, and visualization of key performance data in real time.
 
 ## Speedis main configuration
-The file ./conf/speedis.conf contains a JSON object with the general configuration of the Speedis server.<br/>
-The following table describes the supported fields.<br/>
+The file ./conf/speedis.conf contains a JSON object with the general configuration of the Speedis server.
+The following table describes the supported fields.
 
 | Field | Type | Mandatory | Default | Description |
 |-------|------|-----------|---------|-------------|
@@ -90,10 +90,10 @@ The following table describes the supported fields.<br/>
 | `metricServerLogLevel` | String | `false` | `info` | Logging level for the metric service (`trace`, `debug`, `info`, `warn`, `error`, `fatal`). |  
 
 ## Origins configurations
-In Speedis, the remote server to be cached is referred to as an `origin`.<br/>
-The configuration of Speedis’ behavior for each origin is defined in a configuration file located in ./conf/origin/, which contains a JSON object.<br/>
-During initialization, Speedis will load all configuration files located in that folder.<br/>
-The following table describes the supported fields.<br/>
+In Speedis, the remote server to be cached is referred to as an `origin`.
+The configuration of Speedis’ behavior for each origin is defined in a configuration file located in ./conf/origin/, which contains a JSON object.
+During initialization, Speedis will load all configuration files located in that folder.
+The following table describes the supported fields.
 | Field | Type | Mandatory | Default | Description |
 |-------|------|-----------|---------|-------------|
 | `id` | String | `true` | | Origin’s ID |
@@ -103,12 +103,12 @@ The following table describes the supported fields.<br/>
 | `redis` |  Object | `true` | | Speedis uses [node-redis](https://github.com/redis/node-redis) to connect to the Redis database where the cached contents are stored.This object defines the connection details.Its format is almost identical to the [createClient configuration](https://github.com/redis/node-redis/blob/master/docs/client-configuration.md).The main difference is that, since the configuration is in JSON format, parameters defined as JavaScript entities in the original client configuration are not supported. |
 | origin | Object | true | | This object defines all the details related to the origin management. Its format is detailed below. |
 
-The following table describes the supported fields in the origin configuration object.<br/>
+The following table describes the supported fields in the origin configuration object.
 
 | Field | Type | Mandatory | Default | Description |
 |-------|------|-----------|---------|-------------|
 | `httpxOptions` |  Object | `true` | |  Speedis leverages Node’s native [http](https://nodejs.org/api/http.html)/[https](https://nodejs.org/api/https.html) libraries to make requests to the origin server.This field is used to define the request options.Its format is almost identical to the original [options](https://nodejs.org/api/http.html#httprequestoptions-callback).The main difference is that, since the configuration is in JSON format, parameters defined as JavaScript entities in the original options are not supported. |
-| `agentOptions` |  Object | `false` | |  Speedis allows to use an [Agent](https://nodejs.org/api/https.html#class-httpsagent) to manage connection persistence and reuse for HTTP clients.<br/>This field is used to configure the agent.Its format is almost identical to the original [https options](https://nodejs.org/api/https.html#class-httpsagent) or [http options](https://nodejs.org/api/http.html#new-agentoptions).|
+| `agentOptions` |  Object | `false` | |  Speedis allows to use an [Agent](https://nodejs.org/api/https.html#class-httpsagent) to manage connection persistence and reuse for HTTP clients.This field is used to configure the agent.Its format is almost identical to the original [https options](https://nodejs.org/api/https.html#class-httpsagent) or [http options](https://nodejs.org/api/http.html#new-agentoptions).|
 | `fetchTimeout` |  Number | `false` | | Specifies the maximum time allowed for retrieving the resource from the origin server before the request is considered a failure. |
 | `ignoredQueryParams` |  Boolean | `false` | | The cache key is generated based on the URL requested from the origin.This field defines a list of query string parameters that will be ignored when forming the cache key for the entry (`true` or `false`). |
 | `sortQueryParams` |  Boolean | `false` | `false` | The cache key is generated based on the URL requested from the origin.This field determines whether the query string parameters should be sorted alphabetically before being used to generate the cache key for the entry (`true` or `false`).  |
@@ -121,7 +121,7 @@ The following table describes the supported fields in the origin configuration o
 
 https://github.com/nodeshift/opossum/blob/main/lib/circuit.js
 
-The following table describes the supported fields in the lock configuration object.<br/>
+The following table describes the supported fields in the lock configuration object.
 
 | Field | Type | Mandatory | Default | Description |
 |-------|------|-----------|---------|-------------|
@@ -131,7 +131,7 @@ The following table describes the supported fields in the lock configuration obj
 | `retryJitter` |  Number | `true` | | (Randomized delay variation): Introduces a random variation (in milliseconds) to the retry delay to reduce the likelihood of multiple processes retrying at the same time, which can help prevent contention spikes. |
 
 
-Speedis supports transformations at different phases of a request:<br/>
+Speedis supports transformations at different phases of a request:
 - **ClientRequest**: Apply transformations to the request received by Speedis from the client (via HAProxy).
 - **ClientResponse**: Apply transformations to the response sent by Speedis to the client (via HAProxy).
 - **OriginRequest**: Apply transformations to the request sent by Speedis to the origin server.
@@ -139,8 +139,8 @@ Speedis supports transformations at different phases of a request:<br/>
 - **CacheRequest**: Apply transformations to the request sent by Speedis to the cache (Redis).
 - **CacheResponse**: Apply transformations to the response received by Speedis from the cache (Redis).
 
-In each origin’s configuration file, you can define the transformation to be applied to the URL that matches a pattern defined by a regular expression.<br/>
-The transformations will be applied according to the order in which they are defined.<br/>
+In each origin’s configuration file, you can define the transformation to be applied to the URL that matches a pattern defined by a regular expression.
+The transformations will be applied according to the order in which they are defined.
 ```
     "transformations": [
         {
@@ -160,15 +160,15 @@ The transformations will be applied according to the order in which they are def
 
 ## Reverse proxy
 
-Incorporating a reverse proxy is a [recommended practice](https://fastify.dev/docs/latest/Guides/Recommendations/#use-a-reverse-proxy).<br/>
-In the specific case of Speedis, the main reasons for using it are to facilitate serving multiple domains and to handle TLS termination.<br/>
-We propose using HAProxy as the reverse proxy and have included a configuration file example in ./conf/haproxy/haproxy.cfg.<br/>
-In the HAProxy configuration file, the different domains being served are defined.<br/>
-Depending on the domain through which a request is received, the request path sent to the origin is modified by adding the prefix of the plugin instance that will handle it.<br/>
-Additionally, this folder contains a script to generate a self-signed certificate for the domain used in the configuration.<br/>
-In the included example, the following workflow is defined<br/><br/>
-https://mocks.speedis/v1/items?x=1&y=2 -> http://speedis:3001/mocks/v1/items?x=1&y=2 -> http://mocks:3030/v1/items?x=1&y=2<br/><br/>
-Note: Proper DNS resolution is required for mocks.speedis, speedis, and mocks to function correctly.<br/>
+Incorporating a reverse proxy is a [recommended practice](https://fastify.dev/docs/latest/Guides/Recommendations/#use-a-reverse-proxy).
+In the specific case of Speedis, the main reasons for using it are to facilitate serving multiple domains and to handle TLS termination.
+We propose using HAProxy as the reverse proxy and have included a configuration file example in ./conf/haproxy/haproxy.cfg.
+In the HAProxy configuration file, the different domains being served are defined.
+Depending on the domain through which a request is received, the request path sent to the origin is modified by adding the prefix of the plugin instance that will handle it.
+Additionally, this folder contains a script to generate a self-signed certificate for the domain used in the configuration.
+In the included example, the following workflow is defined
+https://mocks.speedis/v1/items?x=1&y=2 -> http://speedis:3001/mocks/v1/items?x=1&y=2 -> http://mocks:3030/v1/items?x=1&y=2
+Note: Proper DNS resolution is required for mocks.speedis, speedis, and mocks to function correctly.
 
 ## Installation
 
