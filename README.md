@@ -162,7 +162,9 @@ In the HAProxy configuration file, the different domains being served are define
 Depending on the domain through which a request is received, the request path sent to the origin is modified by adding the prefix of the plugin instance that will handle it.
 Additionally, this folder contains a script to generate a self-signed certificate for the domain used in the configuration.
 In the included example, the following workflow is defined
+
 https://mocks.speedis/v1/items?x=1&y=2 -> http://speedis:3001/mocks/v1/items?x=1&y=2 -> http://mocks:3030/v1/items?x=1&y=2
+
 Note: Proper DNS resolution is required for mocks.speedis, speedis, and mocks to function correctly.
 
 ## Installation
