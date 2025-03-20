@@ -103,8 +103,8 @@ The following table describes the supported fields.
 | `redis` |  Object | `true` | | Speedis uses [node-redis](https://github.com/redis/node-redis) to connect to the Redis database where the cached contents are stored.This object defines the connection details.Its format is almost identical to the [createClient configuration](https://github.com/redis/node-redis/blob/master/docs/client-configuration.md).The main difference is that, since the configuration is in JSON format, parameters defined as JavaScript entities in the original client configuration are not supported. |
 | origin | Object | true | | This object defines all the details related to the origin management. Its format is detailed below. |
 
+### Origin configuration object
 The following table describes the supported fields in the origin configuration object.
-
 | Field | Type | Mandatory | Default | Description |
 |-------|------|-----------|---------|-------------|
 | `httpxOptions` |  Object | `true` | |  Speedis leverages Node’s native [http](https://nodejs.org/api/http.html)/[https](https://nodejs.org/api/https.html) libraries to make requests to the origin server.This field is used to define the request options.Its format is almost identical to the original [options](https://nodejs.org/api/http.html#httprequestoptions-callback).The main difference is that, since the configuration is in JSON format, parameters defined as JavaScript entities in the original options are not supported. |
@@ -116,13 +116,10 @@ The following table describes the supported fields in the origin configuration o
 | `lock` |  Boolean | `false` | `true` | Enables (`true`) or disables (`false`) the request coalescing functionality across multiple instances. |
 | `lockOptions` |  Object | `true`if lock is enabled| | Configure the distributed lock mechanism.Its format is detailed below.|
 | `circuitBreaker` |  Boolean | `false` | `true` | Enables (`true`) or disables (`false`) the circuit breaker mechanism. |
-| `circuitBreakerOptions` |  Object | `true`if circuitBreaker is enabled| | Speedis leverages [Opossum](https://nodeshift.dev/opossum/) to implement the circuit breaker mechanism.This field is used to define the circuit braker options.Its format is almost identical to the original [options](https://github.com/nodeshift/opossum/blob/main/lib/circuit.js).The main difference is that, since the configuration is in JSON format, parameters defined as JavaScript entities in the original options are not supported.|
+| `circuitBreakerOptions` |  Object | `true`if circuitBreaker is enabled| | Speedis leverages [Opossum](https://nodeshift.dev/opossum/) to implement the circuit breaker mechanism.This field is used to define the circuit braker options. Its format is almost identical to the original [options](https://github.com/nodeshift/opossum/blob/main/lib/circuit.js).The main difference is that, since the configuration is in JSON format, parameters defined as JavaScript entities in the original options are not supported.|
 
-
-https://github.com/nodeshift/opossum/blob/main/lib/circuit.js
-
+#### Lock configuration object
 The following table describes the supported fields in the lock configuration object.
-
 | Field | Type | Mandatory | Default | Description |
 |-------|------|-----------|---------|-------------|
 | `lockTTL` |  Number | `true` | | (Time-to-Live for the lock): Specifies the duration (in milliseconds) for which the lock remains valid before automatically expiring. If the lock is not explicitly released within this period, it will be removed. |
@@ -130,6 +127,7 @@ The following table describes the supported fields in the lock configuration obj
 | `retryDelay` |  Number | `true` | | (Base delay between retries): Sets the waiting time (in milliseconds) between consecutive lock acquisition attempts. This helps prevent excessive contention when multiple processes try to acquire the same lock. |
 | `retryJitter` |  Number | `true` | | (Randomized delay variation): Introduces a random variation (in milliseconds) to the retry delay to reduce the likelihood of multiple processes retrying at the same time, which can help prevent contention spikes. |
 
+#### Transformations configuration
 
 Speedis supports transformations at different phases of a request:
 - **ClientRequest**: Apply transformations to the request received by Speedis from the client (via HAProxy).
