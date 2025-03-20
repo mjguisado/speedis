@@ -91,7 +91,7 @@ The following table describes the supported fields.
 
 ## Origins configurations
 In Speedis, the remote server to be cached is referred to as an `origin`.
-The configuration of Speedis’ behavior for each origin is defined in a configuration file located in ./conf/origin/, which contains a JSON object.
+The configuration of Speedis’ behavior for each origin is defined in a configuration file which contains a JSON object and is located in ./conf/origin/.
 During initialization, Speedis will load all configuration files located in that folder.
 The following table describes the supported fields.
 | Field | Type | Mandatory | Default | Description |
