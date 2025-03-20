@@ -116,7 +116,7 @@ The following table describes the supported fields in the origin configuration o
 |`lock`|Boolean|`false`|`true`|Enables (`true`) or disables (`false`) the request coalescing functionality across multiple instances.|
 |`lockOptions`|Object|`true` if lock is enabled||Configure the distributed lock mechanism. Its format is detailed below.|
 |`circuitBreaker`|Boolean|`false`|`true`|Enables (`true`) or disables (`false`) the circuit breaker mechanism.|
-|`circuitBreakerOptions`|Object|`true` if circuitBreaker is enabled||Speedis leverages [Opossum](https://nodeshift.dev/opossum/) to implement the circuit breaker mechanism. This field is used to define the circuit braker options. Its format is almost identical to the original [options](https://github.com/nodeshift/opossum/blob/main/lib/circuit.js). The main difference is that, since the configuration is in JSON format, parameters defined as JavaScript entities in the original options are not supported.|
+|`circuitBreakerOptions`|Object|`true` if circuitBreaker is enabled||Speedis leverages [Opossum](https://nodeshift.dev/opossum/) to implement the circuit breaker mechanism. This field is used to define the circuit braker options. Its format is almost identical to the original [options](https://nodeshift.dev/opossum/#circuitbreaker). The main difference is that, since the configuration is in JSON format, parameters defined as JavaScript entities in the original options are not supported.|
 
 #### Lock configuration object
 The following table describes the supported fields in the lock configuration object.
