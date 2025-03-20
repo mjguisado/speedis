@@ -30,6 +30,10 @@ This cold start problem in distributed HTTP Caches can cause inconsistencies in 
 Mitigating this issue often requires cache warming techniques, consistent hashing strategies, or a shared storage backend.
 Speedis mitigates this issue by using [Redis](https://redis.io/) as a shared storage backend, efficiently storing and retrieving cached responses.
 This ensures that all instances can access the same cache data, preventing cold starts and reducing the need for multiple calls to the origin server.
+Speedis leverages the  available as an extension module in  and [Redis Enterprise] to store cache entries in JSON format.
+For environments where the cache must comply with enterprise-grade standards (Linear scalability, High availability, Predictable performance, 24/7 support, support, etc.), using Redis Enterprise in any of its variants -  Self-managed [Redis Software](https://redis.io/software/) or fully managed Redis database-as-a-service [Redis Cloud](https://redis.io/cloud/) — is highly recommended.
+
+Speedis leverages the [JSON capabilities](https://redis.io/docs/latest/develop/data-types/json/) available as an extension module in [Redis Stack](https://redis.io/docs/latest/operate/oss_and_stack/) and Redis Enterprise to store cache entries in JSON format. For environments where the cache must comply with enterprise-grade standards (linear scalability, high availability, predictable performance, 24/7 support, etc.), using Redis Enterprise in any of its variants— the fully managed Redis database-as-a-service, [Redis Cloud] or the self-managed [Redis Software](https://redis.io/software/)— is highly recommended.
 
 ### Request coalescing
 [Cache stampede](https://en.wikipedia.org/wiki/Cache_stampede) is a problem that occurs when multiple clients request the same resource simultaneously, but the cached version is expired or unavailable.
