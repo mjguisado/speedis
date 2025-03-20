@@ -23,18 +23,18 @@ Speedis creates an instance of the plugin for each origin configuration file.
 Requests are routed to the corresponding plugin instance using a prefix in the URL path.
 
 ### Shared storage backend
-In a distributed HTTP caching system, a common issue arises when new instances are added to the cache pool.<br />
-If these instances do not share the same storage for cached objects (e.g., a shared backend or replication mechanism), they start in a “cold” state with no cached data.<br />
-As a result, these new instances must fetch content from the origin server, leading to increased latency and higher load on the backend until their cache is sufficiently populated.<br />
-This cold start problem in distributed HTTP Caches can cause inconsistencies in response times and reduce the overall effectiveness of the caching layer, especially during scaling events or instance replacements.<br />
-Mitigating this issue often requires cache warming techniques, consistent hashing strategies, or a shared storage backend.<br />
-Speedis mitigates this issue by using [Redis](https://redis.io/) as a shared storage backend, efficiently storing and retrieving cached responses..<br />
+In a distributed HTTP caching system, a common issue arises when new instances are added to the cache pool.
+If these instances do not share the same storage for cached objects (e.g., a shared backend or replication mechanism), they start in a “cold” state with no cached data.
+As a result, these new instances must fetch content from the origin server, leading to increased latency and higher load on the backend until their cache is sufficiently populated.
+This cold start problem in distributed HTTP Caches can cause inconsistencies in response times and reduce the overall effectiveness of the caching layer, especially during scaling events or instance replacements.
+Mitigating this issue often requires cache warming techniques, consistent hashing strategies, or a shared storage backend.
+Speedis mitigates this issue by using [Redis](https://redis.io/) as a shared storage backend, efficiently storing and retrieving cached responses.
 This ensures that all instances can access the same cache data, preventing cold starts and reducing the need for multiple calls to the origin server.
 
 ### Request coalescing
-[Cache stampede](https://en.wikipedia.org/wiki/Cache_stampede) is a problem that occurs when multiple clients request the same resource simultaneously, but the cached version is expired or unavailable.<br />
-Since the cache does not contain a valid response, all requests are forwarded to the origin server at the same time, causing a sudden surge in load.<br />
-This can lead to performance degradation, increased latency, and even server overload.<br />
+[Cache stampede](https://en.wikipedia.org/wiki/Cache_stampede) is a problem that occurs when multiple clients request the same resource simultaneously, but the cached version is expired or unavailable.
+Since the cache does not contain a valid response, all requests are forwarded to the origin server at the same time, causing a sudden surge in load.
+This can lead to performance degradation, increased latency, and even server overload.
 Speedis implements request coalescing, a mechanism that prevents multiple identical requests from being sent to the origin server simultaneously.<br/>
 When multiple clients request the same resource while it is being fetched, request coalescing ensures that only one request is forwarded to the origin, while the other requests wait for the response to be cached.<br/>
 Once the response is available, all waiting requests reuse the cached result, reducing the load on the origin server and improving performance.<br/>
@@ -67,12 +67,12 @@ When the clients of a cache are geographically distributed, geographically distr
 - **Disaster Recovery**: In the event of a regional failure (e.g., network outage, power failure), the cache can continue to operate from other regions, ensuring service continuity and reducing the risk of downtime.
 - **Scalability**: A geographically distributed cache can easily scale to meet growing demands by adding more cache nodes in various locations, providing a seamless way to expand without a major overhaul.
 
-As previously mentioned, Speedis uses Redis to store cache entries.<br />
-The Redis Enterprise versions offer [Active-Active geo-distributed databases](https://redis.io/docs/latest/operate/rs/databases/active-active/).<br />
-With Active-Active databases, applications can read and write to the same data set from different geographical locations seamlessly and with latency less than one millisecond (ms), without changing the way the application connects to the database.<br />
-The features of these databases make it easier to geographically distribute Speedis instances, so that each instance can connect by default to the nearest replica of the database.<br />
-This way, all the benefits outlined earlier in this section and in the ‘Shared Storage Backend’ section are achieved.<br />
-Additionally, in case of issues between Speedis instances and Redis, the instances can temporarily connect to any of the other replicas of the database, maintaining service continuity.<br />
+As previously mentioned, Speedis uses Redis to store cache entries.
+The Redis Enterprise versions offer [Active-Active geo-distributed databases](https://redis.io/docs/latest/operate/rs/databases/active-active/).
+With Active-Active databases, applications can read and write to the same data set from different geographical locations seamlessly and with latency less than one millisecond (ms), without changing the way the application connects to the database.
+The features of these databases make it easier to geographically distribute Speedis instances, so that each instance can connect by default to the nearest replica of the database.
+This way, all the benefits outlined earlier in this section and in the ‘Shared Storage Backend’ section are achieved.
+Additionally, in case of issues between Speedis instances and Redis, the instances can temporarily connect to any of the other replicas of the database, maintaining service continuity.
 
 ### Observability
 The application exposes operational metrics using Prometheus, a powerful open-source monitoring and alerting toolkit. These metrics provide valuable insights into the performance, health, and resource usage of the application, enabling proactive monitoring and troubleshooting. Prometheus can scrape these metrics at regular intervals, allowing for the collection, storage, and visualization of key performance data in real time.
@@ -100,23 +100,23 @@ The following table describes the supported fields.<br/>
 | `prefix` | String | `true` | | URL path prefix used to route incoming requests to this origin. |
 | `logLevel` | String | `true` | `info` | Logging level for this origin (`trace`, `debug`, `info`, `warn`, `error`, `fatal`). |
 | `exposeErrors` |  Boolean | | |  This parameter defines whether descriptive error messages are included in the response body (`true` or `false`). |
-| `redis` |  Object | `true` | | Speedis uses [node-redis](https://github.com/redis/node-redis) to connect to the Redis database where the cached contents are stored.<br />This object defines the connection details.<br />Its format is almost identical to the [createClient configuration](https://github.com/redis/node-redis/blob/master/docs/client-configuration.md).<br />The main difference is that, since the configuration is in JSON format, parameters defined as JavaScript entities in the original client configuration are not supported. |
+| `redis` |  Object | `true` | | Speedis uses [node-redis](https://github.com/redis/node-redis) to connect to the Redis database where the cached contents are stored.This object defines the connection details.Its format is almost identical to the [createClient configuration](https://github.com/redis/node-redis/blob/master/docs/client-configuration.md).The main difference is that, since the configuration is in JSON format, parameters defined as JavaScript entities in the original client configuration are not supported. |
 | origin | Object | true | | This object defines all the details related to the origin management. Its format is detailed below. |
 
 The following table describes the supported fields in the origin configuration object.<br/>
 
 | Field | Type | Mandatory | Default | Description |
 |-------|------|-----------|---------|-------------|
-| `httpxOptions` |  Object | `true` | |  Speedis leverages Node’s native [http](https://nodejs.org/api/http.html)/[https](https://nodejs.org/api/https.html) libraries to make requests to the origin server.<br />This field is used to define the request options.<br />Its format is almost identical to the original [options](https://nodejs.org/api/http.html#httprequestoptions-callback).<br />The main difference is that, since the configuration is in JSON format, parameters defined as JavaScript entities in the original options are not supported. |
-| `agentOptions` |  Object | `false` | |  Speedis allows to use an [Agent](https://nodejs.org/api/https.html#class-httpsagent) to manage connection persistence and reuse for HTTP clients.<br/>This field is used to configure the agent.<br />Its format is almost identical to the original [https options](https://nodejs.org/api/https.html#class-httpsagent) or [http options](https://nodejs.org/api/http.html#new-agentoptions).|
+| `httpxOptions` |  Object | `true` | |  Speedis leverages Node’s native [http](https://nodejs.org/api/http.html)/[https](https://nodejs.org/api/https.html) libraries to make requests to the origin server.This field is used to define the request options.Its format is almost identical to the original [options](https://nodejs.org/api/http.html#httprequestoptions-callback).The main difference is that, since the configuration is in JSON format, parameters defined as JavaScript entities in the original options are not supported. |
+| `agentOptions` |  Object | `false` | |  Speedis allows to use an [Agent](https://nodejs.org/api/https.html#class-httpsagent) to manage connection persistence and reuse for HTTP clients.<br/>This field is used to configure the agent.Its format is almost identical to the original [https options](https://nodejs.org/api/https.html#class-httpsagent) or [http options](https://nodejs.org/api/http.html#new-agentoptions).|
 | `fetchTimeout` |  Number | `false` | | Specifies the maximum time allowed for retrieving the resource from the origin server before the request is considered a failure. |
-| `ignoredQueryParams` |  Boolean | `false` | | The cache key is generated based on the URL requested from the origin.<br />This field defines a list of query string parameters that will be ignored when forming the cache key for the entry (`true` or `false`). |
-| `sortQueryParams` |  Boolean | `false` | `false` | The cache key is generated based on the URL requested from the origin.<br />This field determines whether the query string parameters should be sorted alphabetically before being used to generate the cache key for the entry (`true` or `false`).  |
+| `ignoredQueryParams` |  Boolean | `false` | | The cache key is generated based on the URL requested from the origin.This field defines a list of query string parameters that will be ignored when forming the cache key for the entry (`true` or `false`). |
+| `sortQueryParams` |  Boolean | `false` | `false` | The cache key is generated based on the URL requested from the origin.This field determines whether the query string parameters should be sorted alphabetically before being used to generate the cache key for the entry (`true` or `false`).  |
 | `requestCoalescing` |  Boolean | `false` | `false` | Enables (`true`) or disables (`false`) the request coalescing mechanism. |
 | `lock` |  Boolean | `false` | `true` | Enables (`true`) or disables (`false`) the request coalescing functionality across multiple instances. |
-| `lockOptions` |  Object | `true`<br />if lock is enabled| | Configure the distributed lock mechanism.<br />Its format is detailed below.|
+| `lockOptions` |  Object | `true`if lock is enabled| | Configure the distributed lock mechanism.Its format is detailed below.|
 | `circuitBreaker` |  Boolean | `false` | `true` | Enables (`true`) or disables (`false`) the circuit breaker mechanism. |
-| `circuitBreakerOptions` |  Object | `true`<br />if circuitBreaker is enabled| | Speedis leverages [Opossum](https://nodeshift.dev/opossum/) to implement the circuit breaker mechanism.<br />This field is used to define the circuit braker options.<br />Its format is almost identical to the original [options](https://github.com/nodeshift/opossum/blob/main/lib/circuit.js).<br />The main difference is that, since the configuration is in JSON format, parameters defined as JavaScript entities in the original options are not supported.|
+| `circuitBreakerOptions` |  Object | `true`if circuitBreaker is enabled| | Speedis leverages [Opossum](https://nodeshift.dev/opossum/) to implement the circuit breaker mechanism.This field is used to define the circuit braker options.Its format is almost identical to the original [options](https://github.com/nodeshift/opossum/blob/main/lib/circuit.js).The main difference is that, since the configuration is in JSON format, parameters defined as JavaScript entities in the original options are not supported.|
 
 
 https://github.com/nodeshift/opossum/blob/main/lib/circuit.js
