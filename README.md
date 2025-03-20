@@ -1,6 +1,7 @@
 # Speedis
 
-Speedis is a High-Performance Shared HTTP Cache with Geographical Distribution Capability.
+**Speedis is a High-Performance Shared HTTP Cache with Geographical Distribution Capability.**
+
 In the implementation, the guidelines established in [RFC 9110](https://www.rfc-editor.org/rfc/rfc9111.html) on HTTP Semantics and [RFC 9111](https://www.rfc-editor.org/rfc/rfc9111.html) on HTTP Caching have been followed.
 In the design of Speedis, special attention has been given to incorporating mechanisms to protect the origin servers against overloading.
 
@@ -30,10 +31,9 @@ This cold start problem in distributed HTTP Caches can cause inconsistencies in 
 Mitigating this issue often requires cache warming techniques, consistent hashing strategies, or a shared storage backend.
 Speedis mitigates this issue by using [Redis](https://redis.io/) as a shared storage backend, efficiently storing and retrieving cached responses.
 This ensures that all instances can access the same cache data, preventing cold starts and reducing the need for multiple calls to the origin server.
-Speedis leverages the  available as an extension module in  and [Redis Enterprise] to store cache entries in JSON format.
-For environments where the cache must comply with enterprise-grade standards (Linear scalability, High availability, Predictable performance, 24/7 support, support, etc.), using Redis Enterprise in any of its variants -  Self-managed [Redis Software](https://redis.io/software/) or fully managed Redis database-as-a-service [Redis Cloud](https://redis.io/cloud/) — is highly recommended.
+Speedis leverages the [JSON capabilities](https://redis.io/docs/latest/develop/data-types/json/) available as an extension module in [Redis Stack](https://redis.io/docs/latest/operate/oss_and_stack/) and Redis Enterprise to store cache entries in JSON format.
 
-Speedis leverages the [JSON capabilities](https://redis.io/docs/latest/develop/data-types/json/) available as an extension module in [Redis Stack](https://redis.io/docs/latest/operate/oss_and_stack/) and Redis Enterprise to store cache entries in JSON format. For environments where the cache must comply with enterprise-grade standards (linear scalability, high availability, predictable performance, 24/7 support, etc.), using Redis Enterprise in any of its variants— the fully managed Redis database-as-a-service, [Redis Cloud] or the self-managed [Redis Software](https://redis.io/software/)— is highly recommended.
+For environments where the cache must comply with enterprise-grade standards (linear scalability, high availability, predictable performance, 24/7 support, etc.), using Redis Enterprise in any of its variants— the fully managed Redis database-as-a-service, [Redis Cloud](https://redis.io/cloud/) or the self-managed [Redis Software](https://redis.io/software/)— is highly recommended.
 
 ### Request coalescing
 [Cache stampede](https://en.wikipedia.org/wiki/Cache_stampede) is a problem that occurs when multiple clients request the same resource simultaneously, but the cached version is expired or unavailable.
@@ -42,19 +42,17 @@ This can lead to performance degradation, increased latency, and even server ove
 Speedis implements request coalescing, a mechanism that prevents multiple identical requests from being sent to the origin server simultaneously.
 When multiple clients request the same resource while it is being fetched, request coalescing ensures that only one request is forwarded to the origin, while the other requests wait for the response to be cached.
 Once the response is available, all waiting requests reuse the cached result, reducing the load on the origin server and improving performance.
-Speedis not only coalesces requests arriving at a single instance but also coalesces requests across multiple instances.
-It achieves this by implementing a [lock](https://en.wikipedia.org/wiki/Cache_stampede#Locking) using a [distributed lock pattern with Redis](https://redis.io/docs/latest/develop/use/patterns/distributed-locks/), ensuring maximum protection for the origin server.
+Speedis can not only coalesce requests arriving at a single instance but also coalesce requests across multiple instances.
+It achieves it by implementing a [locking mechanism](https://en.wikipedia.org/wiki/Cache_stampede#Locking) using a [distributed lock pattern with Redis](https://redis.io/docs/latest/develop/use/patterns/distributed-locks/), ensuring maximum protection for the origin server.
 
 ### Handling Cache Origin Unavailability with Circuit Breaker
 When the origin of the cache becomes unavailable (e.g., due to network failures, server downtime, or high latency), it can lead to several issues:
-
 - **Increased Latency**: Requests that would normally be served from the cache must be redirected to the origin, causing higher response times.
 - **Overloading the Origin**: Repeated failed attempts to fetch data from the origin can further burden an already overloaded or down server, exacerbating the problem.
 - **Unreliable User Experience**: The cache’s inability to serve data can result in errors or poor performance, negatively impacting the user experience.
-
-Speedis addresses these challenges by incorporating a Circuit Breaker mechanism.
+Speedis addresses these challenges by incorporating a circuit breaker mechanism.
 This mechanism acts as a safeguard against repeated failed requests to the origin.
-When the system detects a failure threshold (e.g., multiple failed requests within a short period), the Circuit Breaker opens and prevents further requests to the origin, thereby avoiding overloading the server.
+When the system detects a failure threshold (e.g., multiple failed requests within a short period), the circuit breaker opens and prevents further requests to the origin, thereby avoiding overloading the server.
 Instead, it can return a default response or serve stale cached data, ensuring a more stable and reliable user experience even when the origin is unavailable.
 
 ### Clustering
@@ -64,13 +62,11 @@ By default, Speedis uses [os.availableParallelism()](https://nodejs.org/api/os.h
 
 ###  Geographically Distributed Cache
 When the clients of a cache are geographically distributed, geographically distributing the cache itself provides additional benefits compared to a local cache, among which the following are highlighted:
-
 - **Reduced Latency**: By placing cache instances closer to end users, geographically distributed caches can significantly reduce response times, improving the overall performance and user experience.
 - **Improved Availability**: A distributed cache ensures high availability by replicating cached data across multiple locations. If one region or data center experiences issues, other regions can continue to serve requests, minimizing downtime.
 - **Load Balancing**: Distributing the cache across multiple geographical locations helps balance the load, preventing any single server or data center from becoming a bottleneck and improving scalability.
 - **Disaster Recovery**: In the event of a regional failure (e.g., network outage, power failure), the cache can continue to operate from other regions, ensuring service continuity and reducing the risk of downtime.
 - **Scalability**: A geographically distributed cache can easily scale to meet growing demands by adding more cache nodes in various locations, providing a seamless way to expand without a major overhaul.
-
 As previously mentioned, Speedis uses Redis to store cache entries.
 The Redis Enterprise versions offer [Active-Active geo-distributed databases](https://redis.io/docs/latest/operate/rs/databases/active-active/).
 With Active-Active databases, applications can read and write to the same data set from different geographical locations seamlessly and with latency less than one millisecond (ms), without changing the way the application connects to the database.
