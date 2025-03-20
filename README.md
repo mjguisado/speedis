@@ -16,11 +16,11 @@ Implementing a shared HTTP cache provides benefits among which the following are
 ## Features
 
 ### Fast and lightweight
-Speedis is built on top of the [Fastify](https://fastify.dev/) web framework to ensure high performance and efficient request handling.<br/>
-This framework allows users to extend its functionality by implementing [plugins](https://fastify.dev/docs/latest/Reference/Plugins/).<br/>
-The core of Speedis is developed as a Fastify plugin.<br/>
-Speedis creates an instance of the plugin for each origin configuration file.<br/>
-Requests are routed to the corresponding plugin instance using a prefix in the URL path.<br/>
+Speedis is built on top of the [Fastify](https://fastify.dev/) web framework to ensure high performance and efficient request handling.
+This framework allows users to extend its functionality by implementing [plugins](https://fastify.dev/docs/latest/Reference/Plugins/).
+The core of Speedis is developed as a Fastify plugin.
+Speedis creates an instance of the plugin for each origin configuration file.
+Requests are routed to the corresponding plugin instance using a prefix in the URL path.
 
 ### Shared storage backend
 In a distributed HTTP caching system, a common issue arises when new instances are added to the cache pool.<br />
