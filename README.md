@@ -99,7 +99,7 @@ The following table describes the supported fields.
 |`id`|String|`true`||Origin’s ID|
 |`prefix`|String|`true`||URL path prefix used to route incoming requests to this origin.|
 |`logLevel`|String|`true`|`info`|Logging level for this origin (`trace`, `debug`, `info`, `warn`, `error`, `fatal`).|
-|`exposeErrors`|Boolean|||This parameter defines whether descriptive error messages are included in the response body (`true` or `false`).|
+|`exposeErrors`|Boolean|`false`|`false`|This parameter determines whether descriptive error messages are included in the response body (`true` or `false`).|
 |`redis`|Object|`true`||Speedis uses [node-redis](https://github.com/redis/node-redis) to connect to the Redis database where the cached contents are stored. This object defines the connection details. Its format is almost identical to the [createClient configuration](https://github.com/redis/node-redis/blob/master/docs/client-configuration.md). The main difference is that, since the configuration is in JSON format, parameters defined as JavaScript entities in the original client configuration are not supported.|
 |origin|Object|true||This object defines all the details related to the origin management. Its format is detailed below.|
 
