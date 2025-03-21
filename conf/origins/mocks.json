@@ -25,9 +25,9 @@
         "requestCoalescing": true,
         "lock": true,
         "lockOptions": {
-            "lockTTL": 1250,
+            "lockTTL": 750,
             "retryCount": 3,
-            "retryDelay": 1000,
+            "retryDelay": 500,
             "retryJitter": 250
         },
         "circuitBreaker": true,
