@@ -243,9 +243,68 @@ or to stop all containers and delete the Prometheus data volumen, run:
 docker compose down -v
 ```
 
-## Load Test
+## Request coalescing test
+We are going to run some tests to observe the effects of the Request Coalescing mechanism on the origin.
+First, we modify the configuration file for the mocks origin, located at ./conf/origins/mocks.json, to ensure that the coalescing mechanisms are disabled—both for requests arriving at the same instance (requestCoalescing = false) and across different instances (lock = false).
 
+Once modified, we proceed to start the environment:
+```sh
+docker compose up --build -d
+```
 
+To visualize the effects, we will use a dashboard that we will import into Grafana.
+
+1. **Access Grafana at http://localhost:3000 (User: admin, Password: grafana).**
+
+<img src="./img/login.png" width="75%" />
+
+2. **Select the Dashboards option.**
+
+<img src="./img/dashboards.png" width="75%" />
+
+3. **Click on Import a new Dashboard.**
+
+<img src="./img/import.png" width="75%" />
+
+4. **Upload the contents of the ./conf/grafana/Speedis-dashboard.json file.**
+
+<img src="./img/upload.png" width="75%" />
+
+5. **Confirm the import.**
+
+<img src="./img/confirm.png" width="75%" />
+
+6. **Once imported, the dashboard will be available for use.**
+
+<img src="./img/dashboard.png" width="75%" />
+
+The next step is to generate load on the platform using [artillery](https://www.artillery.io/)
+Specifically, we will use a scenario where 500 requests per second are sent to the same resource for 15 minutes.
+```sh
+artillery run --scenario-name 'overflow' ./artillery/load-test.yml
+```
+In the request sent to the mocks server (origin), we specify that the response should be delayed by 500ms and that it will remain valid in the cache for 5 seconds.
+
+After the initial moments, the number of incoming requests to Speedis stabilizes at around 500 req/s, while the number of requests to the origin is significantly lower, around 40-45 req/s. This represents a 90% load reduction on the origin server for these requests. It is also observed that the response time for requests reaching the origin is around 500ms, as configured, whereas requests served from the cache have a significantly lower response time of approximately 30ms. This is due to the effect of using a cache.
+
+<img src="./img/without_coalescing.png" width="75%" />
+
+Now, we modify the configuration to enable the coalescing mechanisms for requests arriving at the same instance (requestCoalescing = true) and restart the environment.
+```sh
+docker compose up --build -d
+```
+
+A further drastic reduction in the number of requests to the origin is observed, dropping from around 40 req/s to 0.35 req/s.
+
+<img src="./img/instance_coalescing_1.png" width="75%" />
+<img src="./img/instance_coalescing_2.png" width="75%" />
+
+Finally, we modify the configuration to enable the coalescing mechanisms also for requests arriving across different instances (lock = true) and restart the environment.
+```sh
+docker compose up --build -d
+```
+
+<img src="./img/distributed_coalescing.png" width="75%" />
 
 ## Contributing
 Contributions are welcome! Feel free to submit issues or pull requests.
