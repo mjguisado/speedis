@@ -1,11 +1,9 @@
 import fastify from 'fastify'
 import mocksPlugin from './plugins/mocks.js'
-import fastifyCaching from '@fastify/caching'
-import fastifyETag from '@fastify/etag'
 import { collectDefaultMetrics, register, Counter, Histogram } from 'prom-client'
 
 const mockServer = fastify({
-    logger: { level: 'warn' }
+    logger: { level: 'info' }
 })
 
 const httpRequestsTotal = new Counter({
@@ -53,11 +51,8 @@ mockServer.get('/metrics', async (request, reply) => {
 await mockServer.register(mocksPlugin, {
     id: "mocks",
     prefix: "/mocks",
-    logLevel: "warn"
+    logLevel: "info"
 })
-
-// await mockServer.register(fastifyCaching, {})
-// await mockServer.register(fastifyETag, {})
 
 try {
     await mockServer.listen({ host: '::', port: 3030 })

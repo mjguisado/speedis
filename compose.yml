@@ -51,7 +51,7 @@ services:
     build:  
       context: .
       dockerfile: Dockerfile
-      target: development
+      target: production
     container_name: speedis
     restart: unless-stopped
     develop:
@@ -63,7 +63,11 @@ services:
           target: /usr/src/app/src
         - action: sync+restart
           path: ./conf
-          target: /usr/src/app/conf
+          target: /usr/src/app/conf       
+    deploy:
+      resources:
+        limits:
+          cpus: "5"
     ports:
       - 3001:3001
       - 3003:3003
@@ -77,6 +81,7 @@ services:
     ports:
       - 80:80
       - 443:443
+      - 8405:8405
     volumes:
       - ./conf/haproxy/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg
       - ./conf/haproxy/certs:/usr/local/etc/haproxy/certs:ro

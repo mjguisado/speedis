@@ -1,7 +1,5 @@
-# Speedis
-
+# Speedis (Gonzales)
 **Speedis is a High-Performance Shared HTTP Cache with Geographical Distribution Capability.**
-
 In the implementation, the guidelines established in [RFC 9110](https://www.rfc-editor.org/rfc/rfc9111.html) on HTTP Semantics and [RFC 9111](https://www.rfc-editor.org/rfc/rfc9111.html) on HTTP Caching have been followed.
 In the design of Speedis, special attention has been given to incorporating mechanisms to protect the origin servers against overloading.
 
@@ -190,7 +188,7 @@ The test domain is mocks.speedis
 ### **Start the environment**  
 Run the following command to start all services:  
 ```sh
-docker compose up -d
+docker compose up --build -d
 ```
 This will start:
 - **Redis**: In-memory shared data storage
@@ -244,6 +242,10 @@ or to stop all containers and delete the Prometheus data volumen, run:
 ```sh
 docker compose down -v
 ```
+
+## Load Test
+
+
 
 ## Contributing
 Contributions are welcome! Feel free to submit issues or pull requests.

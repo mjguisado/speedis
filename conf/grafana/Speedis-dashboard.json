@@ -101,17 +101,17 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "11.5.1",
+      "pluginVersion": "11.5.2",
       "targets": [
         {
           "editorMode": "code",
-          "expr": "sum by (job) (rate(http_responses_total{job=\"speedis\"}[$__rate_interval]))",
+          "expr": "sum(rate(http_responses_total{job=\"speedis\"}[$__rate_interval])) by (job) ",
           "legendFormat": "{{job}}",
           "range": true,
           "refId": "A"
         }
       ],
-      "title": "Number of requests",
+      "title": " Number of requests to Speedis",
       "transparent": true,
       "type": "timeseries"
     },
@@ -195,17 +195,17 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "11.5.1",
+      "pluginVersion": "11.5.2",
       "targets": [
         {
           "editorMode": "code",
-          "expr": "sum by (job) (rate(http_responses_total{job=\"mocks\"}[$__rate_interval]))",
+          "expr": "sum(rate(http_responses_total{job=\"mocks\"}[$__rate_interval])) by (job)",
           "legendFormat": "{{job}}",
           "range": true,
           "refId": "A"
         }
       ],
-      "title": "Number of requests",
+      "title": "Number of requests by origin",
       "transparent": true,
       "type": "timeseries"
     },
@@ -289,11 +289,11 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "11.5.1",
+      "pluginVersion": "11.5.2",
       "targets": [
         {
           "editorMode": "code",
-          "expr": "sum by (cacheStatus) (rate(http_responses_total{job=\"speedis\",origin=\"mocks\"}[$__rate_interval]))",
+          "expr": "sum(rate(http_responses_total{job=\"speedis\",origin=\"mocks\"}[$__rate_interval])) by (cacheStatus)",
           "legendFormat": "{{cacheStatus}}",
           "range": true,
           "refId": "A"
@@ -394,7 +394,7 @@
         "x": 9,
         "y": 8
       },
-      "id": 9,
+      "id": 1,
       "options": {
         "legend": {
           "calcs": [],
@@ -408,7 +408,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "11.5.1",
+      "pluginVersion": "11.5.2",
       "targets": [
         {
           "datasource": {
@@ -417,7 +417,7 @@
           },
           "disableTextWrap": false,
           "editorMode": "code",
-          "expr": "sum by (statusCode) (rate(http_responses_duration_sum{job=\"speedis\",origin=\"mocks\"}[$__rate_interval])) / sum by (statusCode) (rate(http_responses_duration_count{job=\"speedis\",origin=\"mocks\"}[$__rate_interval]))",
+          "expr": "sum(rate(http_responses_duration_sum{job=\"speedis\",origin=\"mocks\"}[$__rate_interval])) by (cacheStatus) / sum(rate(http_responses_duration_count{job=\"speedis\",origin=\"mocks\"}[$__rate_interval])) by (cacheStatus) ",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "legendFormat": "{{cacheStatus}}",
@@ -426,7 +426,7 @@
           "useBackend": false
         }
       ],
-      "title": "Responses duration by Status Code",
+      "title": "Responses duration by Cache Status",
       "transparent": true,
       "type": "timeseries"
     },
@@ -510,11 +510,11 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "11.5.1",
+      "pluginVersion": "11.5.2",
       "targets": [
         {
           "editorMode": "code",
-          "expr": "sum by (statusCode) (rate(http_responses_total{job=\"speedis\",origin=\"mocks\"}[$__rate_interval]))",
+          "expr": "sum(rate(http_responses_total{job=\"speedis\",origin=\"mocks\"}[$__rate_interval])) by (statusCode) ",
           "legendFormat": "{{statusCode}}",
           "range": true,
           "refId": "A"
@@ -615,7 +615,7 @@
         "x": 9,
         "y": 16
       },
-      "id": 1,
+      "id": 9,
       "options": {
         "legend": {
           "calcs": [],
@@ -629,7 +629,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "11.5.1",
+      "pluginVersion": "11.5.2",
       "targets": [
         {
           "datasource": {
@@ -638,7 +638,7 @@
           },
           "disableTextWrap": false,
           "editorMode": "code",
-          "expr": "sum by (cacheStatus) (rate(http_responses_duration_sum{job=\"speedis\",origin=\"mocks\"}[$__rate_interval])) / sum by (cacheStatus) (rate(http_responses_duration_count{job=\"speedis\",origin=\"mocks\"}[$__rate_interval]))",
+          "expr": "sum(rate(http_responses_duration_sum{job=\"speedis\",origin=\"mocks\"}[$__rate_interval])) by (statusCode) / sum(rate(http_responses_duration_count{job=\"speedis\",origin=\"mocks\"}[$__rate_interval])) by (statusCode)",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "legendFormat": "{{cacheStatus}}",
@@ -647,7 +647,7 @@
           "useBackend": false
         }
       ],
-      "title": "Responses duration by Cache Status",
+      "title": "Responses duration by Status Code",
       "transparent": true,
       "type": "timeseries"
     }
@@ -667,6 +667,6 @@
   "timezone": "browser",
   "title": "Speedis",
   "uid": "feamyf5ocs45ca",
-  "version": 6,
+  "version": 2,
   "weekStart": ""
 }
