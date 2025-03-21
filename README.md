@@ -308,13 +308,15 @@ Finally, we modify the configuration to enable the coalescing mechanisms for req
 docker compose up --build -d
 ```
 
-A further reduction in the number of requests to the origin is observed, with requests halving.
+A further reduction in the number of requests to the origin is observed, with requests halving. However, the average response time increases.
 <img src="./img/distributed_coalescing.png"/>
 
-These results can be explained by the fact that in the environment where the tests are being run, the container running Speedis has launched two workers alongside the process managing the cluster.
+The halving of the number of requests is due to the fact that, in the environment where the tests are being run, the container running Speedis has launched two workers alongside the process managing the cluster.
 <img src="./img/docker.png" />
 
 Each worker behaves as an independent instance, and by enabling the coalescing mechanisms across them, only one of the two makes requests to the origin, which results in halving the number of requests to the origin.
+
+The increase in the response time of the requests is due to the fact that, unlike the coalescing mechanism within each instance, where requests waiting are notified that the cache has been updated, the distributed mechanism requires waiting for a period of time, defined by the delays, before checking if the data has been updated.
 
 ## Contributing
 Contributions are welcome! Feel free to submit issues or pull requests.
