@@ -92,7 +92,7 @@ export default async function (server, opts) {
               maxCachedSessions: { type: "integer" },
               servername: { type: "string" },
             }
-          },          
+          },
           fetchTimeout: { type: "integer" },
           ignoredQueryParams: {
             type: "array",
@@ -359,7 +359,7 @@ export default async function (server, opts) {
             Math.round(Math.random() * server.origin.lockOptions.retryJitter)
           await new Promise(resolve => setTimeout(resolve, delay))
           response = await _get(server, request, request.id)
-          tries ++
+          tries++
         }
         if (response === -1) {
           response = {
@@ -367,12 +367,12 @@ export default async function (server, opts) {
             headers: {
               date: new Date().toUTCString()
             },
-            body: server.exposeErrors?
+            body: server.exposeErrors ?
               'Cache is temporarily unavailable due to lock acquisition failure'
-              :''
+              : ''
           }
           utils.setCacheStatus('CACHE_NO_LOCK', response)
-        }      
+        }
       } catch (error) {
         // FIXME: Reaffirm that we want to use the default error handling.
         const msg =
@@ -472,6 +472,7 @@ export default async function (server, opts) {
     }
   })
 
+  // FIXME: Delete the cache entry for the root path of a origin
   server.route({
     method: 'DELETE',
     url: '/*',
@@ -479,8 +480,20 @@ export default async function (server, opts) {
       const fieldNames = utils.parseVaryHeader(request)
       let cacheKey = generateCacheKey(server, request, fieldNames)
       try {
+        let result = 0
         // See: https://antirez.com/news/93
-        let result = await server.redis.unlink(cacheKey)
+        if (cacheKey.indexOf('*') >= -1) {
+          // See: https://github.com/redis/node-redis/blob/master/docs/scan-iterators.md
+          // See: https://github.com/redis/node-redis/blob/master/docs/v4-to-v5.md#scan-iterators
+          for await (const toTrash of server.redis.scanIterator({
+            MATCH: cacheKey,
+            COUNT: 100
+          })) {
+            result += await server.redis.unlink((toTrash))
+          }
+        } else {
+          result = await server.redis.unlink(cacheKey)
+        }
         if (result) {
           reply.code(204)
         } else {
@@ -649,7 +662,7 @@ export default async function (server, opts) {
     try {
 
       // Verify if there is an ongoing fetch operation
-      let fetch = null  
+      let fetch = null
       if (origin.requestCoalescing) {
         fetch = server.ongoing.get(cacheKey)
       }
@@ -935,38 +948,38 @@ export default async function (server, opts) {
 
   function _fetch(server, options) {
     return new Promise((resolve, reject) => {
-        // If we are using the Circuit Breaker the timeout is managed by it.
-        // In other cases, we has to manage the timeout in the request.
-        let signal, timeoutId = null
-        if (Object.prototype.hasOwnProperty.call(origin, "fetchTimeout") &&
-          !Object.prototype.hasOwnProperty.call(options, "signal")) {
-          const abortController = new AbortController()
-          timeoutId = setTimeout(() => {
-            abortController.abort()
-          }, origin.fetchTimeout)
-          signal = abortController.signal
-          options.signal = signal
-        }
+      // If we are using the Circuit Breaker the timeout is managed by it.
+      // In other cases, we has to manage the timeout in the request.
+      let signal, timeoutId = null
+      if (Object.prototype.hasOwnProperty.call(origin, "fetchTimeout") &&
+        !Object.prototype.hasOwnProperty.call(options, "signal")) {
+        const abortController = new AbortController()
+        timeoutId = setTimeout(() => {
+          abortController.abort()
+        }, origin.fetchTimeout)
+        signal = abortController.signal
+        options.signal = signal
+      }
 
-        const request = (options.protocol === 'https:' ? https : http)
-          .get(options, (res) => {
-            let rawData = ''
-            res.on('data', chunk => { rawData += chunk })
-            res.on('end', () => {
-              if (timeoutId) clearTimeout(timeoutId)
-              resolve({ statusCode: res.statusCode, headers: res.headers, body: rawData })
-            })
+      const request = (options.protocol === 'https:' ? https : http)
+        .get(options, (res) => {
+          let rawData = ''
+          res.on('data', chunk => { rawData += chunk })
+          res.on('end', () => {
+            if (timeoutId) clearTimeout(timeoutId)
+            resolve({ statusCode: res.statusCode, headers: res.headers, body: rawData })
           })
-
-        request.on('error', (err) => {
-          if (signal && signal.aborted) {
-            const error = new Error(`Timed out after ${origin.fetchTimeout} ms`, { cause: err })
-            error.code = 'ETIMEDOUT'
-            reject(error)
-          } else {
-            reject(err)
-          }
         })
+
+      request.on('error', (err) => {
+        if (signal && signal.aborted) {
+          const error = new Error(`Timed out after ${origin.fetchTimeout} ms`, { cause: err })
+          error.code = 'ETIMEDOUT'
+          reject(error)
+        } else {
+          reject(err)
+        }
+      })
     })
   }
 

@@ -103,8 +103,6 @@ The application exposes operational metrics using Prometheus, a powerful open-so
 ## Speedis configuration
 You can find more information about Speedis configuration in [doc/Configuration.md](./doc/Configuration.md).
 
-
-
 ## Getting Started
 
 ### **Prerequisites**  
@@ -173,6 +171,23 @@ curl -vXGET -H 'Host: mocks.speedis' 'http://127.0.0.1/mocks/items/RealBetis?del
 ```sh
 curl -vkXGET -H 'Host: mocks.speedis' 'https://127.0.0.1/mocks/items/RealBetis?delay=300&cc=public,max-age=10&a=alfa&b=beta&c='
 ```
+
+#### **HTTP Request to DELETE a cache entry**
+```sh
+curl -vkXDELETE -H 'Host: mocks.speedis' 'https://127.0.0.1/mocks/items/RealBetis'
+```
+
+#### **HTTP Request to DELETE cache entries using asterisk **
+```sh
+curl -vkXDELETE -H 'Host: mocks.speedis' 'https://127.0.0.1/*/items/*'
+```
+
+#### **HTTP Request to Speedis via HAProxy de DELETE all the cache entries (of this origin) **
+```sh
+curl -vkXDELETE -H 'Host: mocks.speedis' 'https://127.0.0.1/*'
+```
+
+
 
 ### **Stopping the environment**  
 To stop all containers, run:  
