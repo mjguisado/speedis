@@ -22,15 +22,15 @@
         "fetchTimeout": 1000,
         "ignoredQueryParams": ["cc", "delay"],
         "sortQueryParams": true,
-        "requestCoalescing": false,
-        "lock": false,
+        "requestCoalescing": true,
+        "lock": true,
         "lockOptions": {
             "lockTTL": 750,
             "retryCount": 3,
             "retryDelay": 500,
             "retryJitter": 250
         },
-        "circuitBreaker": false,
+        "circuitBreaker": true,
         "circuitBreakerOptions": {
             "errorThresholdPercentage": 20,
             "resetTimeout": 15000

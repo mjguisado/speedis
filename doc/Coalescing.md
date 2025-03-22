@@ -1,13 +1,15 @@
 # Request coalescing test
-We are going to run some tests to observe the effects of the Request Coalescing mechanism on the origin.
+We are going to run some tests to observe the effects of the Request Coalescing mechanism on the origin server.
 
 ## Without request coalescing
 First, we modify the configuration file for the mocks origin, located at ./conf/origins/mocks.json, to ensure that the coalescing mechanisms are disabled—both for requests arriving at the same instance (requestCoalescing = false) and across different instances (lock = false).
+
 Once modified, we proceed to start the environment:
 ```sh
 docker compose up --build -d
 ```
 To visualize the effects, we will use a dashboard that we will import into Grafana.
+
 Follow this [instructions to import](./Grafana.md) it into the grafana instance.
 
 The next step is to generate load on the platform using [artillery](https://www.artillery.io/).

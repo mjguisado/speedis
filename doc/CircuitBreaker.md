@@ -1,31 +1,56 @@
 # Circuit breaker test
-We are going to run some tests to observe the effects of the circuit breaker mechanism on the origin.
+We are going to run some tests to observe the effects of the circuit breaker mechanism on the origin server.
 
 ## Without circuit breaker
-First, we modify the configuration file for the mocks origin, located at ./conf/origins/mocks.json, to ensure that the circuit breaker mechanisms is disabled (circuitBreaker = false) and to the coalescing mechanisms are disabled—both for requests arriving at the same instance (requestCoalescing = false) and across different instances (lock = false).
+First, we modify the configuration file for the mocks origin, located at ./conf/origins/mocks.json, to ensure that the circuit breaker mechanisms is disabled (circuitBreaker = false) and the coalescing mechanisms are enabled—both for requests arriving at the same instance (requestCoalescing = true) and across different instances (lock = true).
+
 Once modified, we proceed to start the environment:
 ```sh
 docker compose up --build -d
 ```
 To visualize the effects, we will use a dashboard that we will import into Grafana.
+
 Follow this [instructions to import](./Grafana.md) it into the grafana instance.
 
 The next step is to generate load on the platform using [artillery](https://www.artillery.io/).
-Specifically, we will use a scenario where 500 requests per second are sent to the same resource for 15 minutes.
+Specifically, we will use a scenario where, at a rate of 500 times per second, two requests are sent to the cache for 15 minutes.
+For these tests, we use a scenario where the following flow is executed at a frequency of 500 times per second:
+1. The first request is sent to a resource (URL) and is marked to remain valid in the cache for a random number of seconds between 1 and 60.
+2. The system waits for a random number of seconds between 1 and 60.
+3. A conditional request (If-Modified-Since) is sent to the same resource (URL).
 ```sh
-artillery run --scenario-name 'overflow' ./artillery/load-test.yml
+artillery run --scenario-name '304' ./artillery/load-test.yml
+
 ```
-In the request sent to the mocks server (origin), we specify that the response should be delayed by 500ms and that it will remain valid in the cache for 5 seconds.
+After the initial minutes, the system shows behavior where the number of requests per second to Speedis varies between 200 and 800, to the origin between 50 and 150, and the response times for requests that need to go to the origin are below 25ms.
+<img src="./img/before_cb.png" />
 
-After the initial moments, the number of incoming requests to Speedis stabilizes at around 500 req/s, while the number of requests to the origin is significantly lower, at around 40-45 req/s. This translates to a workload reduction of more than 90% on the origin server for these requests. Additionally, the response time for requests reaching the origin remains around 500ms, as configured, whereas requests served from the cache have a significantly lower response time of approximately 30ms. This improvement is a direct result of using a cache.
-<img src="./img/without_coalescing.png"/>
-
-Now, we provoke an outage in the origin server.
+Then, we provoke an outage in the origin server.
 ```sh
 docker stop mocks
 ```
-
-Now, we recover the origin server.
+And after some minutes we recover the origin server.
 ```sh
 docker start mocks
 ```
+In this case, during approximately the first minute of the 3-minute outage of the origin server, it is observed that the response time for requests served from the cache (**CACHE_HIT**) remains within the millisecond range.
+However, requests start to appear that return cached content (**CACHE_HIT_NOT_REVALIDATED_STALE**) after exceeding the one-second timeout set as the limit for origin requests.
+Additionally, we observe requests that return an error because they could not find a valid entry in the cache and exhausted all retries without successfully obtaining the necessary lock to access the origin.
+In both cases, the waiting times exceed one second.
+Once the origin is restored, the system returns to normal.  
+<img src="./img/after_without_cb.png" />
+
+Finally, we modify the configuration file for the mocks origin to ensure that the circuit breaker mechanisms is enabled (circuitBreaker = true) and restart the environment.
+```sh
+docker compose up --build -d
+```
+We then repeat the previous process of stopping and starting the origin server after the initial stabilization period.
+En este caso lo que observamos es como durante la parada del servidor de origen el mecanismo del circuit breaker salta y evitar que las peticiones vayan a origen.
+De tal forma que el sistema retorna los datos existentes en la caché sin refrescar (**CACHE_HIT_NOT_REVALIDATED_STALE**) pero manteniendo el tiempo de respuesta en el rango de los milisegundos. 
+
+<img src="./img/after_with_cb.png" />
+
+
+
+
+
