@@ -35,8 +35,8 @@ docker start mocks
 ```
 In this case, during approximately the first minute of the 3-minute outage of the origin server, it is observed that the response time for requests served from the cache (**CACHE_HIT**) remains within the millisecond range.
 However, requests start to appear that return cached content (**CACHE_HIT_NOT_REVALIDATED_STALE**) after exceeding the one-second timeout set as the limit for origin requests.
-Additionally, we observe requests that return an error because they could not find a valid entry in the cache and exhausted all retries without successfully obtaining the necessary lock to access the origin.
-In both cases, the waiting times exceed one second.
+Additionally, we observe requests that return an error because they could not find a valid entry in the cache and exhausted all retries without successfully obtaining the necessary lock to access the origin (**CACHE_NO_LOCK**).
+In both cases, the reponse times exceed one second.
 Once the origin is restored, the system returns to normal.  
 <img src="./img/after_without_cb.png" />
 
@@ -45,9 +45,8 @@ Finally, we modify the configuration file for the mocks origin to ensure that th
 docker compose up --build -d
 ```
 We then repeat the previous process of stopping and starting the origin server after the initial stabilization period.
-En este caso lo que observamos es como durante la parada del servidor de origen el mecanismo del circuit breaker salta y evitar que las peticiones vayan a origen.
-De tal forma que el sistema retorna los datos existentes en la caché sin refrescar (**CACHE_HIT_NOT_REVALIDATED_STALE**) pero manteniendo el tiempo de respuesta en el rango de los milisegundos. 
-
+In this case, we observe that during the origin server outage, the circuit breaker mechanism is triggered, preventing requests from reaching the origin.  
+As a result, the system returns the existing data from the cache without refreshing (**CACHE_HIT_NOT_REVALIDATED_STALE**), while keeping the response time within the millisecond range.  
 <img src="./img/after_with_cb.png" />
 
 
