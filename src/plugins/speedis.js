@@ -472,7 +472,6 @@ export default async function (server, opts) {
     }
   })
 
-  // FIXME: Delete the cache entry for the root path of a origin
   server.route({
     method: 'DELETE',
     url: '/*',
@@ -482,7 +481,7 @@ export default async function (server, opts) {
       try {
         let result = 0
         // See: https://antirez.com/news/93
-        if (cacheKey.indexOf('*') >= -1) {
+        if (cacheKey.indexOf('*') > -1) {
           // See: https://github.com/redis/node-redis/blob/master/docs/scan-iterators.md
           // See: https://github.com/redis/node-redis/blob/master/docs/v4-to-v5.md#scan-iterators
           for await (const toTrash of server.redis.scanIterator({
