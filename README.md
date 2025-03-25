@@ -187,8 +187,6 @@ curl -vkXDELETE -H 'Host: mocks.speedis' 'https://127.0.0.1/*/items/*'
 curl -vkXDELETE -H 'Host: mocks.speedis' 'https://127.0.0.1/*'
 ```
 
-
-
 ### **Stopping the environment**  
 To stop all containers, run:  
 ```sh

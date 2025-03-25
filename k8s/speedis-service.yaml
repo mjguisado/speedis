@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: speedis
+  namespace: cache
+spec:
+  selector:
+    app: speedis
+  ports:
+    - protocol: TCP
+      port: 3001
+      targetPort: 3001
+      name: http
+    - protocol: TCP
+      port: 3003
+      targetPort: 3003
+      name: metrics
+  type: ClusterIP

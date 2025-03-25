@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: cache
+  name: speedis
+  labels:
+    app: speedis
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: speedis
+  template:
+    metadata:
+      labels:
+        app: speedis
+    spec:
+      containers:
+      - name: speedis
+        image: mjguisado/speedis
+        ports:
+        - containerPort: 3001
+        - containerPort: 3003
+        env:
+        - name: NODE_ENV
+          value: "production"
+        volumeMounts:
+        - name: speedis-config 
+          mountPath: /usr/src/app/conf/speedis.json
+          subPath: speedis.json
+        - name: speedis-origins
+          mountPath: /usr/src/app/conf/origins
+      imagePullSecrets:
+      - name: dockerhub-secret
+      volumes:
+      - name: speedis-config
+        configMap:
+          name: speedis-config
+      - name: speedis-origins
+        configMap:
+          name: speedis-origins

@@ -1,0 +1,38 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: cache
+  name: haproxy
+  labels:
+    app: haproxy
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: haproxy
+  template:
+    metadata:
+      labels:
+        app: haproxy
+    spec:
+      containers:
+      - name: haproxy
+        image: haproxy:latest
+        ports:
+        - containerPort: 80
+        - containerPort: 443
+        - containerPort: 8405
+        volumeMounts:
+        - name: haproxy-cfg 
+          mountPath: /usr/local/etc/haproxy/haproxy.cfg
+          subPath: haproxy.cfg
+        - name: haproxy-certs
+          mountPath: /usr/local/etc/haproxy/certs
+          readOnly: true
+      volumes:
+      - name: haproxy-cfg
+        configMap:
+          name: haproxy-cfg 
+      - name: haproxy-certs
+        secret:
+          secretName: haproxy-certs

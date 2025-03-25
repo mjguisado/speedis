@@ -33,6 +33,8 @@ services:
       timeout: 5s
       retries: 5      
   mocks:
+    image: mjguisado/mocks:latest
+    pull_policy: build
     build:
       context: .
       dockerfile: Dockerfile.mocks
@@ -48,6 +50,8 @@ services:
     ports:
       - 3030:3030
   speedis:
+    image: mjguisado/speedis:latest
+    pull_policy: build
     build:  
       context: .
       dockerfile: Dockerfile
