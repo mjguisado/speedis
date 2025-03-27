@@ -1,8 +1,8 @@
 apiVersion: v1
 kind: Service
 metadata:
+  namespace: speedis
   name: speedis
-  namespace: cache
 spec:
   selector:
     app: speedis
@@ -16,3 +16,4 @@ spec:
       targetPort: 3003
       name: metrics
   type: ClusterIP
+  

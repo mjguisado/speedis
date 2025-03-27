@@ -1,8 +1,8 @@
 apiVersion: v1
 kind: Service
 metadata:
+  namespace: speedis
   name: mocks
-  namespace: cache
 spec:
   selector:
     app: mocks

@@ -1,7 +1,7 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  namespace: cache
+  namespace: speedis
   name: speedis
   labels:
     app: speedis
@@ -15,6 +15,8 @@ spec:
       labels:
         app: speedis
     spec:
+      imagePullSecrets:
+      - name: dockerhub-secret
       containers:
       - name: speedis
         image: mjguisado/speedis
@@ -30,8 +32,6 @@ spec:
           subPath: speedis.json
         - name: speedis-origins
           mountPath: /usr/src/app/conf/origins
-      imagePullSecrets:
-      - name: dockerhub-secret
       volumes:
       - name: speedis-config
         configMap:

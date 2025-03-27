@@ -3,7 +3,9 @@
         "https://www.artillery.io/schema.json": [
             "file:///Users/manuel.guisado/redis/speedis/load-test.yml",
             "file:///Users/manuel.guisado/redis/speedis/artillery/load-test.yml",
-            "git:/Users/manuel.guisado/redis/speedis/artillery/load-test.yml?%7B%22path%22%3A%22%2FUsers%2Fmanuel.guisado%2Fredis%2Fspeedis%2Fartillery%2Fload-test.yml%22%2C%22ref%22%3A%22~%22%7D"
+            "git:/Users/manuel.guisado/redis/speedis/artillery/load-test.yml?%7B%22path%22%3A%22%2FUsers%2Fmanuel.guisado%2Fredis%2Fspeedis%2Fartillery%2Fload-test.yml%22%2C%22ref%22%3A%22~%22%7D",
+            "file:///Users/manuel.guisado/redis/speedis/artillery/load-test%20copy.yml",
+            "file:///Users/manuel.guisado/redis/speedis/artillery/load-test-k8s.yml"
         ]
     }
 }

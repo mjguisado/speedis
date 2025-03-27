@@ -1,0 +1,36 @@
+config:
+  payload:
+    # path is relative to the location of the test script
+    path: 'uuids.csv'
+    fields:
+      - 'uuid'
+  target: https://localhost:61283
+  tls:
+    rejectUnauthorized: false
+  phases:
+    - name: 'loadtest'
+      duration: 1h
+      arrivalRate: 500
+scenarios:
+  - name: '304'
+    flow:
+    - get:
+        url: '/mocks/items/{{ uuid }}?cc=public,max-age={{ $randomNumber(1,60) }}'
+        headers:
+          'Host': 'mocks.speedis'
+        capture:
+          - header: 'last-modified'
+            as: 'lastModified'
+    - think: '{{ $randomNumber(1,60) }}s'
+    - get:
+        url: '/mocks/items/{{ uuid }}?cc=public,max-age={{ $randomNumber(1,60) }}'
+        headers:
+          'Host': 'mocks.speedis'
+          'If-Modified-Since': '{{ lastModified }}'
+        ifTrue: 'lastModified'
+  - name: 'overflow'
+    flow:
+    - get:
+        url: '/mocks/items/overflow?delay=500&cc=public,max-age=5'
+        headers:
+          'Host': 'mocks.speedis'
