@@ -6,7 +6,7 @@ metadata:
   labels:
     app: speedis
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app: speedis

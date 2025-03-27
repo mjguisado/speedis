@@ -1,0 +1,19 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  namespace: speedis
+  name: speedis-ingress
+  annotations:
+    haproxy.org/ssl-redirect: "false"  
+spec:
+  ingressClassName: haproxy
+  rules:
+    - http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: speedis
+                port:
+                  number: 3001
