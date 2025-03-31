@@ -2,13 +2,18 @@ apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   namespace: speedis
-  name: speedis-ingress
+  name: haproxy-ingress
   annotations:
     haproxy.org/ssl-redirect: "false"  
 spec:
   ingressClassName: haproxy
+  tls:
+  - hosts:
+      - mocks.speedis
+    secretName: mocks-tls-secret  
   rules:
-    - http:
+    - host: mocks.speedis
+      http:
         paths:
           - path: /
             pathType: Prefix

@@ -10,4 +10,4 @@ openssl x509 -req -in mocks.speedis.csr -signkey mocks.speedis.key -out mocks.sp
 # Concatenate the private key (KEY) and the certificate (CRT) into a single file (PEM)
 cat mocks.speedis.crt mocks.speedis.key > certs/mocks.speedis.pem
 # Remove the private key (KEY), CSR, and certificate (CRT)
-rm mocks.speedis.key mocks.speedis.csr mocks.speedis.crt
+# rm mocks.speedis.key mocks.speedis.csr mocks.speedis.crt
