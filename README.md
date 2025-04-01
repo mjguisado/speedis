@@ -104,103 +104,15 @@ The application exposes operational metrics using Prometheus, a powerful open-so
 You can find more information about Speedis configuration in [doc/Configuration.md](./doc/Configuration.md).
 
 ## Getting Started
-
-### **Prerequisites**  
-Ensure you have the following installed:  
-- [Docker](https://docs.docker.com/get-docker/)  
-- [Docker Compose](https://docs.docker.com/compose/)
-- [OpenSSL](https://www.openssl.org/)
-
-### **Clone the repository**  
-```sh
-git clone https://github.com/mjguisado/speedis.git
-cd speedis
-```
-
-### **Generate self signed certificate**
-Generate self signed certificate to test HAProxy TLS termination
-The test domain is mocks.speedis
-```sh
-./conf/haproxy/generate_self_signed_cert.sh
-```
-
-### **Start the environment**  
-Run the following command to start all services:  
-```sh
-docker compose up --build -d
-```
-This will start:
-- **Redis**: In-memory shared data storage
-- **HAProxy**: Reverse Proxy
-- **Speedis**: The main caching service
-- **Mocks**: Mocked origin server
-- **Prometheus**: Monitoring system
-- **Grafana**: Visualization tool
-
-### **Verify the setup**  
-Check the running containers:  
-```sh
-docker ps
-```
-You should see all containers (`redis-stack-server`, `speedis`, `haproxy`, etc.) running.
-
-### **Access Services**  
-- **HAProxy** → `http(s)://localhost`  
-- **Speedis** → `http://localhost:3001`
-- **Speedis (Metrics)** → `http://localhost:3003/metrics`
-- **Mocks** → `http://localhost:3030`
-- **Grafana** → `http://localhost:3000` (User: `admin`, Password: `grafana`)  
-- **Prometheus** → `http://localhost:9090`
-
-### **Examples of requests**
-
-#### **Request to the Mocked origin server**
-```sh
-curl -vXGET 'http://127.0.0.1:3030/mocks/items/RealBetis?delay=300&cc=public,max-age=10&a=alfa&b=beta&c='
-```
-#### **Request to Speedis**
-```sh
-curl -vXGET 'http://127.0.0.1:3001/mocks/mocks/items/RealBetis?delay=300&cc=public,max-age=10&a=alfa&b=beta&c='
-```
-Repeat the request several times to observe how the response headers (Age, X-Speedis-Cache-Status) indicate the cache status.
-#### **HTTP Request to Speedis via HAProxy**
-```sh
-curl -vXGET -H 'Host: mocks.speedis' 'http://127.0.0.1/mocks/items/RealBetis?delay=300&cc=public,max-age=10&a=alfa&b=beta&c='
-```
-#### **HTTP Request to Speedis via HAProxy**
-```sh
-curl -vkXGET -H 'Host: mocks.speedis' 'https://127.0.0.1/mocks/items/RealBetis?delay=300&cc=public,max-age=10&a=alfa&b=beta&c='
-```
-
-#### **HTTP Request to DELETE a cache entry**
-```sh
-curl -vkXDELETE -H 'Host: mocks.speedis' 'https://127.0.0.1/mocks/items/RealBetis'
-```
-
-#### **HTTP Request to DELETE cache entries using asterisk **
-```sh
-curl -vkXDELETE -H 'Host: mocks.speedis' 'https://127.0.0.1/*/items/*'
-```
-
-#### **HTTP Request to Speedis via HAProxy de DELETE all the cache entries (of this origin) **
-```sh
-curl -vkXDELETE -H 'Host: mocks.speedis' 'https://127.0.0.1/*'
-```
-
-### **Stopping the environment**  
-To stop all containers, run:  
-```sh
-docker compose down
-```
-or to stop all containers and delete the Prometheus data volumen, run:  
-```sh
-docker compose down -v
-```
+This repository includes examples of how to deploy Speedis using [Docker Compose](./doc/Docker.md) or in a [Kubernetes cluster](./doc/Kubernetes.md).
+To facilitate testing Speedis’ capabilities, some additional components are also included in the deployment.
 
 ## Contributing
 Contributions are welcome! Feel free to submit issues or pull requests.
 
 ## License
-TBD
+This project is licensed under the **GNU Affero General Public License v3.0 (AGPL-3.0)**.
 
+By using this license, we ensure that any modifications or improvements made to the software, even when used over a network (such as in a SaaS environment), must be released under the same AGPL-3.0 license. This guarantees that the community benefits from all enhancements and that the project remains truly open.
 
+For more details, please refer to the [AGPL-3.0 license text](https://www.gnu.org/licenses/agpl-3.0.html).
