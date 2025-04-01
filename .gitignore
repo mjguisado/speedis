@@ -4,4 +4,3 @@ haproxy/*.crt
 haproxy/*.csr
 haproxy/*.key
 haproxy/certs/*.pem
-doc/Kubernetes.md

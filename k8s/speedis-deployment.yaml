@@ -15,8 +15,6 @@ spec:
       labels:
         app: speedis
     spec:
-      imagePullSecrets:
-      - name: dockerhub-secret
       containers:
       - name: speedis
         image: mjguisado/speedis
