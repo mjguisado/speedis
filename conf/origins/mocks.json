@@ -37,6 +37,30 @@
         },
         "transformations": [
             {
+                "urlPattern": "/mocks/users/1",
+                "actions": [
+                    {
+                        "phase": "OriginResponse",
+                        "uses":  "deleteJsonPaths",
+                        "with": {
+                            "jsonpaths": ["$[*].user.phones[*].type", "$[*].metadata"]
+                        }         
+                    }
+                ]  
+            },
+            {
+                "urlPattern": "/mocks/users/2",
+                "actions": [
+                    {
+                        "phase": "OriginResponse",
+                        "uses":  "keepJsonPaths",
+                        "with": {
+                            "jsonpaths": ["$[*].user.phones[*].type", "$[*].metadata"]
+                        }         
+                    }
+                ]  
+            },
+            {
                 "urlPattern": ".*",
                 "actions": [
                     {

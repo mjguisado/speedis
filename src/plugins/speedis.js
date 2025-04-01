@@ -21,6 +21,7 @@ import Ajv from "ajv"
 // TODO: Dockerizar y Kubernetizar
 // TODO: Gestión de configuraciones remotas. JSON + Client Side Cache
 // TODO: Gestionar Status Code poco habituales
+// TODO: Implement _tranform in the Client Request and Response phases.
 // Incluir métricas en los delete (label method)
 
 export default async function (server, opts) {
@@ -32,8 +33,8 @@ export default async function (server, opts) {
 
   const ajv = new Ajv()
 
-  const CLIENT_REQUEST = "ClientRequest"
-  const CLIENT_RESPONSE = "ClientResponse"
+  // const CLIENT_REQUEST  = "ClientRequest"
+  // const CLIENT_RESPONSE = "ClientResponse"
   const ORIGIN_REQUEST = "OriginRequest"
   const ORIGIN_RESPONSE = "OriginResponse"
   const CACHE_REQUEST = "CacheRequest"
@@ -175,8 +176,8 @@ export default async function (server, opts) {
                     properties: {
                       phase: {
                         enum: [
-                          CLIENT_REQUEST,
-                          CLIENT_RESPONSE,
+                          // CLIENT_REQUEST,
+                          // CLIENT_RESPONSE,
                           ORIGIN_REQUEST,
                           ORIGIN_RESPONSE,
                           CACHE_REQUEST,
@@ -576,6 +577,7 @@ export default async function (server, opts) {
     if (cachedResponse) {
 
       // Apply transformations to the entry fetched from the cache
+      cachedResponse.path = path
       _transform(CACHE_RESPONSE, cachedResponse, server)
 
       // See: https://www.rfc-editor.org/rfc/rfc9111.html#name-calculating-freshness-lifet
@@ -769,6 +771,7 @@ export default async function (server, opts) {
     if (amITheFetcher && origin.requestCoalescing) server.ongoing.delete(cacheKey)
 
     // Apply transformations to the response received from the origin
+    originResponse.path = path
     _transform(ORIGIN_RESPONSE, originResponse, server)
 
     // We parse the Cache-Control header to extract cache directives.
