@@ -19,7 +19,7 @@ import Ajv from "ajv"
 // TODO: Completar validaciones AJV.
 // TODO: Handling Redis reconnections
 // TODO: Dockerizar y Kubernetizar
-// TODO: Gestión de configuraciones remotas.
+// TODO: Gestión de configuraciones remotas. JSON + Client Side Cache
 // TODO: Gestionar Status Code poco habituales
 // Incluir métricas en los delete (label method)
 

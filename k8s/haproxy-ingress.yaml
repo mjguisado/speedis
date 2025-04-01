@@ -1,0 +1,25 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  namespace: speedis
+  name: haproxy-ingress
+  annotations:
+    haproxy.org/path-rewrite: (.*) /mocks\1
+    haproxy.org/ssl-redirect: "false"  
+spec:
+  ingressClassName: haproxy
+  tls:
+  - hosts:
+      - mocks.speedis
+    secretName: mocks-tls-secret  
+  rules:
+    - host: mocks.speedis
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: speedis
+                port:
+                  number: 3001

@@ -1,0 +1,23 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: speedis
+  name: mocks
+  labels:
+    app: mocks
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mocks
+  template:
+    metadata:
+      labels:
+        app: mocks
+    spec:
+      containers:
+      - name: mocks
+        image: mjguisado/mocks:latest
+        ports:
+        - containerPort: 3030
+

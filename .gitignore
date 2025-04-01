@@ -1,6 +1,7 @@
+.DS_Store
 node_modules/
-conf/haproxy/*.crt
-conf/haproxy/*.csr
-conf/haproxy/*.key
-conf/haproxy/certs/*.pem
+haproxy/*.crt
+haproxy/*.csr
+haproxy/*.key
+haproxy/certs/*.pem
 doc/Kubernetes.md
