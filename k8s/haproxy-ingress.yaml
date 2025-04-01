@@ -4,6 +4,7 @@ metadata:
   namespace: speedis
   name: haproxy-ingress
   annotations:
+    haproxy.org/path-rewrite: (.*) /mocks\1
     haproxy.org/ssl-redirect: "false"  
 spec:
   ingressClassName: haproxy
