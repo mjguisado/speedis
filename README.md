@@ -111,8 +111,8 @@ To facilitate testing Speedis’ capabilities, some additional components are al
 Contributions are welcome! Feel free to submit issues or pull requests.
 
 ## License
-This project is licensed under the **GNU Affero General Public License v3.0 (AGPL-3.0)**.
+This project is licensed under the **Server Side Public License (SSPL) v1.0**.
 
-By using this license, we ensure that any modifications or improvements made to the software, even when used over a network (such as in a SaaS environment), must be released under the same AGPL-3.0 license. This guarantees that the community benefits from all enhancements and that the project remains truly open.
+The SSPL ensures that if you use this software to provide a service to others, you must make publicly available not only any modifications to the software but also the complete source code of all supporting components required to run the service. This guarantees that the community benefits from all improvements and that the project remains truly open.
 
-For more details, please refer to the [AGPL-3.0 license text](https://www.gnu.org/licenses/agpl-3.0.html).
+For more details, please refer to the [SSPL license text](https://www.mongodb.com/licensing/server-side-public-license).
