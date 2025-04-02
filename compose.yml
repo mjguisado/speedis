@@ -8,7 +8,7 @@ services:
     ports:
       - 9090:9090
     volumes:
-      - ./conf/prometheus:/etc/prometheus
+      - ./prometheus:/etc/prometheus
       - prom_data:/prometheus
   grafana:
     image: grafana/grafana
@@ -19,7 +19,7 @@ services:
       - GF_SECURITY_ADMIN_USER=admin
       - GF_SECURITY_ADMIN_PASSWORD=grafana
     volumes:
-      - ./conf/grafana:/etc/grafana/provisioning/datasources
+      - ./grafana:/etc/grafana/provisioning/datasources
     depends_on:
       - prometheus      
   redis:
@@ -87,8 +87,8 @@ services:
       - 443:443
       - 8405:8405
     volumes:
-      - ./conf/haproxy/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg
-      - ./conf/haproxy/certs:/usr/local/etc/haproxy/certs:ro
+      - ./haproxy/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg
+      - ./haproxy/certs:/usr/local/etc/haproxy/certs:ro
     depends_on:
       - speedis
 volumes:
