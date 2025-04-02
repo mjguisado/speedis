@@ -63,7 +63,8 @@ if (cluster.isPrimary) {
   // See: https://fastify.dev/docs/latest/Guides/Testing/#separating-concerns-makes-testing-easy
 
   const server = await app({
-    logger: { level: config.logLevel?config.logLevel:'info' }
+    logger: { level: config.logLevel?config.logLevel:'info' },
+    actionsLibraries: config.actionsLibraries?config.actionsLibraries:[]
   })
   
   // Run the server!

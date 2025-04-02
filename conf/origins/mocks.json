@@ -35,13 +35,16 @@
             "errorThresholdPercentage": 20,
             "resetTimeout": 15000
         },
+        "actionsLibraries": {
+            "json": "./actionLibraries/json.js"
+        },
         "transformations": [
             {
                 "urlPattern": "/mocks/users/1",
                 "actions": [
                     {
                         "phase": "OriginResponse",
-                        "uses":  "deleteJsonPaths",
+                        "uses":  "json:deleteJsonPaths",
                         "with": {
                             "jsonpaths": ["$[*].user.phones[*].type", "$[*].metadata"]
                         }         
@@ -53,10 +56,10 @@
                 "actions": [
                     {
                         "phase": "OriginResponse",
-                        "uses":  "keepJsonPaths",
+                        "uses":  "json:keepJsonPaths",
                         "with": {
                             "jsonpaths": ["$[*].user.phones[*].type", "$[*].metadata"]
-                        }         
+                        }    
                     }
                 ]  
             },
@@ -65,7 +68,7 @@
                 "actions": [
                     {
                         "phase": "OriginRequest",
-                        "uses":  "setHeaders",
+                        "uses":  "headers:setHeaders",
                         "with": {
                             "x-header": "example of transformation"
                         }         

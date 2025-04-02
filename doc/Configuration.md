@@ -22,7 +22,7 @@ The following table describes the supported fields.
 |`logLevel`|String|`true`|`info`|Logging level for this origin (`trace`, `debug`, `info`, `warn`, `error`, `fatal`).|
 |`exposeErrors`|Boolean|`false`|`false`|This parameter determines whether descriptive error messages are included in the response body (`true` or `false`).|
 |`redis`|Object|`true`||Speedis uses [node-redis](https://github.com/redis/node-redis) to connect to the Redis database where the cached contents are stored. This object defines the connection details. Its format is almost identical to the [createClient configuration](https://github.com/redis/node-redis/blob/master/docs/client-configuration.md). The main difference is that, since the configuration is in JSON format, parameters defined as JavaScript entities in the original client configuration are not supported.|
-|origin|Object|true||This object defines all the details related to the origin management. Its format is detailed below.|
+|`origin`|Object|true||This object defines all the details related to the origin management. Its format is detailed below.|
 
 ## Origin configuration object
 The following table describes the supported fields in the origin configuration object.
@@ -38,6 +38,8 @@ The following table describes the supported fields in the origin configuration o
 |`lockOptions`|Object|`true` if lock is enabled||Configure the distributed lock mechanism. Its format is detailed below.|
 |`circuitBreaker`|Boolean|`false`|`true`|Enables (`true`) or disables (`false`) the circuit breaker mechanism.|
 |`circuitBreakerOptions`|Object|`true` if circuitBreaker is enabled||Speedis leverages [Opossum](https://nodeshift.dev/opossum/) to implement the circuit breaker mechanism. This field is used to define the circuit braker options. Its format is almost identical to the original [options](https://nodeshift.dev/opossum/#circuitbreaker). The main difference is that, since the configuration is in JSON format, parameters defined as JavaScript entities in the original options are not supported.|
+|`actionsLibraries`|Object|`false`||An array containing the full paths to custom action libraries that extend the default set provided out of the box.|
+|`transformations`|Object[]|`false`||Array of objects that define the set of transformations that Speedis can apply to requests and responses at different stages. Its format is detailed below.|
 
 ### Lock configuration object
 The following table describes the supported fields in the lock configuration object.
@@ -49,23 +51,36 @@ The following table describes the supported fields in the lock configuration obj
 |`retryJitter`|Number|`true`||(Randomized delay variation): Introduces a random variation (in milliseconds) to the retry delay to reduce the likelihood of multiple processes retrying at the same time, which can help prevent contention spikes.|
 
 ### Transformations configuration
-Speedis supports transformations at different phases of a request:
-- **ClientRequest**: Apply transformations to the request received by Speedis from the client (via HAProxy).
-- **ClientResponse**: Apply transformations to the response sent by Speedis to the client (via HAProxy).
-- **OriginRequest**: Apply transformations to the request sent by Speedis to the origin server.
-- **OriginResponse**: Apply transformations to the response received by Speedis from the origin server.
-- **CacheRequest**: Apply transformations to the request sent by Speedis to the cache (Redis).
-- **CacheResponse**: Apply transformations to the response received by Speedis from the cache (Redis).
-In each origin’s configuration file, you can define the transformation to be applied to the URL that matches a pattern defined by a regular expression.
-The transformations will be applied according to the order in which they are defined.
+Speedis allows transformations to be applied to requests and responses it handles at different phases of their lifecycle.
+
+|Phase|Description|
+|-----|-----------|
+|**ClientRequest**|Apply transformations to the request received by Speedis from the client.|
+|**ClientResponse**|Apply transformations to the response sent by Speedis to the client.|
+|**OriginRequest**|Apply transformations to the request sent by Speedis to the origin server.|
+|**OriginResponse**|Apply transformations to the response received by Speedis from the origin server.|
+|**CacheRequest**|Apply transformations to the request sent by Speedis to the cache (Redis).|
+|**CacheResponse**|Apply transformations to the response received by Speedis from the cache (Redis).|
+Speedis includes a set of functions, called actions, that allow changes to be made. To simplify management, these functions are grouped into libraries.
+Speedis allows easy extension of this model by adding custom actions libraries.
+To do so, the user must identify the additional action libraries they want to load for each of the sources using the configuration variable actionsLibraries. This variable contains an object, and each of its fields includes the identifier for the library and its location on disk.
+The paths to the libraries can be absolute or relative; in the latter case, the current working directory of the Node.js process will be used as the base.
+Custom actions libraries are ES6 modules containing actions implemented as functions with the following signature:
+```js
+export function actionname(target, params) {}
 ```
+The first parameter `target` represents the object to be modified, whether it is a request or a response.
+The second parameter `params` contains the value of the “with” field within the object that defines the action in the transformation configuration.
+A continuación hay un ejemplo de la configuración de las transformaciones.
+
+```json
     "transformations": [
         {
             "urlPattern": ".*",
             "actions": [
                 {
                     "phase": "OriginRequest",
-                    "uses":  "setHeaders",
+                    "uses":  "headers:setHeaders",
                     "with": {
                         "x-header": "example of transformation"
                     }         
@@ -74,3 +89,11 @@ The transformations will be applied according to the order in which they are def
         } 
     ]
 ```
+Note how the action name is composed of two parts separated by the `:` character.
+The first part is the identifier given to the action library in the configuration, and the second part is the name of the action. This allows using the same action name in different libraries, avoiding collisions.
+
+Speedis includes out of the box two libreries
+|Library ID|Location|Description|
+|----------|--------|-----------|
+|headers|[./src/actions/headers.js](../src/actions/headers.js)|Actions to manipulate headers|
+|json|[./src/actions/json.js](../src/actions/json.js)|Actions to manipulate the body in JSON format|

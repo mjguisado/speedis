@@ -1,12 +1,13 @@
 import http from 'http'
 import https from 'https'
+import path from 'path'
 import { createClient } from 'redis'
 import * as utils from '../utils/utils.js'
-import * as actionsLib from '../actions/actions.js'
 import CircuitBreaker from 'opossum'
-import { randomBytes } from "crypto";
+import { randomBytes } from "crypto"
 import * as crypto from 'crypto'
 import Ajv from "ajv"
+
 
 // TODO: https://www.rfc-editor.org/rfc/rfc9111.html#name-must-understand
 // TODO: https://www.rfc-editor.org/rfc/rfc9111.html#name-no-transform
@@ -39,6 +40,7 @@ export default async function (server, opts) {
   const ORIGIN_RESPONSE = "OriginResponse"
   const CACHE_REQUEST = "CacheRequest"
   const CACHE_RESPONSE = "CacheResponse"
+  const actionsRepository = {}
 
   if (origin) {
 
@@ -155,6 +157,9 @@ export default async function (server, opts) {
               // rotateBucketController: { type: "EventEmitter" }, 
               autoRenewAbortController: { type: "boolean" }
             }
+          },
+          actionsLibraries: {
+            type: "object"
           },
           transformations: {
             type: "array",
@@ -291,6 +296,40 @@ export default async function (server, opts) {
         server.decorate('circuit', circuit)
       }
 
+      // Load actions libraries
+      if (!Object.prototype.hasOwnProperty.call(origin, 'actionsLibraries')) {
+        origin.actionsLibraries = {}
+      }
+      origin.actionsLibraries['headers'] = path.resolve(process.cwd(), './src/actions/headers.js')
+      origin.actionsLibraries['json']    = path.resolve(process.cwd(), './src/actions/json.js')
+      for (let actionsLibraryKey in origin.actionsLibraries) {
+        if (!path.isAbsolute(origin.actionsLibraries[actionsLibraryKey])) {
+          origin.actionsLibraries[actionsLibraryKey] = path.resolve(
+            process.cwd(), 
+            origin.actionsLibraries[actionsLibraryKey]
+          )
+        }
+        if (origin.actionsLibraries[actionsLibraryKey].endsWith(".js")) {
+          try {
+            const library = await import(`file://${origin.actionsLibraries[actionsLibraryKey]}`)
+            Object.entries(library).forEach(([key, value]) => {
+              if (typeof value === 'function') {
+                if (!Object.prototype.hasOwnProperty.call(actionsRepository, actionsLibraryKey)) {
+                  actionsRepository[actionsLibraryKey] = {}
+                }
+                actionsRepository[actionsLibraryKey][key] = value
+              }
+            })
+          } catch (error) {
+            server.log.error(`Error importing the action library ${origin.actionsLibraries[actionsLibraryKey]}. Origin: ${id}`)
+            throw new Error(`The transformation configuration is invalid. Origin: ${id}`)
+          }
+        } else {
+          server.log.error(`The file ${origin.actionsLibraries[actionsLibraryKey]} containing the action library must have a .js extension. Origin: ${id}`)
+          throw new Error(`The transformation configuration is invalid. Origin: ${id}`)
+        }
+      }
+      // Loading transformations
       if (Object.prototype.hasOwnProperty.call(origin, 'transformations')) {
         origin.transformations.forEach(transformation => {
           try {
@@ -300,14 +339,27 @@ export default async function (server, opts) {
             throw new Error(`The transformation configuration is invalid. Origin: ${id}`)
           }
           transformation.actions.forEach(action => {
-            if (!Object.prototype.hasOwnProperty.call(actionsLib, action.uses)) {
+            const tokens =  action.uses.split(':')
+            let library = null
+            let func = null
+            if (tokens.length === 1) {
+              library = 'speedis'
+              func = tokens[0]
+            } else if (tokens.length === 2) {
+              library = tokens[0]
+              func = tokens[1]
+            } else {
+              server.log.error(`The name of the action ${action.uses} is not valid. The correct format is library:action. Origin: ${id}`)
+              throw new Error(`The transformation configuration is invalid. Origin: ${id}`)
+            }
+            if ( !Object.prototype.hasOwnProperty.call(actionsRepository, library) 
+              || !Object.prototype.hasOwnProperty.call(actionsRepository[library], func)) {
               server.log.error(`Function ${action.uses} was not found among the available actions. Origin: ${id}`)
               throw new Error(`The transformation configuration is invalid. Origin: ${id}`)
             }
           })
         })
       }
-
     } else {
       server.log.error(validateOrigin.errors)
       throw new Error(`Origin configuration is invalid. Origin: ${id}`)
@@ -516,18 +568,18 @@ export default async function (server, opts) {
 
   function generateCacheKey(server, request, fieldNames = utils.parseVaryHeader(request)) {
     let path = generatePath(request)
-    const [base, queryString] = path.split("?");
+    const [base, queryString] = path.split("?")
     if (queryString) {
-      const params = new URLSearchParams(queryString);
+      const params = new URLSearchParams(queryString)
       if (Object.prototype.hasOwnProperty.call(server.origin, 'ignoredQueryParams')) {
-        server.origin.ignoredQueryParams.forEach(param => params.delete(param));
+        server.origin.ignoredQueryParams.forEach(param => params.delete(param))
       }
       if (params.size > 0) {
         if (server.origin.sortQueryParams) {
           const sortedParams = [...params.entries()]
             .sort(([a], [b]) => a.localeCompare(b))
             .map(([key, value]) => `${key}=${value}`)
-            .join("&");
+            .join("&")
           path = `${base}?${sortedParams.toString()}`
         } else {
           path = `${base}?${params.toString()}`
@@ -903,11 +955,11 @@ export default async function (server, opts) {
     if (Object.prototype.hasOwnProperty.call(server.origin, 'lockOptions')
       && Object.prototype.hasOwnProperty.call(server.origin.lockOptions, 'lockTTL')
       && server.origin.lockOptions.lockTTL > 0) {
-      lockTTL = server.origin.lockOptions.lockTTL;
+      lockTTL = server.origin.lockOptions.lockTTL
     } else if (server.origin.fetchTimeout && server.origin.fetchTimeout > 0) {
       lockTTL = Math.round(server.origin.fetchTimeout * 1.2)
     } else {
-      lockTTL = Math.round(Math.random() * 10000);
+      lockTTL = Math.round(Math.random() * 10000)
     }
     return 'OK' === await server.redis.set(lockKey, lockValue, { NX: true, PX: lockTTL })
   }
@@ -940,7 +992,17 @@ export default async function (server, opts) {
         if (transformation.re.test(target.path)) {
           transformation.actions.forEach(action => {
             if (action.phase === type) {
-              actionsLib[action.uses](target, action.with ? action.with : null)
+              const tokens =  action.uses.split(':')
+              let library = null
+              let func = null
+              if (tokens.length === 1) {
+                library = 'speedis'
+                func = tokens[0]
+              } else if (tokens.length === 2) {
+                library = tokens[0]
+                func = tokens[1]
+              }
+              actionsRepository[library][func](target, action.with ? action.with : null)
             }
           })
         }
