@@ -20,7 +20,6 @@ import Ajv from "ajv"
 // TODO: Handling Redis reconnections
 // TODO: Gestión de configuraciones remotas. JSON + Client Side Cache
 // TODO: Gestionar Status Code poco habituales
-// TODO: Implement _tranform in the Client Request and Response phases.
 // Incluir métricas en los delete (label method)
 
 export default async function (server, opts) {
@@ -229,6 +228,7 @@ export default async function (server, opts) {
 
       let response = null
       try {
+        _transform(CLIENT_REQUEST, request, server)
         let tries = 1
         response = await _get(server, request, request.id)
         // If the previous _get execution returned -1, it means
@@ -345,6 +345,7 @@ export default async function (server, opts) {
           reply.code(304)
           reply.headers(headers)
         } else {
+          _transform(CLIENT_RESPONSE, response, server)
           reply.code(response.statusCode)
           response.headers['date'] = headers['date']
           reply.headers(response.headers)
