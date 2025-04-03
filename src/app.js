@@ -118,7 +118,7 @@ export async function app(opts = {}, ajv = new Ajv({useDefaults: true})) {
                 rollingCountBuckets: { type: "integer", default: 10 },
                 // name: { type: "string" },
                 rollingPercentilesEnabled: { type: "boolean", default: true },
-                capacity: { type: "integer" },
+                capacity: { type: "integer", default: Number.MAX_SAFE_INTEGER },
                 errorThresholdPercentage: { type: "integer", default: 50 },
                 enabled: { type: "boolean", default: true },
                 allowWarmUp: { type: "boolean", default: false },

@@ -52,18 +52,20 @@ The following table describes the supported fields in the lock configuration obj
 
 ### Transformations configuration
 Speedis allows transformations to be applied to requests and responses it handles at different phases of their lifecycle.
-
 |Phase|Description|
-|-----|-----------|
-|**ClientRequest**|Apply transformations to the request received by Speedis from the client.|
-|**ClientResponse**|Apply transformations to the response sent by Speedis to the client.|
-|**OriginRequest**|Apply transformations to the request sent by Speedis to the origin server.|
-|**OriginResponse**|Apply transformations to the response received by Speedis from the origin server.|
-|**CacheRequest**|Apply transformations to the request sent by Speedis to the cache (Redis).|
-|**CacheResponse**|Apply transformations to the response received by Speedis from the cache (Redis).|
-Speedis includes a set of functions, called actions, that allow changes to be made. To simplify management, these functions are grouped into libraries.
+|-|-|
+|`ClientRequest`|Apply transformations to the request received by Speedis from the client.|
+|`ClientResponse`|Apply transformations to the response sent by Speedis to the client.|
+|`OriginRequest`|Apply transformations to the request sent by Speedis to the origin server.|
+|`OriginResponse`|Apply transformations to the response received by Speedis from the origin server.|
+|`CacheRequest`|Apply transformations to the request sent by Speedis to the cache (Redis).|
+|`CacheResponse`|Apply transformations to the response received by Speedis from the cache (Redis).|
+
+Speedis includes a set of functions, called actions, that allow changes to be made.
+To simplify management, these functions are grouped into libraries.
 Speedis allows easy extension of this model by adding custom actions libraries.
-To do so, the user must identify the additional action libraries they want to load for each of the sources using the configuration variable actionsLibraries. This variable contains an object, and each of its fields includes the identifier for the library and its location on disk.
+To do so, the user must identify the additional action libraries they want to load for each of the sources using the configuration variable actionsLibraries.
+This variable contains an object, and each of its fields includes the identifier for the library and its location on disk.
 The paths to the libraries can be absolute or relative; in the latter case, the current working directory of the Node.js process will be used as the base.
 Custom actions libraries are ES6 modules containing actions implemented as functions with the following signature:
 ```js
