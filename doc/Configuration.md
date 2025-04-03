@@ -1,5 +1,5 @@
 # Speedis main configuration
-The file ./conf/speedis.conf contains a JSON object with the general configuration of the Speedis server.
+The optional file ./conf/speedis.conf contains a JSON object with the general configuration of the Speedis server.
 The following table describes the supported fields.
 
 |Field|Type|Mandatory|Default|Description|
