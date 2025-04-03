@@ -5,17 +5,54 @@ import cluster from "node:cluster"
 import fastify from 'fastify'
 import { app } from './app.js'
 import { AggregatorRegistry,  } from 'prom-client'
+import Ajv from "ajv"
 
 // Load the origin's configuration.
 const configurationFilename = path.join(process.cwd(), 'conf', 'speedis.json')
-const config = await fs.readFile(configurationFilename, 'utf8')
-  .then(jsonString => { return JSON.parse(jsonString) })
+const config = await 
+  fs.stat(configurationFilename)
+  .then(() => {
+    return fs.readFile(configurationFilename, 'utf8')
+  })
+  .then((data) => {
+    return JSON.parse(data)
+  })
   .catch(err => {
-    console.log(err, 'Error loading the configuration file ' + configurationFilename)
-    throw err
+    if (err.code === 'ENOENT') {
+      console.warn('Configuration file not found:', configurationFilename)
+      return {}
+    } else {
+      console.log(err, 'Error loading the configuration file ' + configurationFilename)
+      process.exit(1)
+    }
   })
 
-// TODO: Validate configuration.
+const ajv = new Ajv({useDefaults: true})
+const validateSpeedis = ajv.compile(
+  {
+    type: "object",
+    additionalProperties: false,
+    properties: {
+      maxNumberOfWorkers: { type: "number", default: os.availableParallelism() },
+      port: { type: "number", default: 3001 },
+      logLevel: {
+        enum: ["fatal", "error", "warn", "info", "debug", "trace"],
+        default: "info"
+      },
+      metricServerPort: { type: "number", default: 3003 },
+      metricServerLogLevel: {
+        enum: ["fatal", "error", "warn", "info", "debug", "trace"],
+        default: "info"
+      }
+    }
+  }
+)
+if (!validateSpeedis(config)) {
+  console.error("Invalid configuration file:", configurationFilename)
+  console.error(validateSpeedis.errors)
+  process.exit(1)
+}
+
 const aggregatorRegistry = new AggregatorRegistry()
 
 // https://medium.com/@mjdrehman/implementing-node-js-cluster-for-improved-performance-f800146e58e1
@@ -65,7 +102,7 @@ if (cluster.isPrimary) {
   const server = await app({
     logger: { level: config.logLevel?config.logLevel:'info' },
     actionsLibraries: config.actionsLibraries?config.actionsLibraries:[]
-  })
+  }, ajv)
   
   // Run the server!
   try {

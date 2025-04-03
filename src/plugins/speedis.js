@@ -8,7 +8,6 @@ import { randomBytes } from "crypto"
 import * as crypto from 'crypto'
 import Ajv from "ajv"
 
-
 // TODO: https://www.rfc-editor.org/rfc/rfc9111.html#name-must-understand
 // TODO: https://www.rfc-editor.org/rfc/rfc9111.html#name-no-transform
 // TODO: https://www.rfc-editor.org/rfc/rfc9111.html#name-no-transform-2
@@ -19,7 +18,6 @@ import Ajv from "ajv"
 // TODO: Implementar logs (publicación en Kibana). Fluentd or Central Logging (K8s)
 // TODO: Completar validaciones AJV.
 // TODO: Handling Redis reconnections
-// TODO: Dockerizar y Kubernetizar
 // TODO: Gestión de configuraciones remotas. JSON + Client Side Cache
 // TODO: Gestionar Status Code poco habituales
 // TODO: Implement _tranform in the Client Request and Response phases.
@@ -34,339 +32,170 @@ export default async function (server, opts) {
 
   const ajv = new Ajv()
 
-  // const CLIENT_REQUEST  = "ClientRequest"
-  // const CLIENT_RESPONSE = "ClientResponse"
+  const CLIENT_REQUEST  = "ClientRequest"
+  const CLIENT_RESPONSE = "ClientResponse"
   const ORIGIN_REQUEST = "OriginRequest"
   const ORIGIN_RESPONSE = "OriginResponse"
   const CACHE_REQUEST = "CacheRequest"
   const CACHE_RESPONSE = "CacheResponse"
   const actionsRepository = {}
 
-  if (origin) {
+  /*
+    * Initially, we are only going to support GET requests.
+    * The default method is GET
+    */
+  if (Object.prototype.hasOwnProperty.call(origin.httpxOptions, 'method') &&
+    origin.httpxOptions.method !== 'GET') {
+    throw new Error(`Unsupported HTTP method: ${origin.httpxOptions.method}. Only GET is supported. Origin: ${id}`)
+  }
 
-    const validateOrigin = ajv.compile(
-      {
-        type: "object",
-        additionalProperties: false,
-        required: ["httpxOptions", "lock", "circuitBreaker"],
-        if: { properties: { lock: { const: true } } },
-        then: { required: ["lockOptions"] },
-        if: { properties: { circuitBreaker: { const: true } } },
-        then: { required: ["circuitBreakerOptions"] },
-        properties: {
-          // https://nodejs.org/api/http.html#httprequestoptions-callback
-          httpxOptions: {
-            type: "object",
-            properties: {
-              auth: { type: "string" },
-              defaultPort: { type: "integer" },
-              family: { enum: [4, 6] },
-              headers: { type: "object" },
-              hints: { type: "integer" },
-              host: { type: "string" },
-              hostname: { type: "string" },
-              insecureHTTPParser: { type: "boolean" },
-              joinDuplicateHeaders: { type: "boolean" },
-              localAddress: { type: "string" },
-              localPort: { type: "integer" },
-              maxHeaderSize: { type: "integer" },
-              method: { type: "string" },
-              path: { type: "string" },
-              port: { type: "integer" },
-              protocol: { type: "string" },
-              setHost: { type: "boolean" },
-              socketPath: { type: "string" },
-              timeout: { type: "integer" },
-              uniqueHeaders: { type: "array" }
-            }
-          },
-          // See: https://nodejs.org/api/http.html#new-agentoptions
-          agentOptions: {
-            type: "object",
-            additionalProperties: false,
-            properties: {
-              keepAlive: { type: "boolean" },
-              keepAliveMsecs: { type: "integer" },
-              maxSockets: { type: "integer" },
-              maxTotalSockets: { type: "integer" },
-              maxFreeSockets: { type: "integer" },
-              scheduling: { type: "string" },
-              timeout: { type: "integer" },
-              maxCachedSessions: { type: "integer" },
-              servername: { type: "string" },
-            }
-          },
-          fetchTimeout: { type: "integer" },
-          ignoredQueryParams: {
-            type: "array",
-            items: {
-              type: "string"
-            }
-          },
-          sortQueryParams: { type: "boolean" },
-          requestCoalescing: { type: "boolean" },
-          lock: { type: "boolean" },
-          lockOptions:
-          {
-            type: "object",
-            required: ["lockTTL", "retryCount", "retryDelay", "retryJitter"],
-            additionalProperties: false,
-            properties: {
-              lockTTL: { type: "integer" },
-              retryCount: { type: "integer" },
-              retryDelay: { type: "integer" },
-              retryJitter: { type: "integer" }
-            }
-          },
-          circuitBreaker: { type: "boolean" },
-          // See: https://github.com/nodeshift/opossum/blob/main/lib/circuit.js
-          circuitBreakerOptions: {
-            type: "object",
-            additionalProperties: true,
-            properties: {
-              // status: { type: "Status" }, 
-              // timeout: { type: "integer" }, 
-              maxFailures: { type: "integer" },
-              resetTimeout: { type: "integer" },
-              rollingCountTimeout: { type: "integer" },
-              rollingCountBuckets: { type: "integer" },
-              // name: { type: "string" },
-              rollingPercentilesEnabled: { type: "boolean" },
-              capacity: { type: "integer" },
-              errorThresholdPercentage: { type: "integer" },
-              enabled: { type: "boolean" },
-              allowWarmUp: { type: "boolean" },
-              volumeThreshold: { type: "integer" },
-              // errorFilter: { type: "Function" }, 
-              /*
-              cache: { type: "boolean" },
-              cacheTTL: { type: "integer" },
-              cacheSize: { type: "integer" },
-              cacheGetKey: { type: "Function" }, 
-              cacheTransport: { type: "CacheTransport" }, 
-              coalesce: { type: "boolean" }, 
-              coalesceTTL: { type: "integer" }, 
-              coalesceSize: { type: "integer" }, 
-              coalesceResetOn: { 
-                type: "array",
-                items: { enum: ["error", "success", "timeout"] }
-              },
-              */
-              // abortController: { type: "AbortController" }, 
-              enableSnapshots: { type: "boolean" },
-              // rotateBucketController: { type: "EventEmitter" }, 
-              autoRenewAbortController: { type: "boolean" }
-            }
-          },
-          actionsLibraries: {
-            type: "object"
-          },
-          transformations: {
-            type: "array",
-            items: {
-              type: "object",
-              minProperties: 2,
-              maxProperties: 2,
-              additionalProperties: false,
-              required: ["urlPattern", "actions"],
-              properties: {
-                urlPattern: { type: "string" },
-                actions: {
-                  type: "array",
-                  items: {
-                    type: "object",
-                    minProperties: 2,
-                    maxProperties: 3,
-                    required: ["phase", "uses"],
-                    properties: {
-                      phase: {
-                        enum: [
-                          // CLIENT_REQUEST,
-                          // CLIENT_RESPONSE,
-                          ORIGIN_REQUEST,
-                          ORIGIN_RESPONSE,
-                          CACHE_REQUEST,
-                          CACHE_RESPONSE
-                        ]
-                      },
-                      uses: { type: "string" },
-                      with: { type: "object" }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    )
+  // Ensuring the header array exists
+  if (!Object.prototype.hasOwnProperty.call(origin.httpxOptions, 'headers')) {
+    origin.httpxOptions.headers = {}
+  } else {
+    /*
+      * We ensure that header names are in lowercase for the following
+      * comparisons, which are case-sensitive.
+      * Node HTTP library sets all headers to lower case automatically.
+      */
+    let aux = null
+    for (const header in origin.httpxOptions.headers) {
+      aux = origin.httpxOptions.headers[header]
+      delete origin.httpxOptions.headers[header]
+      origin.httpxOptions.headers[header.toLowerCase()] = aux
+    }
+  }
 
-    const validOrigin = validateOrigin(origin)
+  // Agents are responsible for managing connections.
+  if (Object.prototype.hasOwnProperty.call(origin, 'agentOptions')) {
+    // The default protocol is 'http:'
+    const agent = ('https:' === origin.httpxOptions.protocol ? https : http)
+      .Agent(origin.agentOptions)
+    server.decorate('agent', agent)
+  }
 
-    if (validOrigin) {
+  if (origin.circuitBreaker) {
 
-      /*
-       * Initially, we are only going to support GET requests.
-       * The default method is GET
-       */
-      if (Object.prototype.hasOwnProperty.call(origin.httpxOptions, 'method') &&
-        origin.httpxOptions.method !== 'GET') {
-        throw new Error(`Unsupported HTTP method: ${origin.httpxOptions.method}. Only GET is supported. Origin: ${id}`)
-      }
+    // FIXME: REfinar la validación del objeto circuitBreakerOptions para quitar las 
+    // propiedades que no son necesarias.
 
-      // Ensuring the header array exists
-      if (!Object.prototype.hasOwnProperty.call(origin.httpxOptions, 'headers')) {
-        origin.httpxOptions.headers = {}
-      } else {
-        /*
-         * We ensure that header names are in lowercase for the following
-         * comparisons, which are case-sensitive.
-         * Node HTTP library sets all headers to lower case automatically.
-         */
-        let aux = null
-        for (const header in origin.httpxOptions.headers) {
-          aux = origin.httpxOptions.headers[header]
-          delete origin.httpxOptions.headers[header]
-          origin.httpxOptions.headers[header.toLowerCase()] = aux
-        }
-      }
+    let cbOptions = []
+    if (Object.prototype.hasOwnProperty.call(origin, "circuitBreakerOptions")) {
+      cbOptions = origin.circuitBreakerOptions
+    }
 
-      // Agents are responsible for managing connections.
-      if (Object.prototype.hasOwnProperty.call(origin, 'agentOptions')) {
-        // The default protocol is 'http:'
-        const agent = ('https:' === origin.httpxOptions.protocol ? https : http)
-          .Agent(origin.agentOptions)
-        server.decorate('agent', agent)
-      }
+    // Name of the Circuit Breaker
+    cbOptions['name'] = id
+    // Speedis implements its own coalescing mechanism so we disable the one from the circuit breaker.
+    cbOptions['coalesce'] = false
+    // Speedis itself implements a cache mechanism so we disable the one from the circuit breaker.
+    cbOptions['cache'] = false
 
-      if (origin.circuitBreaker) {
+    if (Object.prototype.hasOwnProperty.call(origin, "fetchTimeout")) {
+      cbOptions['timeout'] = origin.fetchTimeout
+    }
 
-        // FIXME: REfinar la validación del objeto circuitBreakerOptions para quitar las 
-        // propiedades que no son necesarias.
+    // Circuit Breaker instance
+    const circuit = new CircuitBreaker(_fetch, cbOptions)
 
-        let cbOptions = []
-        if (Object.prototype.hasOwnProperty.call(origin, "circuitBreakerOptions")) {
-          cbOptions = origin.circuitBreakerOptions
-        }
+    circuit.on('open', () => {
+      let retryAfter = new Date()
+      retryAfter.setSeconds(retryAfter.getSeconds() + circuit.options.resetTimeout / 1000)
+      circuit['retryAfter'] = retryAfter.toUTCString()
+      server.log.warn(`Circuit Breaker Open: No requests will be made. Origin ${id}.`)
+    })
+    circuit.on('halfOpen', () => {
+      server.log.info(`Circuit Breaker Half Open: Requests are being tested. Origin ${id}.`)
+    })
+    circuit.on('close', () => {
+      server.log.info(`Circuit closed: Request are being made normally. Origin ${id}.`)
+    })
 
-        // Name of the Circuit Breaker
-        cbOptions['name'] = id
-        // Speedis implements its own coalescing mechanism so we disable the one from the circuit breaker.
-        cbOptions['coalesce'] = false
-        // Speedis itself implements a cache mechanism so we disable the one from the circuit breaker.
-        cbOptions['cache'] = false
-
-        if (Object.prototype.hasOwnProperty.call(origin, "fetchTimeout")) {
-          cbOptions['timeout'] = origin.fetchTimeout
-        }
-
-        // Circuit Breaker instance
-        const circuit = new CircuitBreaker(_fetch, cbOptions)
-
-        circuit.on('open', () => {
-          let retryAfter = new Date()
-          retryAfter.setSeconds(retryAfter.getSeconds() + circuit.options.resetTimeout / 1000)
-          circuit['retryAfter'] = retryAfter.toUTCString()
-          server.log.warn(`Circuit Breaker Open: No requests will be made. Origin ${id}.`)
+    for (const eventName of circuit.eventNames()) {
+      circuit.on(eventName, _ => {
+        server.circuitBreakersEvents.labels({
+          origin: id,
+          event: eventName
+        }).inc()
+      })
+      if (eventName === 'success' || eventName === 'failure') {
+        // Not the timeout event because runtime == timeout
+        circuit.on(eventName, (result, runTime) => {
+          server.circuitBreakersPerformance.labels({
+            origin: id,
+            event: eventName
+          }).observe(runTime)
         })
-        circuit.on('halfOpen', () => {
-          server.log.info(`Circuit Breaker Half Open: Requests are being tested. Origin ${id}.`)
-        })
-        circuit.on('close', () => {
-          server.log.info(`Circuit closed: Request are being made normally. Origin ${id}.`)
-        })
+      }
+    }
+    server.decorate('circuit', circuit)
+  }
 
-        for (const eventName of circuit.eventNames()) {
-          circuit.on(eventName, _ => {
-            server.circuitBreakersEvents.labels({
-              origin: id,
-              event: eventName
-            }).inc()
-          })
-          if (eventName === 'success' || eventName === 'failure') {
-            // Not the timeout event because runtime == timeout
-            circuit.on(eventName, (result, runTime) => {
-              server.circuitBreakersPerformance.labels({
-                origin: id,
-                event: eventName
-              }).observe(runTime)
-            })
-          }
-        }
-        server.decorate('circuit', circuit)
-      }
-
-      // Load actions libraries
-      if (!Object.prototype.hasOwnProperty.call(origin, 'actionsLibraries')) {
-        origin.actionsLibraries = {}
-      }
-      origin.actionsLibraries['headers'] = path.resolve(process.cwd(), './src/actions/headers.js')
-      origin.actionsLibraries['json']    = path.resolve(process.cwd(), './src/actions/json.js')
-      for (let actionsLibraryKey in origin.actionsLibraries) {
-        if (!path.isAbsolute(origin.actionsLibraries[actionsLibraryKey])) {
-          origin.actionsLibraries[actionsLibraryKey] = path.resolve(
-            process.cwd(), 
-            origin.actionsLibraries[actionsLibraryKey]
-          )
-        }
-        if (origin.actionsLibraries[actionsLibraryKey].endsWith(".js")) {
-          try {
-            const library = await import(`file://${origin.actionsLibraries[actionsLibraryKey]}`)
-            Object.entries(library).forEach(([key, value]) => {
-              if (typeof value === 'function') {
-                if (!Object.prototype.hasOwnProperty.call(actionsRepository, actionsLibraryKey)) {
-                  actionsRepository[actionsLibraryKey] = {}
-                }
-                actionsRepository[actionsLibraryKey][key] = value
-              }
-            })
-          } catch (error) {
-            server.log.error(`Error importing the action library ${origin.actionsLibraries[actionsLibraryKey]}. Origin: ${id}`)
-            throw new Error(`The transformation configuration is invalid. Origin: ${id}`)
-          }
-        } else {
-          server.log.error(`The file ${origin.actionsLibraries[actionsLibraryKey]} containing the action library must have a .js extension. Origin: ${id}`)
-          throw new Error(`The transformation configuration is invalid. Origin: ${id}`)
-        }
-      }
-      // Loading transformations
-      if (Object.prototype.hasOwnProperty.call(origin, 'transformations')) {
-        origin.transformations.forEach(transformation => {
-          try {
-            transformation.re = new RegExp(transformation.urlPattern)
-          } catch (error) {
-            server.log.error(`urlPattern ${transformation.urlPattern} is not a valid regular expresion. Origin: ${id}`)
-            throw new Error(`The transformation configuration is invalid. Origin: ${id}`)
-          }
-          transformation.actions.forEach(action => {
-            const tokens =  action.uses.split(':')
-            let library = null
-            let func = null
-            if (tokens.length === 1) {
-              library = 'speedis'
-              func = tokens[0]
-            } else if (tokens.length === 2) {
-              library = tokens[0]
-              func = tokens[1]
-            } else {
-              server.log.error(`The name of the action ${action.uses} is not valid. The correct format is library:action. Origin: ${id}`)
-              throw new Error(`The transformation configuration is invalid. Origin: ${id}`)
+  // Load actions libraries
+  if (!Object.prototype.hasOwnProperty.call(origin, 'actionsLibraries')) {
+    origin.actionsLibraries = {}
+  }
+  origin.actionsLibraries['headers'] = path.resolve(process.cwd(), './src/actions/headers.js')
+  origin.actionsLibraries['json']    = path.resolve(process.cwd(), './src/actions/json.js')
+  for (let actionsLibraryKey in origin.actionsLibraries) {
+    if (!path.isAbsolute(origin.actionsLibraries[actionsLibraryKey])) {
+      origin.actionsLibraries[actionsLibraryKey] = path.resolve(
+        process.cwd(), 
+        origin.actionsLibraries[actionsLibraryKey]
+      )
+    }
+    if (origin.actionsLibraries[actionsLibraryKey].endsWith(".js")) {
+      try {
+        const library = await import(`file://${origin.actionsLibraries[actionsLibraryKey]}`)
+        Object.entries(library).forEach(([key, value]) => {
+          if (typeof value === 'function') {
+            if (!Object.prototype.hasOwnProperty.call(actionsRepository, actionsLibraryKey)) {
+              actionsRepository[actionsLibraryKey] = {}
             }
-            if ( !Object.prototype.hasOwnProperty.call(actionsRepository, library) 
-              || !Object.prototype.hasOwnProperty.call(actionsRepository[library], func)) {
-              server.log.error(`Function ${action.uses} was not found among the available actions. Origin: ${id}`)
-              throw new Error(`The transformation configuration is invalid. Origin: ${id}`)
-            }
-          })
+            actionsRepository[actionsLibraryKey][key] = value
+          }
         })
+      } catch (error) {
+        server.log.error(`Error importing the action library ${origin.actionsLibraries[actionsLibraryKey]}. Origin: ${id}`)
+        throw new Error(`The transformation configuration is invalid. Origin: ${id}`)
       }
     } else {
-      server.log.error(validateOrigin.errors)
-      throw new Error(`Origin configuration is invalid. Origin: ${id}`)
+      server.log.error(`The file ${origin.actionsLibraries[actionsLibraryKey]} containing the action library must have a .js extension. Origin: ${id}`)
+      throw new Error(`The transformation configuration is invalid. Origin: ${id}`)
     }
-  } else {
-    throw new Error(`Origin configuration not found. Origin: ${id}`)
   }
+  // Loading transformations
+  if (Object.prototype.hasOwnProperty.call(origin, 'transformations')) {
+    origin.transformations.forEach(transformation => {
+      try {
+        transformation.re = new RegExp(transformation.urlPattern)
+      } catch (error) {
+        server.log.error(`urlPattern ${transformation.urlPattern} is not a valid regular expresion. Origin: ${id}`)
+        throw new Error(`The transformation configuration is invalid. Origin: ${id}`)
+      }
+      transformation.actions.forEach(action => {
+        const tokens =  action.uses.split(':')
+        let library = null
+        let func = null
+        if (tokens.length === 1) {
+          library = 'speedis'
+          func = tokens[0]
+        } else if (tokens.length === 2) {
+          library = tokens[0]
+          func = tokens[1]
+        } else {
+          server.log.error(`The name of the action ${action.uses} is not valid. The correct format is library:action. Origin: ${id}`)
+          throw new Error(`The transformation configuration is invalid. Origin: ${id}`)
+        }
+        if ( !Object.prototype.hasOwnProperty.call(actionsRepository, library) 
+          || !Object.prototype.hasOwnProperty.call(actionsRepository[library], func)) {
+          server.log.error(`Function ${action.uses} was not found among the available actions. Origin: ${id}`)
+          throw new Error(`The transformation configuration is invalid. Origin: ${id}`)
+        }
+      })
+    })
+  }
+
   server.decorate('origin', origin)
 
 
