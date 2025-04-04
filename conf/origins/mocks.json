@@ -3,17 +3,19 @@
     "prefix": "/mocks",
     "logLevel": "info",
     "exposeErrors": false,
+    "redisTimeout": 250,
+    "redisBreaker": true,
+    "redisBreakerOptions": {
+        "errorThresholdPercentage": 25,
+        "resetTimeout": 5000
+    },
     "redis": {
         "url": "redis://redis:6379"
     },
     "origin": {
         "httpxOptions": {
-            "protocol": "http:",
             "host": "mocks",
-            "family": 4,
             "port": 3030,
-            "method": "GET",
-            "headers": {},
             "timeout": 2000
         },
         "agentOptions": {
@@ -21,18 +23,18 @@
         },
         "ignoredQueryParams": ["cc", "delay"],
         "sortQueryParams": true,
-        "requestCoalescing": true,
-        "lock": true,
-        "lockOptions": {
+        "localRequestsCoalescing": true,
+        "distributedRequestsCoalescing": false,
+        "distributedRequestsCoalescingOptions": {
             "lockTTL": 750,
             "retryCount": 3,
             "retryDelay": 500,
             "retryJitter": 250
         },
-        "circuitBreaker": true,
-        "circuitBreakerOptions": {
-            "errorThresholdPercentage": 20,
-            "resetTimeout": 15000
+        "originBreaker": false,
+        "originBreakerOptions": {
+            "errorThresholdPercentage": 25,
+            "resetTimeout": 20000
         },
         "actionsLibraries": {
             "json": "./actionLibraries/json.js"

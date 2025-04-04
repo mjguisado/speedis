@@ -2,7 +2,7 @@
 We are going to run some tests to observe the effects of the circuit breaker mechanism on the origin server.
 
 ## Without circuit breaker
-First, we modify the configuration file for the mocks origin, located at ./conf/origins/mocks.json, to ensure that the circuit breaker mechanisms is disabled (circuitBreaker = false) and the coalescing mechanisms are enabled—both for requests arriving at the same instance (requestCoalescing = true) and across different instances (lock = true).
+First, we modify the configuration file for the mocks origin, located at ./conf/origins/mocks.json, to ensure that the circuit breaker mechanisms is disabled (originBreaker = false) and the coalescing mechanisms are enabled—both for requests arriving at the same instance (localRequestsCoalescing = true) and across different instances (distributedRequestsCoalescing = true).
 
 Once modified, we proceed to start the environment:
 ```sh
@@ -40,7 +40,7 @@ In both cases, the reponse times exceed one second.
 Once the origin is restored, the system returns to normal.  
 <img src="./img/after_without_cb.png" />
 
-Finally, we modify the configuration file for the mocks origin to ensure that the circuit breaker mechanisms is enabled (circuitBreaker = true) and restart the environment.
+Finally, we modify the configuration file for the mocks origin to ensure that the circuit breaker mechanisms is enabled (originBreaker = true) and restart the environment.
 ```sh
 docker compose up --build -d
 ```

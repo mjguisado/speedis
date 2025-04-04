@@ -35,28 +35,32 @@ export default async function (server, opts) {
   })
 
   /**
-   * Wrap all Redis commands to apply a timeout per operation.
-   * @param {object} client - The Redis client.
-   * @param {number} timeoutMs - Timeout in milliseconds for each command.
-   * @returns {object} - A proxy to the Redis client with timeout applied.
+   * Wraps a Redis client so that any command you call on it will automatically have a timeout.
+   * If the Redis command takes too long it will reject with a timeout error.
+   * 
+   * @param {object} client - The original Redis client object.
+   * @param {number} timeout - Optional. The maximum time (in milliseconds) to wait for a Redis command to complete before timing out. Defaults to 1000ms 
+   * @returns {object} - Proxy object that behaves just like the original Redis client, but with a timeout behavior added to each command.
    */
-  function wrapRedisWithTimeout(client, timeoutMs = 1000) {
+  function wrapRedisWithTimeout(client, timeout) {
     const handler = {
       get(target, prop, receiver) {
         const original = target[prop]
         // Module JSON is a special case, we need to wrap its methods
-        if ('json' === prop) return wrapRedisWithTimeout(original, timeoutMs)
+        if ('object' === typeof original && 'json' === prop) {
+          return wrapRedisWithTimeout(original, timeout)
+        }
         if (typeof original !== 'function') return original
         return (...args) => {
-          const promise = original.apply(target, args)
-          return Promise.race([
-            promise,
+          const command = Promise.race([
+            original.apply(target, args),
             new Promise((_, reject) =>
               setTimeout(() => reject(
-                new Error(`Redis command "${prop}" timed out after ${timeoutMs} ms`)
-              ), timeoutMs)
+                new Error(`Redis command "${prop}" timed out after ${timeout} ms`)
+              ), timeout)
             )
           ])
+          return command
         }
       }
     }
@@ -64,8 +68,68 @@ export default async function (server, opts) {
   }
 
   try {
+
     await client.connect()
-    server.decorate('redis', wrapRedisWithTimeout(client, origin.redisTimeout))
+
+opts.redisBreaker = false
+
+    if (opts.redisBreaker) {
+      
+      let redisBreakerOptions = []
+      if (Object.prototype.hasOwnProperty.call(opts, "redisBreakerOptions")) {
+        redisBreakerOptions = opts.redisBreakerOptions
+      }      
+      // Name of the Circuit Breaker
+      redisBreakerOptions['name'] = `redis-${id}`
+      // Speedis implements its own coalescing mechanism so we disable the one from the circuit breaker.
+      redisBreakerOptions['coalesce'] = false
+      // Speedis itself implements a cache mechanism so we disable the one from the circuit breaker.
+      redisBreakerOptions['cache'] = false
+      // Timeout for the Circuit Breaker
+      if (Object.prototype.hasOwnProperty.call(opts, "redisTimeout")) {
+        redisBreakerOptions['timeout'] = opts.redisTimeout
+      }
+
+      // Redis Breaker instance
+      const redisBreaker = new CircuitBreaker(_fetch, redisBreakerOptions)
+ 
+      redisBreaker.on('open', () => {
+        let retryAfter = new Date()
+        retryAfter.setSeconds(retryAfter.getSeconds() + redisBreaker.options.resetTimeout / 1000)
+        redisBreaker['retryAfter'] = retryAfter.toUTCString()
+        server.log.err(`Fetch Circuit Breaker OPEN: No requests will be made. Origin ${id}.`)
+      })
+      redisBreaker.on('halfOpen', () => {
+        server.log.warn(`Fech Circuit Breaker HALF OPEN: Requests are being tested. Origin ${id}.`)
+      })
+      redisBreaker.on('close', () => {
+        server.log.info(`Fech Circuit Breaker CLOSED: Request are being made normally. Origin ${id}.`)
+      })
+
+      // Origin Circuit Breaker events
+      for (const eventName of redisBreaker.eventNames()) {
+        redisBreaker.on(eventName, _ => {
+          server.redisBreakerEvents.labels({
+            origin: id,
+            event: eventName
+          }).inc()
+        })
+        if (eventName === 'success' || eventName === 'failure') {
+          // Not the timeout event because runtime == timeout
+          redisBreaker.on(eventName, (result, runTime) => {
+            server.redisBreakerPerformance.labels({
+              origin: id,
+              event: eventName
+            }).observe(runTime)
+          })
+        }
+      }
+
+    } else if (opts.redisTimeout) {
+      server.decorate('redis', wrapRedisWithTimeout(client, opts.redisTimeout))
+    } else {
+      server.decorate('redis', client)
+    }
   } catch (error) {
     throw new Error(`Unable to connect to Redis during startup. Origin: ${id}.`, { cause: error })
   }
@@ -105,52 +169,53 @@ export default async function (server, opts) {
   }
 
   // This Map storages the ongoing Fecth Operations
-  if (origin.requestCoalescing) server.decorate('ongoing', new Map())
+  if (origin.localRequestsCoalescing) server.decorate('ongoing', new Map())
 
-  if (origin.circuitBreaker) {
+  if (origin.originBreaker) {
 
-    let cbOptions = []
-    if (Object.prototype.hasOwnProperty.call(origin, "circuitBreakerOptions")) {
-      cbOptions = origin.circuitBreakerOptions
+    let originBreakerOptions = []
+    if (Object.prototype.hasOwnProperty.call(origin, "originBreakerOptions")) {
+      originBreakerOptions = origin.originBreakerOptions
     }
 
     // Name of the Circuit Breaker
-    cbOptions['name'] = id
+    originBreakerOptions['name'] = `fetch-${id}`
     // Speedis implements its own coalescing mechanism so we disable the one from the circuit breaker.
-    cbOptions['coalesce'] = false
+    originBreakerOptions['coalesce'] = false
     // Speedis itself implements a cache mechanism so we disable the one from the circuit breaker.
-    cbOptions['cache'] = false
+    originBreakerOptions['cache'] = false
     // Timeout for the Circuit Breaker
-    if (Object.prototype.hasOwnProperty.call(origin, "fetchTimeout")) {
-      cbOptions['timeout'] = origin.fetchTimeout
+    if (Object.prototype.hasOwnProperty.call(origin, "originTimeout")) {
+      originBreakerOptions['timeout'] = origin.originTimeout
     }
 
-    // Circuit Breaker instance
-    const circuit = new CircuitBreaker(_fetch, cbOptions)
-    circuit.on('open', () => {
+    // Origin Breaker instance
+    const originBreaker = new CircuitBreaker(_fetch, originBreakerOptions)
+    originBreaker.on('open', () => {
       let retryAfter = new Date()
-      retryAfter.setSeconds(retryAfter.getSeconds() + circuit.options.resetTimeout / 1000)
-      circuit['retryAfter'] = retryAfter.toUTCString()
-      server.log.warn(`Circuit Breaker Open: No requests will be made. Origin ${id}.`)
+      retryAfter.setSeconds(retryAfter.getSeconds() + originBreaker.options.resetTimeout / 1000)
+      originBreaker['retryAfter'] = retryAfter.toUTCString()
+      server.log.err(`Fetch Circuit Breaker OPEN: No requests will be made. Origin ${id}.`)
     })
-    circuit.on('halfOpen', () => {
-      server.log.info(`Circuit Breaker Half Open: Requests are being tested. Origin ${id}.`)
+    originBreaker.on('halfOpen', () => {
+      server.log.warn(`Fech Circuit Breaker HALF OPEN: Requests are being tested. Origin ${id}.`)
     })
-    circuit.on('close', () => {
-      server.log.info(`Circuit closed: Request are being made normally. Origin ${id}.`)
+    originBreaker.on('close', () => {
+      server.log.info(`Fech Circuit Breaker CLOSED: Request are being made normally. Origin ${id}.`)
     })
 
-    for (const eventName of circuit.eventNames()) {
-      circuit.on(eventName, _ => {
-        server.circuitBreakersEvents.labels({
+    // Origin Circuit Breaker events
+    for (const eventName of originBreaker.eventNames()) {
+      originBreaker.on(eventName, _ => {
+        server.originBreakerEvents.labels({
           origin: id,
           event: eventName
         }).inc()
       })
       if (eventName === 'success' || eventName === 'failure') {
         // Not the timeout event because runtime == timeout
-        circuit.on(eventName, (result, runTime) => {
-          server.circuitBreakersPerformance.labels({
+        originBreaker.on(eventName, (result, runTime) => {
+          server.originBreakerPerformance.labels({
             origin: id,
             event: eventName
           }).observe(runTime)
@@ -158,7 +223,7 @@ export default async function (server, opts) {
       }
     }
 
-    server.decorate('circuit', circuit)
+    server.decorate('originCircuit', originBreaker)
 
   }
 
@@ -262,11 +327,11 @@ export default async function (server, opts) {
         // If the previous _get execution returned -1, it means
         // that it couldn't acquire the lock to make a request to the
         // origin. Therefore, the origin has a lock mechanism enabled,
-        // and the origin.lockOptions should exist, with all its
+        // and the origin.distributedRequestsCoalescingOptions should exist, with all its
         // attributes being mandatory.
-        while (response === -1 && tries < server.origin.lockOptions.retryCount) {
-          let delay = server.origin.lockOptions.retryDelay +
-            Math.round(Math.random() * server.origin.lockOptions.retryJitter)
+        while (response === -1 && tries < server.origin?.distributedRequestsCoalescingOptions?.retryCount) {
+          let delay = server.origin?.distributedRequestsCoalescingOptions?.retryDelay +
+            Math.round(Math.random() * server.origin?.distributedRequestsCoalescingOptions?.retryJitter)
           await new Promise(resolve => setTimeout(resolve, delay))
           response = await _get(server, request, request.id)
           tries++
@@ -438,7 +503,7 @@ export default async function (server, opts) {
         server.origin.ignoredQueryParams.forEach(param => params.delete(param))
       }
       if (params.size > 0) {
-        if (server.origin.sortQueryParams) {
+        if (Object.prototype.hasOwnProperty.call(server.origin, 'sortQueryParams')) {
           const sortedParams = [...params.entries()]
             .sort(([a], [b]) => a.localeCompare(b))
             .map(([key, value]) => `${key}=${value}`)
@@ -579,7 +644,7 @@ export default async function (server, opts) {
     // Apply transformations to the request before sending it to the origin
     _transform(ORIGIN_REQUEST, options, server)
 
-    // If requestCoalescing is enabled, only the first request 
+    // If localRequestsCoalescing is enabled, only the first request 
     // will contact the origin to prevent overloading it.
     let amITheFetcher = false
 
@@ -594,19 +659,19 @@ export default async function (server, opts) {
 
       // Verify if there is an ongoing fetch operation
       let fetch = null
-      if (origin.requestCoalescing) {
+      if (origin.localRequestsCoalescing) {
         fetch = server.ongoing.get(cacheKey)
       }
 
       if (!fetch) {
         // https://redis.io/docs/latest/develop/use/patterns/distributed-locks/#correct-implementation-with-a-single-instance
-        if (server.origin.lock) {
+        if (server.origin?.distributedRequestsCoalescing) {
           lockKey = `${cacheKey}.lock`
           lockValue = `${process.pid}:${server.id}:${rid}:` + randomBytes(4).toString("hex")
           locked = await _adquireLock(server, lockKey, lockValue)
         }
 
-        if (server.origin.lock && !locked) {
+        if (server.origin?.distributedRequestsCoalescing && !locked) {
           // At this point, we should have acquired a lock to make a request to 
           // the origin, but we haven’t. So, we return -1 to indicate that the 
           // entire function should be retried, as another thread could have
@@ -614,12 +679,12 @@ export default async function (server, opts) {
           return -1
         }
 
-        if (server.circuit) {
-          fetch = server.circuit.fire(server, options)
+        if (server.originBreaker) {
+          fetch = server.originBreaker.fire(server, options)
         } else {
           fetch = _fetch(server, options)
         }
-        if (origin.requestCoalescing) server.ongoing.set(cacheKey, fetch)
+        if (origin.localRequestsCoalescing) server.ongoing.set(cacheKey, fetch)
         amITheFetcher = true
 
       }
@@ -648,8 +713,8 @@ export default async function (server, opts) {
 
     } catch (error) {
 
-      if (server.origin.lock && locked) await _releaseLock(server, lockKey, lockValue)
-      if (amITheFetcher && origin.requestCoalescing) server.ongoing.delete(cacheKey)
+      if (server.origin?.distributedRequestsCoalescing && locked) await _releaseLock(server, lockKey, lockValue)
+      if (amITheFetcher && origin.localRequestsCoalescing) server.ongoing.delete(cacheKey)
 
       delete options.agent
       server.log.error(error,
@@ -686,8 +751,8 @@ export default async function (server, opts) {
             break
           case 'EOPENBREAKER':
             generatedResponse.statusCode = 503
-            if (server.circuit.options.resetTimeout) {
-              generatedResponse.headers['retry-after'] = server.circuit.retryAfter
+            if (server.originBreaker.options.resetTimeout) {
+              generatedResponse.headers['retry-after'] = server.originBreaker.retryAfter
             }
             break
           default:
@@ -698,7 +763,7 @@ export default async function (server, opts) {
       }
     }
 
-    if (amITheFetcher && origin.requestCoalescing) server.ongoing.delete(cacheKey)
+    if (amITheFetcher && origin.localRequestsCoalescing) server.ongoing.delete(cacheKey)
 
     // Apply transformations to the response received from the origin
     originResponse.path = path
@@ -803,7 +868,7 @@ export default async function (server, opts) {
     }
 
     // In this point the Cache Entry has been updated or deleted in Redis.
-    if (server.origin.lock && locked) await _releaseLock(server, lockKey, lockValue)
+    if (server.origin?.distributedRequestsCoalescing && locked) await _releaseLock(server, lockKey, lockValue)
 
     // See: https://www.rfc-editor.org/rfc/rfc9111.html#cache-request-directive.only-if-cached
     if (Object.prototype.hasOwnProperty.call(clientCacheDirectives, 'only-if-cached')
@@ -834,11 +899,11 @@ export default async function (server, opts) {
 
     let lockTTL
     if (Object.prototype.hasOwnProperty.call(server.origin, 'lockOptions')
-      && Object.prototype.hasOwnProperty.call(server.origin.lockOptions, 'lockTTL')
-      && server.origin.lockOptions.lockTTL > 0) {
-      lockTTL = server.origin.lockOptions.lockTTL
-    } else if (server.origin.fetchTimeout && server.origin.fetchTimeout > 0) {
-      lockTTL = Math.round(server.origin.fetchTimeout * 1.2)
+      && Object.prototype.hasOwnProperty.call(server.origin?.distributedRequestsCoalescingOptions, 'lockTTL')
+      && server.origin?.distributedRequestsCoalescingOptions?.lockTTL > 0) {
+      lockTTL = server.origin?.distributedRequestsCoalescingOptions?.lockTTL
+    } else if (server.origin.originTimeout && server.origin.originTimeout > 0) {
+      lockTTL = Math.round(server.origin.originTimeout * 1.2)
     } else {
       lockTTL = Math.round(Math.random() * 10000)
     }
@@ -910,12 +975,12 @@ export default async function (server, opts) {
       // If we are using the Circuit Breaker the timeout is managed by it.
       // In other cases, we has to manage the timeout in the request.
       let signal, timeoutId = null
-      if (Object.prototype.hasOwnProperty.call(origin, "fetchTimeout") &&
+      if (Object.prototype.hasOwnProperty.call(origin, "originTimeout") &&
         !Object.prototype.hasOwnProperty.call(options, "signal")) {
         const abortController = new AbortController()
         timeoutId = setTimeout(() => {
           abortController.abort()
-        }, origin.fetchTimeout)
+        }, origin.originTimeout)
         signal = abortController.signal
         options.signal = signal
       }
@@ -932,7 +997,7 @@ export default async function (server, opts) {
 
       request.on('error', (err) => {
         if (signal && signal.aborted) {
-          const error = new Error(`Timed out after ${origin.fetchTimeout} ms`, { cause: err })
+          const error = new Error(`Timed out after ${origin.originTimeout} ms`, { cause: err })
           error.code = 'ETIMEDOUT'
           reject(error)
         } else {

@@ -13,6 +13,50 @@ export async function app(opts = {}, ajv = new Ajv({useDefaults: true})) {
       type: "object",
       additionalProperties: false,
       required: ["id", "prefix", "redis", "origin"],
+      if: { properties: { redisBreaker: { const: true } } },
+      then: { required: ["redisBreakerOptions"] },
+      definitions: {
+        circuitBreakerOptions: {
+          type: "object",
+          additionalProperties: false,
+          // See: https://github.com/nodeshift/opossum/blob/main/lib/circuit.js
+          properties: {
+            // status: { type: "Status" }, 
+            // timeout: { type: "integer" },
+            // Default value (10) is not specified because maxFailures it is deprecated
+            maxFailures: { type: "integer" },
+            resetTimeout: { type: "integer", default: 30000 },
+            rollingCountTimeout: { type: "integer", default: 10000 },
+            rollingCountBuckets: { type: "integer", default: 10 },
+            // name: { type: "string" },
+            rollingPercentilesEnabled: { type: "boolean", default: true },
+            capacity: { type: "integer", default: Number.MAX_SAFE_INTEGER },
+            errorThresholdPercentage: { type: "integer", default: 50 },
+            enabled: { type: "boolean", default: true },
+            allowWarmUp: { type: "boolean", default: false },
+            volumeThreshold: { type: "integer", default: 0 },
+            // errorFilter: { type: "Function" }, 
+            /*
+            cache: { type: "boolean" },
+            cacheTTL: { type: "integer" },
+            cacheSize: { type: "integer" },
+            cacheGetKey: { type: "Function" }, 
+            cacheTransport: { type: "CacheTransport" }, 
+            coalesce: { type: "boolean" }, 
+            coalesceTTL: { type: "integer" }, 
+            coalesceSize: { type: "integer" }, 
+            coalesceResetOn: { 
+              type: "array",
+              items: { enum: ["error", "success", "timeout"] }
+            },
+            */
+            // abortController: { type: "AbortController" }, 
+            enableSnapshots: { type: "boolean" },
+            // rotateBucketController: { type: "EventEmitter" }, 
+            autoRenewAbortController: { type: "boolean", default: false }
+          }
+        }
+      },
       properties: {
         id: { type: "string" },
         prefix: { type: "string" },
@@ -21,17 +65,20 @@ export async function app(opts = {}, ajv = new Ajv({useDefaults: true})) {
           default: "info"
         },
         exposeErrors: { type: "boolean", default: false },
+        redisTimeout: { type: "integer" },        
+        redisBreaker: { type: "boolean", default: false },
+        redisBreakerOptions: { $ref: "#/definitions/circuitBreakerOptions" },        
         redis: {
           type: "object",
         },
         origin:{
           type: "object",
           additionalProperties: false,
-          required: ["httpxOptions", "lock", "circuitBreaker"],
-          if: { properties: { lock: { const: true } } },
-          then: { required: ["lockOptions"] },
-          if: { properties: { circuitBreaker: { const: true } } },
-          then: { required: ["circuitBreakerOptions"] },
+          required: ["httpxOptions"],
+          if: { properties: { distributedRequestsCoalescing: { const: true } } },
+          then: { required: ["distributedRequestsCoalescingOptions"] },
+          if: { properties: { originBreaker: { const: true } } },
+          then: { required: ["originBreakerOptions"] },
           properties: {
             // https://nodejs.org/api/http.html#httprequestoptions-callback
             httpxOptions: {
@@ -42,7 +89,7 @@ export async function app(opts = {}, ajv = new Ajv({useDefaults: true})) {
                 // createConnection: { type: "function" },
                 defaultPort: { type: "integer" },
                 family: { enum: [4, 6] },
-                headers: { type: "object" },
+                headers: { type: "object", default: {} },
                 hints: { type: "integer" },
                 host: { type: "string", default: "localhost" },
                 hostname: { type: "string" },
@@ -81,8 +128,6 @@ export async function app(opts = {}, ajv = new Ajv({useDefaults: true})) {
                 servername: { type: "string" },
               }
             },
-            redisTimeout: { type: "integer", default: 200  },
-            fetchTimeout: { type: "integer", default: 1000 },
             ignoredQueryParams: {
               type: "array",
               items: {
@@ -90,9 +135,9 @@ export async function app(opts = {}, ajv = new Ajv({useDefaults: true})) {
               }
             },
             sortQueryParams: { type: "boolean", default: false },
-            requestCoalescing: { type: "boolean", default: true },
-            lock: { type: "boolean", default: false },
-            lockOptions:
+            localRequestsCoalescing: { type: "boolean", default: true },
+            distributedRequestsCoalescing: { type: "boolean", default: false },
+            distributedRequestsCoalescingOptions:
             {
               type: "object",
               required: ["lockTTL", "retryCount", "retryDelay", "retryJitter"],
@@ -104,47 +149,9 @@ export async function app(opts = {}, ajv = new Ajv({useDefaults: true})) {
                 retryJitter: { type: "integer" }
               }
             },
-            circuitBreaker: { type: "boolean", default: false },
-            // See: https://github.com/nodeshift/opossum/blob/main/lib/circuit.js
-            circuitBreakerOptions: {
-              type: "object",
-              additionalProperties: false,
-              properties: {
-                // status: { type: "Status" }, 
-                // timeout: { type: "integer" },
-                // Default value (10) is not specified because maxFailures it is deprecated
-                maxFailures: { type: "integer" },
-                resetTimeout: { type: "integer", default: 30000 },
-                rollingCountTimeout: { type: "integer", default: 10000 },
-                rollingCountBuckets: { type: "integer", default: 10 },
-                // name: { type: "string" },
-                rollingPercentilesEnabled: { type: "boolean", default: true },
-                capacity: { type: "integer", default: Number.MAX_SAFE_INTEGER },
-                errorThresholdPercentage: { type: "integer", default: 50 },
-                enabled: { type: "boolean", default: true },
-                allowWarmUp: { type: "boolean", default: false },
-                volumeThreshold: { type: "integer", default: 0 },
-                // errorFilter: { type: "Function" }, 
-                /*
-                cache: { type: "boolean" },
-                cacheTTL: { type: "integer" },
-                cacheSize: { type: "integer" },
-                cacheGetKey: { type: "Function" }, 
-                cacheTransport: { type: "CacheTransport" }, 
-                coalesce: { type: "boolean" }, 
-                coalesceTTL: { type: "integer" }, 
-                coalesceSize: { type: "integer" }, 
-                coalesceResetOn: { 
-                  type: "array",
-                  items: { enum: ["error", "success", "timeout"] }
-                },
-                */
-                // abortController: { type: "AbortController" }, 
-                enableSnapshots: { type: "boolean" },
-                // rotateBucketController: { type: "EventEmitter" }, 
-                autoRenewAbortController: { type: "boolean", default: false }
-              }
-            },
+            originTimeout: { type: "integer" },
+            originBreaker: { type: "boolean", default: false },
+            originBreakerOptions: { $ref: "#/definitions/circuitBreakerOptions" },
             actionsLibraries: {
               type: "object"
             },
@@ -202,19 +209,33 @@ export async function app(opts = {}, ajv = new Ajv({useDefaults: true})) {
   })
   server.decorate('httpRequestsTotal', httpRequestsTotal)
 
-  const circuitBreakersEvents = new Counter({
-    name: 'circuit_brakers_events',
-    help: `A count of all circuit' events`,
+  const originBreakerEvents = new Counter({
+    name: 'origin_braker_events',
+    help: `A count of all circuit events from all origins' circuit' events`,
     labelNames: ['origin', 'event']
   })
-  server.decorate('circuitBreakersEvents', circuitBreakersEvents)
+  server.decorate('originBreakerEvents', originBreakerEvents)
 
-  const circuitBreakersPerformance = new Summary({
-    name: 'circuit_brakers_performance',
-    help: `A summary of all circuit's events`,
+  const originBreakerPerformance = new Summary({
+    name: 'origin_braker_performance',
+    help: `A summary of all circuit events from all origins`,
     labelNames: ['origin', 'event']
   })
-  server.decorate('circuitBreakersPerformance', circuitBreakersPerformance)
+  server.decorate('originBreakerPerformance', originBreakerPerformance)
+
+  const redisBreakerEvents = new Counter({
+    name: 'redis_braker_events',
+    help: `A count of all circuit events from all redis databases`,
+    labelNames: ['origin', 'event']
+  })
+  server.decorate('redisBreakerEvents', redisBreakerEvents)
+
+  const redisBreakerPerformance = new Summary({
+    name: 'redis_braker_performance',
+    help: `A summary of all circuit events from all redis databases`,
+    labelNames: ['origin', 'event']
+  })
+  server.decorate('redisBreakerPerformance', redisBreakerPerformance)
 
   const httpResponsesTotal = new Counter({
     name: 'http_responses_total',

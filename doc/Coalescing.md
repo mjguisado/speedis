@@ -2,7 +2,7 @@
 We are going to run some tests to observe the effects of the Request Coalescing mechanism on the origin server.
 
 ## Without request coalescing
-First, we modify the configuration file for the mocks origin, located at ./conf/origins/mocks.json, to ensure that the coalescing mechanisms are disabled—both for requests arriving at the same instance (requestCoalescing = false) and across different instances (lock = false).
+First, we modify the configuration file for the mocks origin, located at ./conf/origins/mocks.json, to ensure that the coalescing mechanisms are disabled—both for requests arriving at the same instance (localRequestsCoalescing = false) and across different instances (distributedRequestsCoalescing = false).
 
 Once modified, we proceed to start the environment:
 ```sh
@@ -23,7 +23,7 @@ After the initial moments, the number of incoming requests to Speedis stabilizes
 <img src="./img/without_coalescing.png"/>
 
 ## Request coalescing at the same instance
-Now, we modify the configuration to enable the coalescing mechanisms for requests arriving at the same instance (requestCoalescing = true) and restart the environment.
+Now, we modify the configuration to enable the coalescing mechanisms for requests arriving at the same instance (localRequestsCoalescing = true) and restart the environment.
 ```sh
 docker compose up --build -d
 ```
@@ -35,7 +35,7 @@ A further drastic reduction in the number of requests to the origin is observed,
 These results can be explained because the requests arriving at Speedis while the cached version had expired had to go to the origin (Cache stampede), leading to a response time slightly above the 500ms it takes the origin to respond. However, now all requests arriving while the first request that found the cached version expired is refreshing it will wait for the cache to be updated before reusing the value. The average wait time is distributed randomly between 0 and 500ms, which results in an average of 250ms, as observed in this scenario.
 
 ## Request coalescing across different instances
-Finally, we modify the configuration to enable the coalescing mechanisms for requests arriving across different instances (lock = true) and restart the environment.
+Finally, we modify the configuration to enable the coalescing mechanisms for requests arriving across different instances (distributedRequestsCoalescing = true) and restart the environment.
 ```sh
 docker compose up --build -d
 ```
