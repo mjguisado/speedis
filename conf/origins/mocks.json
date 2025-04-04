@@ -19,7 +19,6 @@
         "agentOptions": {
             "keepAlive": true
         },
-        "fetchTimeout": 1000,
         "ignoredQueryParams": ["cc", "delay"],
         "sortQueryParams": true,
         "requestCoalescing": true,

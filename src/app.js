@@ -22,7 +22,7 @@ export async function app(opts = {}, ajv = new Ajv({useDefaults: true})) {
         },
         exposeErrors: { type: "boolean", default: false },
         redis: {
-          type: "object"
+          type: "object",
         },
         origin:{
           type: "object",
@@ -81,7 +81,8 @@ export async function app(opts = {}, ajv = new Ajv({useDefaults: true})) {
                 servername: { type: "string" },
               }
             },
-            fetchTimeout: { type: "integer" },
+            redisTimeout: { type: "integer", default: 200  },
+            fetchTimeout: { type: "integer", default: 1000 },
             ignoredQueryParams: {
               type: "array",
               items: {
@@ -197,7 +198,7 @@ export async function app(opts = {}, ajv = new Ajv({useDefaults: true})) {
   const httpRequestsTotal = new Counter({
     name: 'http_requests_total',
     help: 'Total number of HTTP requests to Speedis',
-    labelNames: ['origin']
+    labelNames: ['origin','method',]
   })
   server.decorate('httpRequestsTotal', httpRequestsTotal)
 
