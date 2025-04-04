@@ -14,9 +14,11 @@ import * as crypto from 'crypto'
 // TODO: https://www.rfc-editor.org/rfc/rfc9111#name-storing-incomplete-response
 // TODO: https://www.rfc-editor.org/rfc/rfc9111.html#name-constructing-responses-from
 // https://tohidhaghighi.medium.com/add-prometheus-metrics-in-nodejs-ce0ff5a43b44
-// TODO: Implementar logs (publicación en Kibana). Fluentd or Central Logging (K8s)
-// TODO: Gestión de configuraciones remotas. JSON + Client Side Cache
-// TODO: Gestionar Status Code poco habituales
+
+// TODO: Use circuit breaker in case of Redis failure
+// REVIEW: Unusual Status Code management
+// THINK ABOUT: Remote Configuration Management => JSON + Client Side Cache
+// THINK ABOUT: Logs management (Kiabana). Fluentd or Central Logging (K8s)
 
 export default async function (server, opts) {
 
