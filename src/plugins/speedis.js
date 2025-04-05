@@ -71,10 +71,8 @@ export default async function (server, opts) {
 
     await client.connect()
 
-opts.redisBreaker = false
-
     if (opts.redisBreaker) {
-      
+      /*
       let redisBreakerOptions = []
       if (Object.prototype.hasOwnProperty.call(opts, "redisBreakerOptions")) {
         redisBreakerOptions = opts.redisBreakerOptions
@@ -124,7 +122,8 @@ opts.redisBreaker = false
           })
         }
       }
-
+      */
+      server.decorate('redis', client)
     } else if (opts.redisTimeout) {
       server.decorate('redis', wrapRedisWithTimeout(client, opts.redisTimeout))
     } else {
@@ -191,7 +190,9 @@ opts.redisBreaker = false
 
     // Origin Breaker instance
     const originBreaker = new CircuitBreaker(_fetch, originBreakerOptions)
+    server.breakersMetrics.add([originBreaker])
     originBreaker.on('open', () => {
+      // We will use this value to set the Retry-After header 
       let retryAfter = new Date()
       retryAfter.setSeconds(retryAfter.getSeconds() + originBreaker.options.resetTimeout / 1000)
       originBreaker['retryAfter'] = retryAfter.toUTCString()
@@ -203,25 +204,6 @@ opts.redisBreaker = false
     originBreaker.on('close', () => {
       server.log.info(`Fech Circuit Breaker CLOSED: Request are being made normally. Origin ${id}.`)
     })
-
-    // Origin Circuit Breaker events
-    for (const eventName of originBreaker.eventNames()) {
-      originBreaker.on(eventName, _ => {
-        server.originBreakerEvents.labels({
-          origin: id,
-          event: eventName
-        }).inc()
-      })
-      if (eventName === 'success' || eventName === 'failure') {
-        // Not the timeout event because runtime == timeout
-        originBreaker.on(eventName, (result, runTime) => {
-          server.originBreakerPerformance.labels({
-            origin: id,
-            event: eventName
-          }).observe(runTime)
-        })
-      }
-    }
 
     server.decorate('originCircuit', originBreaker)
 

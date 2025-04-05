@@ -2,9 +2,9 @@ import fastify from 'fastify'
 import path from 'path'
 import fs from 'fs/promises'
 import speedisPlugin from './plugins/speedis.js'
-import { collectDefaultMetrics, Counter, Histogram, Summary } from 'prom-client'
+import { collectDefaultMetrics, Counter, Histogram } from 'prom-client'
+import PrometheusMetrics from 'opossum-prometheus'
 import Ajv from "ajv"
-
 
 export async function app(opts = {}, ajv = new Ajv({useDefaults: true})) {
   
@@ -202,40 +202,15 @@ export async function app(opts = {}, ajv = new Ajv({useDefaults: true})) {
 
   collectDefaultMetrics()
 
+  const breakersMetrics = new PrometheusMetrics({})
+  server.decorate('breakersMetrics', breakersMetrics)
+
   const httpRequestsTotal = new Counter({
     name: 'http_requests_total',
     help: 'Total number of HTTP requests to Speedis',
     labelNames: ['origin','method',]
   })
   server.decorate('httpRequestsTotal', httpRequestsTotal)
-
-  const originBreakerEvents = new Counter({
-    name: 'origin_braker_events',
-    help: `A count of all circuit events from all origins' circuit' events`,
-    labelNames: ['origin', 'event']
-  })
-  server.decorate('originBreakerEvents', originBreakerEvents)
-
-  const originBreakerPerformance = new Summary({
-    name: 'origin_braker_performance',
-    help: `A summary of all circuit events from all origins`,
-    labelNames: ['origin', 'event']
-  })
-  server.decorate('originBreakerPerformance', originBreakerPerformance)
-
-  const redisBreakerEvents = new Counter({
-    name: 'redis_braker_events',
-    help: `A count of all circuit events from all redis databases`,
-    labelNames: ['origin', 'event']
-  })
-  server.decorate('redisBreakerEvents', redisBreakerEvents)
-
-  const redisBreakerPerformance = new Summary({
-    name: 'redis_braker_performance',
-    help: `A summary of all circuit events from all redis databases`,
-    labelNames: ['origin', 'event']
-  })
-  server.decorate('redisBreakerPerformance', redisBreakerPerformance)
 
   const httpResponsesTotal = new Counter({
     name: 'http_responses_total',

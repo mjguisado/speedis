@@ -1,6 +1,6 @@
 # Circuit breaker test
 We are going to run some tests to observe the effects of the circuit breaker mechanism on the origin server.
-
+Please ensure that you follow the steps described in [Docker.md](./Docker.md)
 ## Without circuit breaker
 First, we modify the configuration file for the mocks origin, located at ./conf/origins/mocks.json, to ensure that the circuit breaker mechanisms is disabled (originBreaker = false) and the coalescing mechanisms are enabled—both for requests arriving at the same instance (localRequestsCoalescing = true) and across different instances (distributedRequestsCoalescing = true).
 
