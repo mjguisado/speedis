@@ -1,10 +1,7 @@
 {
     "id": "mocks",
     "prefix": "/mocks",
-    "logLevel": "info",
-    "exposeErrors": false,
-    "redisTimeout": 250,
-    "redisBreaker": true,
+    "redisBreaker": false,
     "redisBreakerOptions": {
         "errorThresholdPercentage": 25,
         "resetTimeout": 5000
@@ -23,7 +20,7 @@
         },
         "ignoredQueryParams": ["cc", "delay"],
         "sortQueryParams": true,
-        "localRequestsCoalescing": true,
+        "localRequestsCoalescing": false,
         "distributedRequestsCoalescing": false,
         "distributedRequestsCoalescingOptions": {
             "lockTTL": 750,
@@ -31,6 +28,7 @@
             "retryDelay": 500,
             "retryJitter": 250
         },
+        "originTimeout": 2000,
         "originBreaker": false,
         "originBreakerOptions": {
             "errorThresholdPercentage": 25,
