@@ -1,13 +1,17 @@
 {
     "id": "mocks",
     "prefix": "/mocks",
-    "redisBreaker": false,
-    "redisBreakerOptions": {
-        "errorThresholdPercentage": 25,
-        "resetTimeout": 5000
-    },
     "redis": {
-        "url": "redis://redis:6379"
+        "redisOptions": {
+            "url": "redis://redis:6379"
+        },
+        "redisTimeout": 500,
+        "redisBreaker": true,
+        "redisBreakerOptions": {
+            "errorThresholdPercentage": 25,
+            "resetTimeout": 5000
+        },
+        "disableOriginOnRedisOutage": true
     },
     "origin": {
         "httpxOptions": {

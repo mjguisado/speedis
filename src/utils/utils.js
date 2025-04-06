@@ -268,7 +268,12 @@ export function setCacheStatus(trigger, outResponse) {
       // The stale response IS NOT being reused.
       outResponse.headers['x-speedis-cache-status'] = 'CACHE_HIT_NOT_REVALIDATED from ' + os.hostname()
       break
+    case 'CACHE_REDIS_OUTAGE':
+      // Redis is not available.
+      outResponse.headers['x-speedis-cache-status'] = 'CACHE_REDIS_OUTAGE from ' + os.hostname()
+      break
     }
+
 }
 
 const originRE = /^\/([^/]+)/

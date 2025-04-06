@@ -6,6 +6,8 @@ import * as utils from '../utils/utils.js'
 import CircuitBreaker from 'opossum'
 import { randomBytes } from "crypto"
 import * as crypto from 'crypto'
+import os from 'os'
+
 
 // TODO: https://www.rfc-editor.org/rfc/rfc9111.html#name-must-understand
 // TODO: https://www.rfc-editor.org/rfc/rfc9111.html#name-no-transform
@@ -15,7 +17,6 @@ import * as crypto from 'crypto'
 // TODO: https://www.rfc-editor.org/rfc/rfc9111.html#name-constructing-responses-from
 // https://tohidhaghighi.medium.com/add-prometheus-metrics-in-nodejs-ce0ff5a43b44
 
-// TODO: Use circuit breaker in case of Redis failure
 // REVIEW: Unusual Status Code management
 // THINK ABOUT: Remote Configuration Management => JSON + Client Side Cache
 // THINK ABOUT: Logs management (Kiabana). Fluentd or Central Logging (K8s)
@@ -29,10 +30,16 @@ export default async function (server, opts) {
 
   // Connecting to Redis
   // See: https://redis.io/docs/latest/develop/clients/nodejs/produsage/#handling-reconnections
-  const client = createClient(redis)
+  const client = createClient(redis.redisOptions)
   client.on('error', error => {
     server.log.error(`Redis connection lost. Origin: ${id}.`, { cause: error })
   })
+  try {
+    await client.connect()
+    server.log.info(`Redis connection established. Origin: ${id}.`)
+  } catch (error) {
+    throw new Error(`Unable to connect to Redis during startup. Origin: ${id}.`, { cause: error })
+  }
 
   /**
    * Wraps a Redis client so that any command you call on it will automatically have a timeout.
@@ -66,72 +73,82 @@ export default async function (server, opts) {
     }
     return new Proxy(client, handler)
   }
-
-  try {
-
-    await client.connect()
-
-    if (opts.redisBreaker) {
-      /*
-      let redisBreakerOptions = []
-      if (Object.prototype.hasOwnProperty.call(opts, "redisBreakerOptions")) {
-        redisBreakerOptions = opts.redisBreakerOptions
-      }      
-      // Name of the Circuit Breaker
-      redisBreakerOptions['name'] = `redis-${id}`
-      // Speedis implements its own coalescing mechanism so we disable the one from the circuit breaker.
-      redisBreakerOptions['coalesce'] = false
-      // Speedis itself implements a cache mechanism so we disable the one from the circuit breaker.
-      redisBreakerOptions['cache'] = false
-      // Timeout for the Circuit Breaker
-      if (Object.prototype.hasOwnProperty.call(opts, "redisTimeout")) {
-        redisBreakerOptions['timeout'] = opts.redisTimeout
-      }
-
-      // Redis Breaker instance
-      const redisBreaker = new CircuitBreaker(_fetch, redisBreakerOptions)
- 
-      redisBreaker.on('open', () => {
-        let retryAfter = new Date()
-        retryAfter.setSeconds(retryAfter.getSeconds() + redisBreaker.options.resetTimeout / 1000)
-        redisBreaker['retryAfter'] = retryAfter.toUTCString()
-        server.log.err(`Fetch Circuit Breaker OPEN: No requests will be made. Origin ${id}.`)
-      })
-      redisBreaker.on('halfOpen', () => {
-        server.log.warn(`Fech Circuit Breaker HALF OPEN: Requests are being tested. Origin ${id}.`)
-      })
-      redisBreaker.on('close', () => {
-        server.log.info(`Fech Circuit Breaker CLOSED: Request are being made normally. Origin ${id}.`)
-      })
-
-      // Origin Circuit Breaker events
-      for (const eventName of redisBreaker.eventNames()) {
-        redisBreaker.on(eventName, _ => {
-          server.redisBreakerEvents.labels({
-            origin: id,
-            event: eventName
-          }).inc()
-        })
-        if (eventName === 'success' || eventName === 'failure') {
-          // Not the timeout event because runtime == timeout
-          redisBreaker.on(eventName, (result, runTime) => {
-            server.redisBreakerPerformance.labels({
-              origin: id,
-              event: eventName
-            }).observe(runTime)
-          })
-        }
-      }
-      */
-      server.decorate('redis', client)
-    } else if (opts.redisTimeout) {
-      server.decorate('redis', wrapRedisWithTimeout(client, opts.redisTimeout))
-    } else {
-      server.decorate('redis', client)
+ /**
+  * Executes a Redis command with support for both standard and RedisJSON operations.
+  * This function serves as an abstraction layer to integrate with a Circuit Breaker
+  * implemented using Opossum, in order to monitor and manage Redis availability.
+  *
+  * @function _sendCommandToRedis
+  * @param {string} command - The Redis command to execute (e.g., 'json.get', 'json.set', 'set', 'get', etc.).
+  * @param {Array<string|number>} args - The list of arguments for the Redis command.
+  * @returns {Promise<any>} The result of the Redis command execution.
+  */
+  function _sendCommandToRedis(command, args) {
+    let cmd = null
+    switch (command) {
+      case 'json.get':
+        cmd = client.json.get(...args)
+        break
+      case 'json.set':
+        cmd = client.json.set(...args)
+        break
+      case 'json.merge':
+        cmd = client.json.merge(...args)
+        break
+      case 'sendCommand':
+        cmd = client.sendCommand(...args)
+        break
+      default:
+        cmd = client.sendCommand([command, ...args])
+        break
     }
-  } catch (error) {
-    throw new Error(`Unable to connect to Redis during startup. Origin: ${id}.`, { cause: error })
+    return cmd
   }
+
+  if (redis.redisBreaker) {
+
+    let redisBreakerOptions = []
+    if (Object.prototype.hasOwnProperty.call(opts, "redisBreakerOptions")) {
+      redisBreakerOptions = redis.redisBreakerOptions
+    }
+    // Name of the Circuit Breaker
+    redisBreakerOptions['name'] = `redis-${id}`
+    // Speedis implements its own coalescing mechanism so we disable the one from the circuit breaker.
+    redisBreakerOptions['coalesce'] = false
+    // Speedis itself implements a cache mechanism so we disable the one from the circuit breaker.
+    redisBreakerOptions['cache'] = false
+    // Timeout for the Circuit Breaker
+    if (Object.prototype.hasOwnProperty.call(opts, "redisTimeout")) {
+      redisBreakerOptions['timeout'] = redis.redisTimeout
+    }
+
+    // Redis Breaker instance
+    const redisBreaker = new CircuitBreaker(_sendCommandToRedis, redisBreakerOptions)
+    server.breakersMetrics.add([redisBreaker])
+
+    redisBreaker.on('open', () => {
+      // We will use this value to set the Retry-After header 
+      let retryAfter = new Date()
+      retryAfter.setSeconds(retryAfter.getSeconds() + redisBreaker.options.resetTimeout / 1000)
+      redisBreaker['retryAfter'] = retryAfter.toUTCString()
+      server.log.error(`Redis Breaker OPEN: No commands will be execute. Origin ${id}.`)
+    })
+    redisBreaker.on('halfOpen', () => {
+      server.log.warn(`Redis Breaker HALF OPEN: Commands are being tested. Origin ${id}.`)
+    })
+    redisBreaker.on('close', () => {
+      server.log.info(`Redis Breaker CLOSED: Commands are being executed normally. Origin ${id}.`)
+    })
+
+    server.decorate('redis', client)
+    server.decorate('redisBreaker', redisBreaker)
+
+  } else if (redis.redisTimeout) {
+    server.decorate('redis', wrapRedisWithTimeout(client, redis.redisTimeout))
+  } else {
+    server.decorate('redis', client)
+  }
+  server.decorate('disableOriginOnRedisOutage', redis.disableOriginOnRedisOutage)
 
   /*
     * Initially, we are only going to support GET requests to the origin.
@@ -191,18 +208,19 @@ export default async function (server, opts) {
     // Origin Breaker instance
     const originBreaker = new CircuitBreaker(_fetch, originBreakerOptions)
     server.breakersMetrics.add([originBreaker])
+
     originBreaker.on('open', () => {
       // We will use this value to set the Retry-After header 
       let retryAfter = new Date()
       retryAfter.setSeconds(retryAfter.getSeconds() + originBreaker.options.resetTimeout / 1000)
       originBreaker['retryAfter'] = retryAfter.toUTCString()
-      server.log.err(`Fetch Circuit Breaker OPEN: No requests will be made. Origin ${id}.`)
+      server.log.error(`Origin Breaker OPEN: No requests will be made. Origin ${id}.`)
     })
     originBreaker.on('halfOpen', () => {
-      server.log.warn(`Fech Circuit Breaker HALF OPEN: Requests are being tested. Origin ${id}.`)
+      server.log.warn(`Origin Breaker HALF OPEN: Requests are being tested. Origin ${id}.`)
     })
     originBreaker.on('close', () => {
-      server.log.info(`Fech Circuit Breaker CLOSED: Request are being made normally. Origin ${id}.`)
+      server.log.info(`Origin Breaker CLOSED: Requests are being made normally. Origin ${id}.`)
     })
 
     server.decorate('originCircuit', originBreaker)
@@ -301,6 +319,19 @@ export default async function (server, opts) {
         .labels({ origin: id, method: 'GET' })
         .inc()
 
+      if (server.redisBreaker.opened && server.disableOriginOnRedisOutage) {
+        reply.code(503)
+        reply.headers({ 
+          date: new Date().toUTCString(),
+          'x-speedis-cache-status': 'CACHE_REDIS_OUTAGE from ' + os.hostname()
+        })
+        return reply.send(server.exposeErrors ?
+          'Redis is temporarily unavailable. Please try again later.'
+          : ''
+        )
+        
+      }
+
       let response = null
       try {
         _transform(CLIENT_REQUEST, request, server)
@@ -311,7 +342,9 @@ export default async function (server, opts) {
         // origin. Therefore, the origin has a lock mechanism enabled,
         // and the origin.distributedRequestsCoalescingOptions should exist, with all its
         // attributes being mandatory.
-        while (response === -1 && tries < server.origin?.distributedRequestsCoalescingOptions?.retryCount) {
+        while (response === -1 
+          && tries < server.origin?.distributedRequestsCoalescingOptions?.retryCount 
+          && !server.redisBreaker.opened) {
           let delay = server.origin?.distributedRequestsCoalescingOptions?.retryDelay +
             Math.round(Math.random() * server.origin?.distributedRequestsCoalescingOptions?.retryJitter)
           await new Promise(resolve => setTimeout(resolve, delay))
@@ -319,16 +352,15 @@ export default async function (server, opts) {
           tries++
         }
         if (response === -1) {
-          response = {
-            statusCode: 503,
-            headers: {
-              date: new Date().toUTCString()
-            },
-            body: server.exposeErrors ?
-              'Cache is temporarily unavailable due to lock acquisition failure'
-              : ''
-          }
-          utils.setCacheStatus('CACHE_NO_LOCK', response)
+          reply.code(503)
+          reply.headers({ 
+            date: new Date().toUTCString(),
+            'x-speedis-cache-status': 'CACHE_NO_LOCK from ' + os.hostname()
+          })
+          return reply.send(server.exposeErrors ?
+            'Cache is temporarily unavailable due to lock acquisition failure. Please try again later.'
+            : ''
+          )
         }
       } catch (error) {
         // FIXME: Reaffirm that we want to use the default error handling.
@@ -339,8 +371,8 @@ export default async function (server, opts) {
         else throw new Error(msg)
       }
 
+      // We have a response from the cache or the origin.
       // Check if we have received a conditional request.
-
       /*
       https://www.rfc-editor.org/rfc/rfc9110#name-etag
       ETag       = entity-tag
@@ -355,7 +387,6 @@ export default async function (server, opts) {
       opaque-tag = \x22([\x21\x23-\x7E\x80-\xFF])*\x22
       etag       = [\x21\x23-\x7E\x80-\xFF]
       */
-
       const eTagRE = /(?:W\/)*\x22(?:[\x21\x23-\x7E\x80-\xFF])*\x22/g
       let etags = []
       let lastModified = null
@@ -434,11 +465,9 @@ export default async function (server, opts) {
     method: 'DELETE',
     url: '/*',
     handler: async function (request, reply) {
-
       server.httpRequestsTotal
         .labels({ origin: id, method: 'DELETE' })
         .inc()
-
       const fieldNames = utils.parseVaryHeader(request)
       let cacheKey = generateCacheKey(server, request, fieldNames)
       try {
@@ -542,7 +571,9 @@ export default async function (server, opts) {
 
     let cachedResponse = null
     try {
-      cachedResponse = await server.redis.json.get(cacheKey)
+      cachedResponse = server.redisBreaker
+        ? await server.redisBreaker.fire('json.get', [cacheKey])
+        : await server.redis.json.get(cacheKey)
     } catch (error) {
       server.log.warn(error,
         "Error querying the cache entry in Redis. " +
@@ -788,15 +819,20 @@ export default async function (server, opts) {
 
           // Update the cache
           const ttl = parseInt(cachedResponse.ttl)
-          await server.redis.json.merge(cacheKey, '$',
-            {
-              requestTime: cachedResponse.requestTime,
-              responseTime: cachedResponse.responseTime,
-              headers: cachedResponse.headers
-            }
-          )
-
-          if (!Number.isNaN(ttl) && ttl > 0) await server.redis.expire(cacheKey, ttl)
+          const payload = {
+            requestTime: cachedResponse.requestTime,
+            responseTime: cachedResponse.responseTime,
+            headers: cachedResponse.headers
+          }
+          server.redisBreaker
+            ? await server.redisBreaker.fire('json.merge', [cacheKey, '$', payload])
+            : await server.redis.json.merge(cacheKey, '$', payload)
+          // Set the TTL for the cache entry              
+          if (!Number.isNaN(ttl) && ttl > 0) {
+            server.redisBreaker
+              ? await server.redisBreaker.fire('expire', [cacheKey, ttl])
+              : await server.redis.expire(cacheKey, ttl)
+          }
 
         } catch (error) {
           server.log.warn(error,
@@ -813,8 +849,15 @@ export default async function (server, opts) {
         _transform(CACHE_REQUEST, cacheEntry, server)
         const ttl = parseInt(cacheEntry.ttl)
         try {
-          await server.redis.json.set(cacheKey, '$', cacheEntry)
-          if (!Number.isNaN(ttl) && ttl > 0) await server.redis.expire(cacheKey, ttl)
+          server.redisBreaker
+            ? await server.redisBreaker.fire('json.set', [cacheKey, '$', cacheEntry])
+            : await server.redis.json.set(cacheKey, '$', cacheEntry)
+          // Set the TTL for the cache entry              
+          if (!Number.isNaN(ttl) && ttl > 0) {
+            server.redisBreaker
+              ? await server.redisBreaker.fire('expire', [cacheKey, ttl])
+              : await server.redis.expire(cacheKey, ttl)
+          }
         } catch (error) {
           server.log.warn(error,
             "Error while storing in the cache. " +
@@ -840,7 +883,9 @@ export default async function (server, opts) {
       || (Object.prototype.hasOwnProperty.call(originCacheDirectives, 'private')
         && originCacheDirectives['private'] === null)) {
       try {
-        await server.redis.unlink(cacheKey)
+        server.redisBreaker
+          ? await server.redisBreaker.fire('unlink', [cacheKey])
+          : await server.redis.unlink(cacheKey)
       } catch (error) {
         server.log.warn(error,
           "Error while removing private/no-store entry in the cache. " +
@@ -892,7 +937,10 @@ export default async function (server, opts) {
 
     let locked = false
     try {
-      locked = ('OK' === await server.redis.set(lockKey, lockValue, { NX: true, PX: lockTTL }))
+      let lockResponse = server.redisBreaker
+        ? await server.redisBreaker.fire('set', [lockKey, lockValue, 'NX', 'PX', `${lockTTL}`])
+        : await server.redis.set(lockKey, lockValue, { NX: true, PX: lockTTL })
+      locked = ('OK' === lockResponse)
     } catch (error) {
       server.log.warn(error,
         "Error acquiring the lock. " +
@@ -915,11 +963,18 @@ export default async function (server, opts) {
   const releaseLockScriptSHA1 = crypto.createHash('sha1').update(releaseLockScript).digest('hex')
   async function _releaseLock(server, lockKey, lockValue) {
     try {
-      const exists = await server.redis.sendCommand(['SCRIPT', 'EXISTS', releaseLockScriptSHA1])
+      const exists = server.redisBreaker
+        ? await server.redisBreaker.fire('SCRIPT', ['EXISTS', releaseLockScriptSHA1])
+        : await server.redis.sendCommand(['SCRIPT', 'EXISTS', releaseLockScriptSHA1])
       if (exists[0] === 0) {
-        await server.redis.sendCommand(['SCRIPT', 'LOAD', releaseLockScript])
+        server.redisBreaker
+          ? await server.redisBreaker.fire('SCRIPT', ['LOAD', releaseLockScript])
+          : await server.redis.sendCommand(['SCRIPT', 'LOAD', releaseLockScript])
       }
-      await server.redis.sendCommand(['EVALSHA', releaseLockScriptSHA1, '1', lockKey, lockValue])
+      server.redisBreaker
+        ? await server.redisBreaker.fire('EVALSHA', [releaseLockScriptSHA1, '1', lockKey, lockValue])
+        : await server.redis.sendCommand(['EVALSHA', releaseLockScriptSHA1, '1', lockKey, lockValue])
+
     } catch (error) {
       server.log.warn(error,
         "Error releasing the lock. " +

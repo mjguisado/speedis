@@ -13,8 +13,6 @@ export async function app(opts = {}, ajv = new Ajv({useDefaults: true})) {
       type: "object",
       additionalProperties: false,
       required: ["id", "prefix", "redis", "origin"],
-      if: { properties: { redisBreaker: { const: true } } },
-      then: { required: ["redisBreakerOptions"] },
       definitions: {
         circuitBreakerOptions: {
           type: "object",
@@ -65,11 +63,21 @@ export async function app(opts = {}, ajv = new Ajv({useDefaults: true})) {
           default: "info"
         },
         exposeErrors: { type: "boolean", default: false },
-        redisTimeout: { type: "integer" },        
-        redisBreaker: { type: "boolean", default: false },
-        redisBreakerOptions: { $ref: "#/definitions/circuitBreakerOptions" },        
         redis: {
           type: "object",
+          additionalProperties: false,
+          required: ["redisOptions"],
+          if: { properties: { redisBreaker: { const: true } } },
+          then: { required: ["redisBreakerOptions"] },
+          properties: {
+            redisOptions: {
+              type: "object",
+            },
+            redisTimeout: { type: "integer" },        
+            redisBreaker: { type: "boolean", default: false },
+            redisBreakerOptions: { $ref: "#/definitions/circuitBreakerOptions" },
+            disableOriginOnRedisOutage: { type: "boolean", default: false },
+          }
         },
         origin:{
           type: "object",

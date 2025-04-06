@@ -1,6 +1,6 @@
 
 
-# Speedis (Gonzales)
+# Speedis (Gonzales).
 
 **Speedis is a High-Performance Shared HTTP Cache with Geographical Distribution Capability.**
 
@@ -17,16 +17,16 @@ Implementing a shared HTTP cache provides benefits among which the following are
 - **Consistency Across Multiple Clients**: Since the cache is shared, all clients access the same cached data, ensuring consistency in the responses and reducing discrepancies in what data is served.
 - **Faster Content Delivery**: Shared caches, especially when distributed geographically, can serve content from locations closer to users, ensuring faster content delivery and reducing latency.
 
-## Features
+## Features.
 
-### Fast and lightweight
+### Fast and lightweight.
 Speedis is built on top of the [Fastify](https://fastify.dev/) web framework to ensure high performance and efficient request handling.
 This framework allows users to extend its functionality by implementing [plugins](https://fastify.dev/docs/latest/Reference/Plugins/).
 The core of Speedis is developed as a Fastify plugin.
 Speedis creates an instance of the plugin for each origin configuration file.
 Requests are routed to the corresponding plugin instance using a prefix in the URL path.
 
-### Shared storage backend
+### Shared storage backend.
 In a distributed HTTP caching system, a common issue arises when new instances are added to the cache pool.
 If these instances do not share the same storage for cached objects (e.g., a shared backend or replication mechanism), they start in a “cold” state with no cached data.
 As a result, these new instances must fetch content from the origin server, leading to increased latency and higher load on the backend until their cache is sufficiently populated.
@@ -39,7 +39,7 @@ Speedis leverages the [JSON capabilities](https://redis.io/docs/latest/develop/d
 
 For environments where the cache must comply with enterprise-grade standards (linear scalability, high availability, predictable performance, 24/7 support, etc.), using Redis Enterprise in any of its variants— the fully managed Redis database-as-a-service, [Redis Cloud](https://redis.io/cloud/) or the self-managed [Redis Software](https://redis.io/software/)— is highly recommended.
 
-### Request coalescing
+### Request coalescing.
 [Cache stampede](https://en.wikipedia.org/wiki/Cache_stampede) or or Dogpile Problem is a problem that occurs when multiple clients request the same resource simultaneously, but the cached version is expired or unavailable.
 Since the cache does not contain a valid response, all requests are forwarded to the origin server at the same time, causing a sudden surge in load.
 This can lead to performance degradation, increased latency, and even server overload.
@@ -51,7 +51,7 @@ It achieves it by implementing a [locking mechanism](https://en.wikipedia.org/wi
 
 You can find more information about the effects of the Request Coalescing mechanism in the origin server in [doc/Coalescing.md](./doc/Coalescing.md).
 
-### Handling origin unavailability with Circuit Breaker
+### Handling origin unavailability with Circuit Breaker.
 When the origin of the cache becomes unavailable (e.g., due to network failures, server downtime, or high latency), it can lead to several issues:
 - **Increased Latency**: Requests that would normally be served from the cache must be redirected to the origin, causing higher response times.
 - **Overloading the Origin**: Repeated failed attempts to fetch data from the origin can further burden an already overloaded or down server, exacerbating the problem.
@@ -63,13 +63,21 @@ Instead, it can return a default response or serve stale cached data, ensuring a
 
 You can find more information about the effects of the Circuit Breaker mechanism in the origin server in [doc/CircuitBreaker.md](./doc/CircuitBreaker.md).
 
-### Clustering
+### Handling Redis unavailability with Circuit Breaker.
+Speedis also implements a Circuit Breaker mechanism to handle situations where the Redis database used to store cache entries is unavailable.
+This functionality is configured through the disableOriginOnRedisOutage setting.
+When set to true, this option prevents the application from forwarding requests to the origin server if Redis becomes unavailable.
+This is useful in scenarios where the origin server cannot handle the full traffic load on its own and relies on Redis to absorb most of the read pressure.
+If Redis is down and this setting is enabled, the system will respond with an error (e.g., HTTP 503) instead of attempting to contact the origin.
+This helps protect backend systems from overload and potential failure.
+
+### Clustering.
 Speedis implements clustering using Node’s built-in [cluster](https://nodejs.org/api/cluster.html) module to fully utilize the potential of multi-core systems and enhance the performance of Node.js applications.
 Clustering enables the creation of multiple worker processes to handle incoming requests, improving performance and optimizing system resource utilization.
 By default, Speedis uses [os.availableParallelism()](https://nodejs.org/api/os.html#osavailableparallelism) to create as many workers as possible.
 It is highly recommended that the environment where Speedis runs has multiple CPUs in order to fully benefit from the clustering functionality. Perform tests to determine the optimal number of CPUs for your case. Keep in mind that, in addition to the thread workers, an additional thread is required to control the cluster’s activity, so a **minimum of three CPUs is recommended**.
 
-###  Geographically Distributed Cache
+###  Geographically Distributed Cache.
 When the clients of a cache are geographically distributed, geographically distributing the cache itself provides additional benefits compared to a local cache, among which the following are highlighted:
 - **Reduced Latency**: By placing cache instances closer to end users, geographically distributed caches can significantly reduce response times, improving the overall performance and user experience.
 - **Improved Availability**: A distributed cache ensures high availability by replicating cached data across multiple locations. If one region or data center experiences issues, other regions can continue to serve requests, minimizing downtime.
@@ -84,7 +92,7 @@ The features of these databases make it easier to geographically distribute Spee
 This way, all the benefits outlined earlier in this section and in the ‘Shared Storage Backend’ section are achieved.
 Additionally, in case of issues between Speedis instances and Redis, the instances can temporarily connect to any of the other replicas of the database, maintaining service continuity.
 
-## Reverse proxy
+## Reverse proxy.
 Incorporating a [reverse proxy](https://en.wikipedia.org/wiki/Reverse_proxy) is a [recommended practice](https://fastify.dev/docs/latest/Guides/Recommendations/#use-a-reverse-proxy).
 In the specific case of Speedis, the main reasons for using it are to facilitate serving multiple domains and to handle TLS termination.
 We propose using HAProxy as the reverse proxy and have included a configuration file example in ./conf/haproxy/haproxy.cfg.
@@ -97,20 +105,20 @@ https://mocks.speedis/v1/items?x=1&y=2 -> http://speedis:3001/mocks/v1/items?x=1
 
 Note: Proper DNS resolution is required for mocks.speedis, speedis, and mocks to function correctly.
 
-### Observability
+### Observability.
 The application exposes operational metrics using Prometheus, a powerful open-source monitoring and alerting toolkit. These metrics provide valuable insights into the performance, health, and resource usage of the application, enabling proactive monitoring and troubleshooting. Prometheus can scrape these metrics at regular intervals, allowing for the collection, storage, and visualization of key performance data in real time.
 
-## Speedis configuration
+## Speedis configuration.
 You can find more information about Speedis configuration in [doc/Configuration.md](./doc/Configuration.md).
 
-## Getting Started
+## Getting Started.
 This repository includes examples of how to deploy Speedis using [Docker Compose](./doc/Docker.md) or in a [Kubernetes cluster](./doc/Kubernetes.md).
 To facilitate testing Speedis’ capabilities, some additional components are also included in the deployment.
 
-## Contributing
+## Contributing.
 Contributions are welcome! Feel free to submit issues or pull requests.
 
-## License
+## License.
 This project is licensed under the **Server Side Public License (SSPL) v1.0**.
 
 The SSPL ensures that if you use this software to provide a service to others, you must make publicly available not only any modifications to the software but also the complete source code of all supporting components required to run the service. This guarantees that the community benefits from all improvements and that the project remains truly open.
