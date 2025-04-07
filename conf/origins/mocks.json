@@ -47,6 +47,13 @@
                 "actions": [
                     {
                         "phase": "OriginResponse",
+                        "uses":  "headers:setHeaders",
+                        "with": {
+                            "cache-control": "public,max-age=10"
+                        }         
+                    },
+                    {
+                        "phase": "OriginResponse",
                         "uses":  "json:deleteJsonPaths",
                         "with": {
                             "jsonpaths": ["$[*].user.phones[*].type", "$[*].metadata"]
@@ -57,6 +64,13 @@
             {
                 "urlPattern": "/mocks/users/2",
                 "actions": [
+                    {
+                        "phase": "OriginResponse",
+                        "uses":  "headers:setHeaders",
+                        "with": {
+                            "cache-control": "public,max-age=5"
+                        }         
+                    },                    
                     {
                         "phase": "OriginResponse",
                         "uses":  "json:keepJsonPaths",
