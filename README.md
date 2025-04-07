@@ -20,7 +20,7 @@ Implementing a shared HTTP cache provides benefits among which the following are
 ## Features.
 
 ### Fast and lightweight.
-Speedis is built on top of the [Fastify](https://fastify.dev/) web framework to ensure high performance and efficient request handling.
+Speedis is built on top of the [Fastify](https://fastify.dev/) web framework to ensure [high performance](https://fastify.dev/benchmarks/) and efficient request handling.
 This framework allows users to extend its functionality by implementing [plugins](https://fastify.dev/docs/latest/Reference/Plugins/).
 The core of Speedis is developed as a Fastify plugin.
 Speedis creates an instance of the plugin for each origin configuration file.
@@ -52,7 +52,8 @@ It achieves it by implementing a [locking mechanism](https://en.wikipedia.org/wi
 You can find more information about the effects of the Request Coalescing mechanism in the origin server in [doc/Coalescing.md](./doc/Coalescing.md).
 
 ### Handling origin unavailability with Circuit Breaker.
-When the origin of the cache becomes unavailable (e.g., due to network failures, server downtime, or high latency), it can lead to several issues:
+Speedis also implements a Circuit Breaker mechanism to handle situations where the origin of the cache becomes unavailable unavailable (e.g., due to network failures, server downtime, or high latency)
+This situation can lead to several issues:
 - **Increased Latency**: Requests that would normally be served from the cache must be redirected to the origin, causing higher response times.
 - **Overloading the Origin**: Repeated failed attempts to fetch data from the origin can further burden an already overloaded or down server, exacerbating the problem.
 - **Unreliable User Experience**: The cache’s inability to serve data can result in errors or poor performance, negatively impacting the user experience.
@@ -64,12 +65,11 @@ Instead, it can return a default response or serve stale cached data, ensuring a
 You can find more information about the effects of the Circuit Breaker mechanism in the origin server in [doc/CircuitBreaker.md](./doc/CircuitBreaker.md).
 
 ### Handling Redis unavailability with Circuit Breaker.
-Speedis also implements a Circuit Breaker mechanism to handle situations where the Redis database used to store cache entries is unavailable.
-This functionality is configured through the disableOriginOnRedisOutage setting.
-When set to true, this option prevents the application from forwarding requests to the origin server if Redis becomes unavailable.
-This is useful in scenarios where the origin server cannot handle the full traffic load on its own and relies on Redis to absorb most of the read pressure.
-If Redis is down and this setting is enabled, the system will respond with an error (e.g., HTTP 503) instead of attempting to contact the origin.
-This helps protect backend systems from overload and potential failure.
+Speedis also implements a Circuit Breaker mechanism to handle situations where the Redis database used to store cache entries becomes unavailable.
+When enabled, it prevents the application from forwarding requests to the origin server if Redis is down.
+This is particularly useful in scenarios where the origin server cannot handle the full traffic load on its own and relies on Redis to absorb most of the read pressure.
+If Redis is unavailable and this setting is enabled, Speedis will return an error response (e.g., HTTP 503) instead of attempting to contact the origin.
+This helps protect backend systems from overload and potential cascading failures.
 
 ### Clustering.
 Speedis implements clustering using Node’s built-in [cluster](https://nodejs.org/api/cluster.html) module to fully utilize the potential of multi-core systems and enhance the performance of Node.js applications.
