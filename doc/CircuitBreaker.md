@@ -10,7 +10,7 @@ docker compose up --build -d
 ```
 To visualize the effects, we will use a dashboard that we will import into Grafana.
 
-Follow this [instructions to import](./Grafana.md) it into the grafana instance.
+Follow this [instructions to import](./3rparties/grafana.md) it into the grafana instance.
 
 The next step is to generate load on the platform using [artillery](https://www.artillery.io/).
 Specifically, we will use a scenario where, at a rate of 500 times per second, two requests are sent to the cache for 15 minutes.
@@ -19,7 +19,7 @@ For these tests, we use a scenario where the following flow is executed at a fre
 2. The system waits for a random number of seconds between 1 and 60.
 3. A conditional request (If-Modified-Since) is sent to the same resource (URL).
 ```sh
-artillery run --scenario-name '304' ./artillery/load-test.yml
+artillery run --scenario-name '304' ./3rparties/artillery/load-test.yml
 
 ```
 After the initial minutes, the system shows behavior where the number of requests per second to Speedis varies between 200 and 800, to the origin between 50 and 150, and the response times for requests that need to go to the origin are below 25ms.

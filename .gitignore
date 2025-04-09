@@ -4,3 +4,6 @@ haproxy/*.crt
 haproxy/*.csr
 haproxy/*.key
 haproxy/certs/*.pem
+keycloak/*.csr
+haproxy/certs/*.crt
+haproxy/certs/*.key

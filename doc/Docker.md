@@ -12,7 +12,7 @@ cd speedis
 ```
 ## **Generate self signed certificate**
 Generate self signed certificate to test HAProxy TLS termination
-The test domain is mocks.speedis
+The test domain is mocks.local
 ```sh
 ./conf/haproxy/generate_self_signed_cert.sh
 ```
@@ -41,6 +41,7 @@ You should see all containers (`redis-stack-server`, `speedis`, `haproxy`, etc.)
 - **Mocks** → `http://localhost:3030`
 - **Grafana** → `http://localhost:3000` (User: `admin`, Password: `grafana`)  
 - **Prometheus** → `http://localhost:9090`
+- **Keycloack**  → `http://localhost:8080` (User: `admin`, Password: `keycloak`)  
 You can find examples of request to the different services in [./Requests.md](./Requests.md)
 ## **Stopping the environment**  
 To stop all containers, run:  

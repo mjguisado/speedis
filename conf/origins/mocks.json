@@ -22,7 +22,10 @@
         "agentOptions": {
             "keepAlive": true
         },
-        "ignoredQueryParams": ["cc", "delay"],
+        "ignoredQueryParams": [
+            "cc",
+            "delay"
+        ],
         "sortQueryParams": true,
         "localRequestsCoalescing": true,
         "distributedRequestsCoalescing": true,
@@ -47,37 +50,43 @@
                 "actions": [
                     {
                         "phase": "OriginResponse",
-                        "uses":  "json:deleteJsonPaths",
+                        "uses": "json:deleteJsonPaths",
                         "with": {
-                            "jsonpaths": ["$[*].user.phones[*].type", "$[*].metadata"]
-                        }         
+                            "jsonpaths": [
+                                "$[*].user.phones[*].type",
+                                "$[*].metadata"
+                            ]
+                        }
                     }
-                ]  
+                ]
             },
             {
                 "urlPattern": "/mocks/users/2",
                 "actions": [
                     {
                         "phase": "OriginResponse",
-                        "uses":  "json:keepJsonPaths",
+                        "uses": "json:keepJsonPaths",
                         "with": {
-                            "jsonpaths": ["$[*].user.phones[*].type", "$[*].metadata"]
-                        }    
+                            "jsonpaths": [
+                                "$[*].user.phones[*].type",
+                                "$[*].metadata"
+                            ]
+                        }
                     }
-                ]  
+                ]
             },
             {
                 "urlPattern": ".*",
                 "actions": [
                     {
                         "phase": "OriginRequest",
-                        "uses":  "headers:setHeaders",
+                        "uses": "headers:setHeaders",
                         "with": {
                             "x-header": "example of transformation"
-                        }         
+                        }
                     }
-                ]  
-            } 
+                ]
+            }
         ]
     }
 }
