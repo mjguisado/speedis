@@ -6,24 +6,64 @@ import { jwtDecode } from "jwt-decode"
 // https://medium.com/google-cloud/understanding-oauth2-and-building-a-basic-authorization-server-of-your-own-a-beginners-guide-cf7451a16f66
 // https://skycloak.io/blog/keycloak-how-to-create-a-pkce-authorization-flow-client/
 // https://github.com/panva/openid-client
-// https://datatracker.ietf.org/doc/html/rfc6749
+// https://openid.net/specs/openid-connect-discovery-1_0.html#ProviderConfig
+// https://www.rfc-editor.org/rfc/rfc8414
+// https://www.rfc-editor.org/rfc/rfc6749
+
+// https://www.iana.org/assignments/oauth-parameters/oauth-parameters.xhtml#authorization-server-metadata
 
 export default async function (server, opts) {
 
-  const {id} = opts
+  const { id } = opts
   server.decorate('id', id)
 
-  // Initializing the OpenID Client
-  const authServerIssuerId = new URL('https://keycloak.local:8443/realms/speedis')
+  const discoverySupported = true
+  const authorizationServerMetadataLocation =
+    'https://keycloak.local:8443/realms/speedis/.well-known/openid-configuration'
+
+  // https://www.iana.org/assignments/oauth-parameters/oauth-parameters.xhtml#authorization-server-metadata
+  const authorizationServerMetadata = {
+    // Authorization server's issuer identifier URL
+    issuer: 'https://keycloak.local:8443/realms/speedis',
+    // URL of the authorization server's authorization endpoint
+    authorization_endpoint: 'https://keycloak.local:8443/realms/speedis/protocol/openid-connect/auth',
+    // URL of the authorization server's token endpoint
+    token_endpoint: 'https://keycloak.local:8443/realms/speedis/protocol/openid-connect/token',
+    response_types_supported: ["code", "none", "id_token", "token", "id_token token", "code id_token", "code token", "code id_token token"]
+  }
+  
+  // https://www.rfc-editor.org/rfc/rfc6749#section-4.1.1 
+  const authorizationRequest = {
+    scope: "openid email profile"
+  }
+
+  const tokenIdCookieName = 'JSESSION_ID'
   const clientId = 'confiable'
   const clientSecret = '3ucOCEJzDiA1KXcl08CYMH6J2HBztgFh'
-  const redirect_uri = 'https://fdc4-79-148-39-182.ngrok-free.app/mocks/sessions/callback'
-  const baseUrl = 'https://fdc4-79-148-39-182.ngrok-free.app'
-  const codeVerifierTTL = 300
+  const pkceEnabled = true
+  const baseUrl = 'https://3011-79-148-35-134.ngrok-free.app'
+  const codeVerifierTtl = 300
+
+  // Configuration is an abstraction over the OAuth 2.0 
+  // Authorization Server metadata and OAuth 2.0 Client metadata
+  let configuration = null
+  // Configuration instances are obtained either through:
+  if (discoverySupported) {
+    // (RECOMMENDED) the discovery function that discovers the OAuth 2.0 
+    // Authorization Server metadata using the Authorization Server's Issuer Identifier
+    configuration = await openidClient.discovery(
+      new URL(authorizationServerMetadataLocation),
+      clientId, clientSecret)
+  } else {
+    // The Configuration constructor if the OAuth 2.0 Authorization 
+    // Server metadata is known upfront
+    configuration = new openidClient.Configuration(
+      authorizationServerMetadata, clientId, clientSecret
+    )
+  }
 
   // Connecting to Redis
-  // See: https://redis.io/docs/latest/develop/clients/nodejs/produsage/#handling-reconnections
-  const redisClient = createClient({
+  let redisClient = createClient({
     "url": "redis://redis:6379"
   })
   redisClient.on('error', error => {
@@ -36,68 +76,68 @@ export default async function (server, opts) {
     throw new Error(`Unable to connect to Redis during startup. Origin: ${server.id}.`, { cause: error })
   }
 
-  // Performs Authorization Server Metadata discovery and returns a 
-  // Configuration with the discovered Authorization Server metadata.
-  const authServerConfig = 
-    await openidClient.discovery(authServerIssuerId, clientId, clientSecret)
 
   server.get('/login', async (request, reply) => {
-    // PKCE works by having the client create a secret string, 
-    // nown as the Code Verifier, before it starts the authorization process.
-    const codeVerifier = openidClient.randomPKCECodeVerifier()
-    const codeVerifierId = 'cv:' + crypto.createHash('sha256').update(codeVerifier).digest('base64url')
-    // This verifier is transformed into a Code Challenge by using a hashing function (SHA256).
-    const code_challenge = await openidClient.calculatePKCECodeChallenge(codeVerifier)
+    /*
+    The client initiates the flow by directing the resource owner's
+    user-agent to the authorization endpoint.  The client includes
+    its client identifier, requested scope, local state, and a
+    redirection URI to which the authorization server will send the
+    user-agent back once access is granted (or denied).
+    */
+    let redirect_uri = new URL(
+      request.url.slice(0, request.url.lastIndexOf('/login')) + '/callback',
+      baseUrl
+    )
     const parameters = {
       redirect_uri,
-      scope: 'openid email profile',
-      code_challenge,
-      code_challenge_method: 'S256',
-      state: codeVerifierId
+      ...authorizationRequest,
     }
-    if (!authServerConfig.serverMetadata().supportsPKCE()) {
-      parameters.state = openidClient.randomState()
+
+    if (pkceEnabled) {
+      // PKCE works by having the client create a secret string, 
+      // nown as the Code Verifier, before it starts the authorization process.
+      const codeVerifier = openidClient.randomPKCECodeVerifier()
+      // This verifier is transformed into a Code Challenge by using a hashing function (SHA256).
+      parameters.code_challenge_method = 'S256'
+      parameters.code_challenge = await openidClient.calculatePKCECodeChallenge(codeVerifier)
+      parameters.state = 'cv:' + crypto.randomUUID()
+      try {
+        await redisClient.set(parameters.state, codeVerifier, { EX: codeVerifierTtl })
+      } catch (error) {
+        server.log.error(
+          `Error while storing the code verifier. Origin: ${server.id}.`, { cause: error }
+        )
+        throw error
+      }
     }
-    try {
-      await redisClient.set(codeVerifierId, codeVerifier, { EX: codeVerifierTTL })
-      // The Code Challenge is sent to the authorization server along 
-      // with the authorization request.
-      const redirectTo = openidClient.buildAuthorizationUrl(authServerConfig, parameters)
-      return reply.redirect(redirectTo)
-    } catch (error) {
-      server.log.error(
-        `Error while storing the code verifier. Origin: ${server.id}.`, { cause: error }
-      )
-      throw error
-    }
+
+    return reply.redirect(openidClient.buildAuthorizationUrl(configuration, parameters))
+
   })
 
   server.get('/callback', async (request, reply) => {
-    
-    const state = await request.query['state']
-
-    let code_verifier = null;
-    try {
-      code_verifier = await redisClient.get(state)
-    } catch (error) {
-      server.log.error(
-        `Error while retrieving the code verifier. Origin: ${server.id}.`, { cause: error }
-      )
-      throw error
+    const checks = {}
+    if (pkceEnabled) {
+      let code_verifier
+      try {
+        code_verifier = await redisClient.get(request.query['state'])
+      } catch (error) {
+        server.log.error(
+          `Error while retrieving the code verifier. Origin: ${server.id}.`, { cause: error }
+        )
+        code_verifier = 'it will fail'
+      }
+      checks.expectedState = request.query['state']
+      checks.pkceCodeVerifier = code_verifier
     }
-
-    // Puede que haya expirado
-    if (!code_verifier) {}
 
     let tokens = null;
     try {
       tokens = await openidClient.authorizationCodeGrant(
-        authServerConfig, 
+        configuration,
         new URL(request.raw.url, baseUrl),
-        {
-          pkceCodeVerifier: code_verifier,
-          expectedState: state,
-        }
+        checks
       )
     } catch (error) {
       server.log.error(
@@ -106,31 +146,11 @@ export default async function (server, opts) {
       throw error
     }
 
-    const id_token      = jwtDecode(tokens.id_token)
-    // const access_token  = jwtDecode(tokens.access_token)
-    // const refresh_token = jwtDecode(tokens.refresh_token)
-
+    const id_token = jwtDecode(tokens.id_token)
     try {
-      await redisClient
-        .multi()
-        .HSET(
-          id_token.jti,
-          {
-            access_token: tokens.access_token, 
-            expires_in: tokens.expires_in,
-            refresh_expires_in: tokens.refresh_expires_in,
-            refresh_token: tokens.refresh_token,
-            token_type: tokens.token_type,
-            id_token: tokens.id_token,
-            'not-before-policy': tokens['not-before-policy'],
-            session_state: tokens.session_state,	
-            scope: tokens.scope
-          }
-        )
-        .EXPIREAT(id_token.jti, id_token.exp)
-        // .HEXPIREAT(id_token.jti, ['access_token'],  access_token.exp)
-        // .HEXPIREAT(id_token.jti, ['refresh_token'], refresh_token.exp)
-        .exec()
+      await redisClient.HSET(id_token.jti, tokens)
+      await redisClient.EXPIREAT(id_token.jti, id_token.exp)
+      await redisClient.UNLINK(request.query['state'])
     } catch (error) {
       server.log.error(
         `Error while storing the session.`, { cause: error }
@@ -139,13 +159,10 @@ export default async function (server, opts) {
     }
 
     // We set the tokenId in a cookie
-    /*
-    reply.setCookie('token_id', tokenId, {
-      path: '/',
-      httpOnly: true,
-      secure: false, // true en producción
-    })
-    */
-    reply.send(tokens)
+    // https://github.com/fastify/fastify-cookie?tab=readme-ov-file#sending
+    reply.header('set-cookie', `${tokenIdCookieName}=${id_token.jti}; Path=/; Secure; HttpOnly`)
+    return reply.redirect("https://bankinter.com")
+    // reply.send(tokens)
   })
+
 }

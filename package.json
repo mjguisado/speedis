@@ -22,7 +22,6 @@
   "homepage": "https://github.com/mjguisado/speedis#readme",
   "dependencies": {
     "@fastify/cookie": "^11.0.2",
-    "@fastify/secure-session": "^8.1.1",
     "fastify": "^5.2.2",
     "jsonpath": "^1.1.1",
     "jwt-decode": "^4.0.0",
