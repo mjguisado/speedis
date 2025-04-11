@@ -2,7 +2,7 @@
 
 # Speedis (Gonzales).
 
-**Speedis is a High-Performance Shared HTTP Cache with Geographical Distribution Capability with OAuth2-based Access Control**
+**Speedis is a High-Performance Shared HTTP Cache with Geographical Distribution Capability and OAuth2-based Access Control**
 
 In the implementation, the guidelines established in [RFC 9110](https://www.rfc-editor.org/rfc/rfc9111.html) on HTTP Semantics and [RFC 9111](https://www.rfc-editor.org/rfc/rfc9111.html) on HTTP Caching have been followed.
 In the design of Speedis, special attention has been given to incorporating mechanisms to protect the origin servers against overloading.
