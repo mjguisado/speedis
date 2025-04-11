@@ -10,6 +10,7 @@ import { jwtDecode } from "jwt-decode"
 // https://www.rfc-editor.org/rfc/rfc8414
 // https://www.rfc-editor.org/rfc/rfc6749
 // https://www.iana.org/assignments/oauth-parameters/oauth-parameters.xhtml#authorization-server-metadata
+
 // TODO: Redis breaker
 export default async function (server, opts) {
 
@@ -35,9 +36,7 @@ export default async function (server, opts) {
   }
 
   // Connecting to Redis
-  let redisClient = createClient({
-    "url": "redis://redis:6379"
-  })
+  let redisClient = createClient(opts.redis.redisOptions)
   redisClient.on('error', error => {
     server.log.error(`Redis connection lost. Origin: ${server.id}.`, { cause: error })
   })
@@ -47,7 +46,6 @@ export default async function (server, opts) {
   } catch (error) {
     throw new Error(`Unable to connect to Redis during startup. Origin: ${server.id}.`, { cause: error })
   }
-
 
   server.get(opts.redirectPath, async (request, reply) => {
     /*
@@ -90,7 +88,9 @@ export default async function (server, opts) {
   })
 
   server.get(opts.callbackPath, async (request, reply) => {
+    
     const checks = {}
+
     if (opts.pkceEnabled) {
       let code_verifier
       try {
@@ -134,8 +134,7 @@ export default async function (server, opts) {
     // We set the tokenId in a cookie
     // https://github.com/fastify/fastify-cookie?tab=readme-ov-file#sending
     reply.header('set-cookie', `${opts.sessionIdCookieName}=${id_session}; Path=/; Secure; HttpOnly`)
-    // return reply.redirect(opts.postAuthRedirectUrl)
-    return reply.send(tokens)
+    return reply.redirect(opts.postAuthRedirectUrl)
   })
 
 }

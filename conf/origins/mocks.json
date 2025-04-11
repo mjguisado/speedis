@@ -99,7 +99,7 @@
             "authorization_endpoint":"https://keycloak.local:8443/realms/speedis/protocol/openid-connect/auth",
             "token_endpoint":"https://keycloak.local:8443/realms/speedis/protocol/openid-connect/token"
         },
-        "postAuthRedirectUrl": "https://81e1-79-148-35-134.ngrok-free.app/mocks/items/RealBetis?delay=300&cc=public,max-age=10&a=alfa&b=beta&c=",
+        "postAuthRedirectUrl": "https://81e1-79-148-35-134.ngrok-free.app/mocks/mocks/items/RealBetis?delay=300&cc=public,max-age=10&a=alfa&b=beta&c=",
         "redis": {
             "redisOptions": {
                 "url": "redis://redis:6379"
