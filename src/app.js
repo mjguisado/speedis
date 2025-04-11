@@ -206,6 +206,7 @@ export async function app(opts = {}, ajv = new Ajv({useDefaults: true})) {
           type: "object",
           additionalProperties: false,
           required: [
+            "id",
             "baseUrl", 
             "clientId", 
             "clientSecret", 
@@ -217,6 +218,7 @@ export async function app(opts = {}, ajv = new Ajv({useDefaults: true})) {
           if: { properties: { discoverySupported: { const: false } } },
           then: { required: ["authorizationServerMetadata"] },
           properties: {
+            id: { type: "string" },
             prefix: { type: "string", default: "/oauth2" },
             logLevel: {
               enum: ["fatal", "error", "warn", "info", "debug", "trace"],

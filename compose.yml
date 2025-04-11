@@ -39,10 +39,11 @@ services:
     environment:
       - KC_BOOTSTRAP_ADMIN_USERNAME=admin
       - KC_BOOTSTRAP_ADMIN_PASSWORD=keycloak
-      - KC_HTTPS_CERTIFICATE_FILE=/opt/keycloak/conf/certs/keycloak.local.crt
-      - KC_HTTPS_CERTIFICATE_KEY_FILE=/opt/keycloak/conf/certs/keycloak.local.key
+      - KC_HTTPS_CERTIFICATE_FILE=/opt/keycloak/conf/certs/keycloak.crt
+      - KC_HTTPS_CERTIFICATE_KEY_FILE=/opt/keycloak/conf/certs/keycloak.key
     volumes:
       - ./3rparties/keycloak/certs:/opt/keycloak/conf/certs:ro
+      - ./3rparties/haproxy/mocks.crt:/opt/keycloak/conf/truststores/mocks.pem:ro
       - keycloak_data:/opt/keycloak/data
     ports:
       - 8080:8080

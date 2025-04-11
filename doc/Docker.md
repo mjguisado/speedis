@@ -11,10 +11,13 @@ git clone https://github.com/mjguisado/speedis.git
 cd speedis
 ```
 ## **Generate self signed certificate**
-Generate self signed certificate to test HAProxy TLS termination
-The test domain is mocks.local
+Generate self signed certificate to test HAProxy TLS termination. The domain is mocks.local
 ```sh
-./conf/haproxy/generate_self_signed_cert.sh
+./3rparties/haproxy/generate_self_signed_cert.sh
+```
+Keycloak also requires TLS. The domain is keycloak.local
+```sh
+./3rparties/keycloak/generate_self_signed_cert.sh
 ```
 ## **Start the environment**  
 Run the following command to start all services:  

@@ -111,6 +111,7 @@ Speedis includes out of the box two libreries
 The following table describes the supported fields in the OAuth2-based Access Control configuration object.
 |Field|Type|Mandatory|Default|Description|
 |-----|----|---------|-------|-----------|
+|`id`|String|`true`||Lorem ipsum dolor sit amet|
 |`prefix`|String|`false`|`/oauth2`|URL path prefix used to route incoming requests to the OAuth2 services.|
 |`logLevel`|String|`false`|`info`|Logging level for the OAuth2 (`trace`, `debug`, `info`, `warn`, `error`, `fatal`).|
 |`baseUrl`|String|`true`||Since Speedis can serve multiple domains, this variable is used to specify the domain currently in use for yhe current origin.|

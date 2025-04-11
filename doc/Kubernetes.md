@@ -12,10 +12,9 @@ git clone https://github.com/mjguisado/speedis.git
 cd speedis
 ```
 ## **Generate self signed certificate**
-Generate self signed certificate to test HAProxy TLS termination
-The test domain is mocks.local
+Generate self signed certificate to test HAProxy TLS termination. The domain is mocks.local
 ```sh
-./conf/haproxy/generate_self_signed_cert.sh
+./3rparties/haproxy/generate_self_signed_cert.sh
 ```
 ## **Deploy the resources**
 1. Change to the K8S directory that contains the manifests:
