@@ -21,6 +21,8 @@ The following table describes the supported fields.
 |`exposeErrors`|Boolean|`false`|`false`|This parameter determines whether descriptive error messages are included in the response body (`true` or `false`).|
 |`redis`|Object|true||This object defines all the details related to the redis database. Its format is detailed below.|
 |`origin`|Object|true||This object defines all the details related to the origin management. Its format is detailed below.|
+|`oauth2`|Object|true||This object defines all the details related to the OAuth2-based Access Control. Its format is detailed below.|
+
 ## Redis configuration object
 The following table describes the supported fields in the redis configuration object.
 |Field|Type|Mandatory|Default|Description|
@@ -30,6 +32,7 @@ The following table describes the supported fields in the redis configuration ob
 |`redisBreaker`|Boolean|`false`|`false`|Enables (`true`) or disables (`false`) the redis's circuit breaker mechanism.|
 |`redisBreakerOptions`|Object|`true` if redisBreaker is enabled||Speedis leverages [Opossum](https://nodeshift.dev/opossum/) to implement the circuit breaker mechanism. This field is used to define the circuit braker options. Its format is almost identical to the original [options](https://nodeshift.dev/opossum/#circuitbreaker). The main difference is that, since the configuration is in JSON format, parameters defined as JavaScript entities in the original options are not supported. Additionally, options related to caching and coalescing features are also not supported.
 |`disableOriginOnRedisOutage`|Boolean|`false`|`false`|When set to `true` Speedis will not forward requests to the origin server if Redis becomes unavailable.|
+
 ## Origin configuration object
 The following table describes the supported fields in the origin configuration object.
 |Field|Type|Mandatory|Default|Description|
@@ -103,3 +106,24 @@ Speedis includes out of the box two libreries
 |----------|--------|-----------|
 |headers|[./src/actions/headers.js](../src/actions/headers.js)|Actions to manipulate headers|
 |json|[./src/actions/json.js](../src/actions/json.js)|Actions to manipulate the body in JSON format|
+
+## OAuth2-based Access Control
+The following table describes the supported fields in the OAuth2-based Access Control configuration object.
+|Field|Type|Mandatory|Default|Description|
+|-----|----|---------|-------|-----------|
+|`prefix`|String|`false`|`/oauth2`|URL path prefix used to route incoming requests to the OAuth2 services.|
+|`logLevel`|String|`false`|`info`|Logging level for the OAuth2 (`trace`, `debug`, `info`, `warn`, `error`, `fatal`).|
+|`baseUrl`|String|`true`||Since Speedis can serve multiple domains, this variable is used to specify the domain currently in use for yhe current origin.|
+|`redirectPath`|String|`false`|`/login`|Indicates the final part of the URL of the client that the User-Agent will use to redirect the Resource Owner to the Authentication endpoint of the Authorization Server, initiating the OAuth2 authentication flow.|
+|`callbackPath`|String|`false`|`/callback`|Indicates the final part of the client’s URL where the authorization server redirects the User-Agent back to the client after completing the OAuth2 authentication flow.|
+|`clientId`|String|`true`||The client identifier issued to the client during the registration process|
+|`clientSecret`|String|`true`||The client secret.|
+|`discoverySupported`|Boolean|`true`||If `true`, this indicates that the Authorization Server exposes a metadata document, allowing the client to automatically retrieve endpoint URLs and other configuration details. If `false`, all necessary endpoints and settings must be provided manually.|
+|`authorizationServerMetadataLocation`|String|`true` if discoverySupported is `true`||Specifies the absolute URL to the Authorization Server’s metadata JSON document|
+|`authorizationServerMetadata`|Object|`true` if discoverySupported is `false`||An object that defines all the necessary endpoint URLs and configuration parameters of the Authorization Server. Its format is defined in [ServerMetadata](https://github.com/panva/openid-client/blob/main/docs/interfaces/ServerMetadata.md). For further details, refer to [RFC 8414](https://www.rfc-editor.org/rfc/rfc8414.html#section-2). Speedis specifically requires the issuer, authorization_endpoint, and token_endpoint.|
+|`authorizationRequest`|Object|false||Allows the definition of values for the parameters that will be included in the query component of the authorization endpoint URI, used in the client’s [request to the Authorization Server](https://www.rfc-editor.org/rfc/rfc6749#section-4.1.1) during the OAuth2 authorization flow.|
+|`pkceEnabled`|Boolean|`false`|`false`|Indicates whether PKCE (Proof Key for Code Exchange) is enabled. Although the client is considered Confidential, enabling PKCE provides an additional layer of security during the token exchange process.|
+|`authorizationCodeTtl`|Number|`false`|`300`|Defines the time-to-live (TTL) for the authorization code, indicating how long the code remains valid before it expires. This value is typically set to a short duration (e.g., 5-10 minutes) to ensure that the code is used promptly after issuance.|
+|`sessionIdCookieName`|String|`false`|`speedis_token_id`|Specifies the name of the cookie that the client uses to communicate the value of the ID token to the User-Agent.|
+|`postAuthRedirectUrl`|String|`true`||Specifies the URL to which the user will be redirected after successful authentication and the establishment of the authentication cookie. This page is typically a landing page or the main entry point to the application, ensuring that the user is directed to the appropriate location after login.|
+|`redis`|Object|`true`||Used to define the connection to Redis, the secure in-memory database that the client uses to store established sessions. Redis ensures fast and reliable storage of session data, providing efficient management of user authentication state. Its format follows the same structure as previously defined in the Redis configuration object.|

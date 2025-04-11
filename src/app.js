@@ -14,7 +14,7 @@ export async function app(opts = {}, ajv = new Ajv({useDefaults: true})) {
       additionalProperties: false,
       required: ["id", "prefix", "redis", "origin"],
       definitions: {
-        circuitBreakerOptions: {
+        circuitBreakerConfiguration: {
           type: "object",
           additionalProperties: false,
           // See: https://github.com/nodeshift/opossum/blob/main/lib/circuit.js
@@ -53,17 +53,8 @@ export async function app(opts = {}, ajv = new Ajv({useDefaults: true})) {
             // rotateBucketController: { type: "EventEmitter" }, 
             autoRenewAbortController: { type: "boolean", default: false }
           }
-        }
-      },
-      properties: {
-        id: { type: "string" },
-        prefix: { type: "string" },
-        logLevel: {
-          enum: ["fatal", "error", "warn", "info", "debug", "trace"],
-          default: "info"
         },
-        exposeErrors: { type: "boolean", default: false },
-        redis: {
+        redisConfiguration: {
           type: "object",
           additionalProperties: false,
           required: ["redisOptions"],
@@ -75,10 +66,20 @@ export async function app(opts = {}, ajv = new Ajv({useDefaults: true})) {
             },
             redisTimeout: { type: "integer" },        
             redisBreaker: { type: "boolean", default: false },
-            redisBreakerOptions: { $ref: "#/definitions/circuitBreakerOptions" },
+            redisBreakerOptions: { $ref: "#/definitions/circuitBreakerConfiguration" },
             disableOriginOnRedisOutage: { type: "boolean", default: false },
           }
+        }
+      },
+      properties: {
+        id: { type: "string" },
+        prefix: { type: "string" },
+        logLevel: {
+          enum: ["fatal", "error", "warn", "info", "debug", "trace"],
+          default: "info"
         },
+        exposeErrors: { type: "boolean", default: false },
+        redis: { $ref: "#/definitions/redisConfiguration" },
         origin:{
           type: "object",
           additionalProperties: false,
@@ -159,7 +160,7 @@ export async function app(opts = {}, ajv = new Ajv({useDefaults: true})) {
             },
             originTimeout: { type: "integer" },
             originBreaker: { type: "boolean", default: false },
-            originBreakerOptions: { $ref: "#/definitions/circuitBreakerOptions" },
+            originBreakerOptions: { $ref: "#/definitions/circuitBreakerConfiguration" },
             actionsLibraries: {
               type: "object"
             },
@@ -200,11 +201,62 @@ export async function app(opts = {}, ajv = new Ajv({useDefaults: true})) {
               }
             }
           }
+        },
+        oauth2: {
+          type: "object",
+          additionalProperties: false,
+          required: [
+            "baseUrl", 
+            "clientId", 
+            "clientSecret", 
+            "discoverySupported",
+            "postAuthRedirectUrl",
+            "redis"],
+          if: { properties: { discoverySupported: { const: true } } },
+          then: { required: ["authorizationServerMetadataLocation"] },
+          if: { properties: { discoverySupported: { const: false } } },
+          then: { required: ["authorizationServerMetadata"] },
+          properties: {
+            prefix: { type: "string", default: "/oauth2" },
+            logLevel: {
+              enum: ["fatal", "error", "warn", "info", "debug", "trace"],
+              default: "info"
+            },
+            baseUrl: { type: "string" },
+            redirectPath: { type: "string", default: "/login" },
+            callbackPath: { type: "string", default: "/callback" },
+            clientId: { type: "string" },
+            clientSecret: { type: "string" },
+            discoverySupported: { type: "boolean" },
+            authorizationServerMetadataLocation: { type: "string" },
+            authorizationServerMetadata: { 
+              type: "object",
+              additionalProperties: true,
+              required: ["issuer","authorization_endpoint","token_endpoint"],
+              properties: {
+                issuer: { type: "string" },
+                authorization_endpoint: { type: "string" },
+                token_endpoint: { type: "string" },
+                response_types_supported: {
+                  type: "array",
+                  items: {
+                    type: "string"
+                  }
+                }
+              }  
+            },
+            authorizationRequest: { type: "object", default: {} },
+            pkceEnabled: { type: "boolean", default: false },
+            authorizationCodeTtl: { type: "number", default: 300 },
+            sessionIdCookieName: { type: "string", default: "speedis_token_id" },
+            postAuthRedirectUrl: { type: "string" }, 
+            redis: { $ref: "#/definitions/redisConfiguration" } 
+          }
         }
       }
     }
   )
-  
+
   // Register the Prometheus metrics.
   const server = fastify(opts)
 

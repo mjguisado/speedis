@@ -27,10 +27,9 @@ export default async function (server, opts) {
   server.decorate('id', opts.id)
   server.decorate('exposeErrors', opts.exposeErrors)
 
-  server.register(sessionPlugin, {
-    id: `${id},sessions`,
-    prefix: '/sessions'}
-  )
+  if (Object.prototype.hasOwnProperty.call(opts, "oauth2")) {
+    server.register(sessionPlugin, opts.oauth2)
+  }
 
   // Connecting to Redis
   // See: https://redis.io/docs/latest/develop/clients/nodejs/produsage/#handling-reconnections
