@@ -9,9 +9,9 @@ import { jwtDecode } from "jwt-decode"
 // https://openid.net/specs/openid-connect-discovery-1_0.html#ProviderConfig
 // https://www.rfc-editor.org/rfc/rfc8414
 // https://www.rfc-editor.org/rfc/rfc6749
-
 // https://www.iana.org/assignments/oauth-parameters/oauth-parameters.xhtml#authorization-server-metadata
 
+// TODO: Redis breaker
 export default async function (server, opts) {
 
   const { id } = opts

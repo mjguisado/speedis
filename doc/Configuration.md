@@ -1,7 +1,6 @@
 # Speedis main configuration
 The optional file ./conf/speedis.conf contains a JSON object with the general configuration of the Speedis server.
 The following table describes the supported fields.
-
 |Field|Type|Mandatory|Default|Description|
 |-----|----|---------|-------|-----------|
 |`maxNumberOfWorkers`|Number|`false`|[os.availableParallelism()](https://nodejs.org/api/os.html#osavailableparallelism)|This parameters limits the number of workers.|
@@ -9,7 +8,6 @@ The following table describes the supported fields.
 |`logLevel`|String|`false`|`info`|Logging level for the main service (`trace`, `debug`, `info`, `warn`, `error`, `fatal`).|
 |`metricServerPort`|Number|`false`|3003|The port on which the metrics service is running.|
 |`metricServerLogLevel`|String|`false`|`info`|Logging level for the metric service (`trace`, `debug`, `info`, `warn`, `error`, `fatal`).|
-
 # Origins configurations
 In Speedis, the remote server to be cached is referred to as an `origin`.
 The configuration of Speedis’ behavior for each origin is defined in a configuration file which contains a JSON object and is located in ./conf/origin/.
@@ -32,7 +30,6 @@ The following table describes the supported fields in the redis configuration ob
 |`redisBreaker`|Boolean|`false`|`false`|Enables (`true`) or disables (`false`) the redis's circuit breaker mechanism.|
 |`redisBreakerOptions`|Object|`true` if redisBreaker is enabled||Speedis leverages [Opossum](https://nodeshift.dev/opossum/) to implement the circuit breaker mechanism. This field is used to define the circuit braker options. Its format is almost identical to the original [options](https://nodeshift.dev/opossum/#circuitbreaker). The main difference is that, since the configuration is in JSON format, parameters defined as JavaScript entities in the original options are not supported. Additionally, options related to caching and coalescing features are also not supported.
 |`disableOriginOnRedisOutage`|Boolean|`false`|`false`|When set to `true` Speedis will not forward requests to the origin server if Redis becomes unavailable.|
-
 ## Origin configuration object
 The following table describes the supported fields in the origin configuration object.
 |Field|Type|Mandatory|Default|Description|
@@ -49,7 +46,6 @@ The following table describes the supported fields in the origin configuration o
 |`originBreakerOptions`|Object|`true` if originBreaker is enabled||Speedis leverages [Opossum](https://nodeshift.dev/opossum/) to implement the circuit breaker mechanism. This field is used to define the circuit braker options. Its format is almost identical to the original [options](https://nodeshift.dev/opossum/#circuitbreaker). The main difference is that, since the configuration is in JSON format, parameters defined as JavaScript entities in the original options are not supported. Additionally, options related to caching and coalescing features are also not supported.|
 |`actionsLibraries`|Object|`false`||An array containing the full paths to custom action libraries that extend the default set provided out of the box.|
 |`transformations`|[Object]|`false`||Array of objects that define the set of transformations that Speedis can apply to requests and responses at different stages. Its format is detailed below.|
-
 ### Lock configuration object
 The following table describes the supported fields in the lock configuration object.
 |Field|Type|Mandatory|Default|Description|
@@ -58,7 +54,6 @@ The following table describes the supported fields in the lock configuration obj
 |`retryCount`|Number|`true`||(Number of retry attempts): Defines the maximum number of times the system will attempt to acquire the lock if the initial attempt fails.|
 |`retryDelay`|Number|`true`||(Base delay between retries): Sets the waiting time (in milliseconds) between consecutive lock acquisition attempts. This helps prevent excessive contention when multiple processes try to acquire the same lock.|
 |`retryJitter`|Number|`true`||(Randomized delay variation): Introduces a random variation (in milliseconds) to the retry delay to reduce the likelihood of multiple processes retrying at the same time, which can help prevent contention spikes.|
-
 ### Transformations configuration
 Speedis allows transformations to be applied to requests and responses it handles at different phases of their lifecycle.
 |Phase|Description|
@@ -82,7 +77,7 @@ export function actionname(target, params) {}
 ```
 The first parameter `target` represents the object to be modified, whether it is a request or a response.
 The second parameter `params` contains the value of the “with” field within the object that defines the action in the transformation configuration.
-A continuación hay un ejemplo de la configuración de las transformaciones.
+Below is an example of the transformation configuration.
 
 ```json
     "transformations": [
