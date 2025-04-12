@@ -531,7 +531,9 @@ export default async function (server, opts) {
       }
     }
 
-    let cacheKey = server.id + path.replaceAll('/', ':')
+    let cacheKey = server.origin.includeOriginIdInCacheKey?server.id:''
+    cacheKey += path.replaceAll('/', ':')
+    if (cacheKey.startsWith(':')) cacheKey = cacheKey.slice(1)
 
     // See: https://www.rfc-editor.org/rfc/rfc9111.html#name-calculating-cache-keys-with
     fieldNames.forEach(fieldName => {
