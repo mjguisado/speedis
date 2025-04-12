@@ -3,5 +3,5 @@ node_modules/
 3rparties/haproxy/*.crt
 3rparties/haproxy/*.key
 3rparties/haproxy/certs/*.pem
-3rparties/keycloack/certs/*.crt
-3rparties/keycloack/certs/*.key
+3rparties/keycloak/certs/*.crt
+3rparties/keycloak/certs/*.key
