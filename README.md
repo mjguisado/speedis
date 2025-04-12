@@ -2,7 +2,7 @@
 
 # Speedis (Gonzales).
 
-**Speedis is a High-Performance Shared HTTP Cache with Geographical Distribution Capability.**
+**Speedis is a High-Performance Shared HTTP Cache with Geographical Distribution Capability and OAuth2-based Access Control**
 
 In the implementation, the guidelines established in [RFC 9110](https://www.rfc-editor.org/rfc/rfc9111.html) on HTTP Semantics and [RFC 9111](https://www.rfc-editor.org/rfc/rfc9111.html) on HTTP Caching have been followed.
 In the design of Speedis, special attention has been given to incorporating mechanisms to protect the origin servers against overloading.
@@ -101,9 +101,12 @@ Depending on the domain through which a request is received, the request path se
 Additionally, this folder contains a script to generate a self-signed certificate for the domain used in the configuration.
 In the included example, the following workflow is defined
 
-https://mocks.speedis/v1/items?x=1&y=2 -> http://speedis:3001/mocks/v1/items?x=1&y=2 -> http://mocks:3030/v1/items?x=1&y=2
+https://mocks.local/v1/items?x=1&y=2 -> http://speedis:3001/mocks/v1/items?x=1&y=2 -> http://mocks:3030/v1/items?x=1&y=2
 
-Note: Proper DNS resolution is required for mocks.speedis, speedis, and mocks to function correctly.
+Note: Proper DNS resolution is required for mocks.local, speedis, and mocks to function correctly.
+
+### OAuth2-based Access Control
+Speedis can be used as a backend for web or mobile applications. In modern applications, securing access to sensitive resources is crucial. Speedis relies on OAuth2 to provide limited access to the resources it caches. Specifically, Speedis uses the Authentication Code Flow, implementing the roles of Resource Server and Client. If you are not familiar with OAuth2, you can refer to a brief [introduction](./doc/OAuth2.md) focusing on the parts of the framework used in Speedis.
 
 ### Observability.
 The application exposes operational metrics using Prometheus, a powerful open-source monitoring and alerting toolkit. These metrics provide valuable insights into the performance, health, and resource usage of the application, enabling proactive monitoring and troubleshooting. Prometheus can scrape these metrics at regular intervals, allowing for the collection, storage, and visualization of key performance data in real time.

@@ -12,10 +12,9 @@ git clone https://github.com/mjguisado/speedis.git
 cd speedis
 ```
 ## **Generate self signed certificate**
-Generate self signed certificate to test HAProxy TLS termination
-The test domain is mocks.speedis
+Generate self signed certificate to test HAProxy TLS termination. The domain is mocks.local
 ```sh
-./conf/haproxy/generate_self_signed_cert.sh
+./3rparties/haproxy/generate_self_signed_cert.sh
 ```
 ## **Deploy the resources**
 1. Change to the K8S directory that contains the manifests:
@@ -51,8 +50,8 @@ helm install haproxy-kubernetes-ingress haproxytech/kubernetes-ingress --create-
 ```
 7. Deploy the Ingress to access Speedis:
 ```sh
-kubectl create secret tls mocks-tls-secret --cert=../haproxy/certs/mocks.speedis.pem --key=../haproxy/certs/mocks.speedis.pem --namespace=speedis --dry-run=client -o yaml | kubectl apply -f -
-kubectl apply -f ./haproxy-ingress.yaml
+kubectl create secret tls mocks-tls-secret --cert=../3rparties/haproxy/certs/mocks.local.pem --key=../3rparties/haproxy/certs/mocks.local.pem --namespace=speedis --dry-run=client -o yaml | kubectl apply -f -
+kubectl apply -f ./3rparties/haproxy-ingress.yaml
 ```
 After executing the previous steps, you can retrieve the details of the new service that has been created:
 ```sh
@@ -79,5 +78,5 @@ To test the deployment, you can use the examples of request found in [./Requests
 
 **HTTP Request to Speedis via HAProxy**
 ```sh
-curl -vkXGET -H 'Host: mocks.speedis' 'https://127.0.0.1:51785/mocks/items/RealBetis?delay=300&cc=public,max-age=10&a=alfa&b=beta&c='
+curl -vkXGET -H 'Host: mocks.local' 'https://127.0.0.1:51785/mocks/items/RealBetis?delay=300&cc=public,max-age=10&a=alfa&b=beta&c='
 ```

@@ -1,6 +1,7 @@
 .DS_Store
 node_modules/
-haproxy/*.crt
-haproxy/*.csr
-haproxy/*.key
-haproxy/certs/*.pem
+3rparties/haproxy/*.crt
+3rparties/haproxy/*.key
+3rparties/haproxy/certs/*.pem
+3rparties/keycloack/certs/*.crt
+3rparties/keycloack/certs/*.key

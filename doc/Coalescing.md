@@ -10,12 +10,12 @@ docker compose up --build -d
 ```
 To visualize the effects, we will use a dashboard that we will import into Grafana.
 
-Follow this [instructions to import](./Grafana.md) it into the grafana instance.
+Follow this [instructions to import](./3rparties/grafana.md) it into the grafana instance.
 
 The next step is to generate load on the platform using [artillery](https://www.artillery.io/).
 Specifically, we will use a scenario where 500 requests per second are sent to the same resource for 15 minutes.
 ```sh
-artillery run --scenario-name 'overflow' ./artillery/load-test.yml
+artillery run --scenario-name 'overflow' ./3rparties/artillery/load-test.yml
 ```
 In the request sent to the mocks server (origin), we specify that the response should be delayed by 500ms and that it will remain valid in the cache for 5 seconds.
 

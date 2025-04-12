@@ -8,7 +8,7 @@ services:
     ports:
       - 9090:9090
     volumes:
-      - ./prometheus:/etc/prometheus
+      - ./3rparties/prometheus:/etc/prometheus
       - prom_data:/prometheus
   grafana:
     image: grafana/grafana
@@ -19,7 +19,7 @@ services:
       - GF_SECURITY_ADMIN_USER=admin
       - GF_SECURITY_ADMIN_PASSWORD=grafana
     volumes:
-      - ./grafana:/etc/grafana/provisioning/datasources
+      - ./3rparties/grafana:/etc/grafana/provisioning/datasources
     depends_on:
       - prometheus      
   redis:
@@ -31,7 +31,23 @@ services:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
       timeout: 5s
-      retries: 5      
+      retries: 5
+  keycloak:
+    image: quay.io/keycloak/keycloak:latest
+    container_name: keycloak
+    command: start-dev
+    environment:
+      - KC_BOOTSTRAP_ADMIN_USERNAME=admin
+      - KC_BOOTSTRAP_ADMIN_PASSWORD=keycloak
+      - KC_HTTPS_CERTIFICATE_FILE=/opt/keycloak/conf/certs/keycloak.crt
+      - KC_HTTPS_CERTIFICATE_KEY_FILE=/opt/keycloak/conf/certs/keycloak.key
+    volumes:
+      - ./3rparties/keycloak/certs:/opt/keycloak/conf/certs:ro
+      - ./3rparties/haproxy/mocks.crt:/opt/keycloak/conf/truststores/mocks.pem:ro
+      - keycloak_data:/opt/keycloak/data
+    ports:
+      - 8080:8080
+      - 8443:8443      
   mocks:
     image: mjguisado/mocks:latest
     pull_policy: build
@@ -49,6 +65,7 @@ services:
           target: /usr/src/app/mocks
     ports:
       - 3030:3030
+
   speedis:
     image: mjguisado/speedis:latest
     pull_policy: build
@@ -68,10 +85,8 @@ services:
         - action: sync+restart
           path: ./conf
           target: /usr/src/app/conf       
-    deploy:
-      resources:
-        limits:
-          cpus: "5"
+    environment:
+      - NODE_TLS_REJECT_UNAUTHORIZED=0
     ports:
       - 3001:3001
       - 3003:3003
@@ -87,9 +102,10 @@ services:
       - 443:443
       - 8405:8405
     volumes:
-      - ./haproxy/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg
-      - ./haproxy/certs:/usr/local/etc/haproxy/certs:ro
+      - ./3rparties/haproxy/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg
+      - ./3rparties/haproxy/certs:/usr/local/etc/haproxy/certs:ro
     depends_on:
       - speedis
 volumes:
   prom_data:
+  keycloak_data:

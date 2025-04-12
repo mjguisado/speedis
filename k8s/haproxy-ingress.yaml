@@ -10,10 +10,10 @@ spec:
   ingressClassName: haproxy
   tls:
   - hosts:
-      - mocks.speedis
+      - mocks.local
     secretName: mocks-tls-secret  
   rules:
-    - host: mocks.speedis
+    - host: mocks.local
       http:
         paths:
           - path: /
