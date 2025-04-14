@@ -5,6 +5,32 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "Attach to Main in Docker",
+            "type": "node",
+            "request": "attach",
+            "address": "localhost",
+            "port": 9229,
+            "restart": false,
+            "localRoot": "${workspaceFolder}",
+            "remoteRoot": "/usr/src/app",
+            "skipFiles": [
+                "<node_internals>/**"
+            ]
+          },
+          {
+            "name": "Attach to Worker in Docker",
+            "type": "node",
+            "request": "attach",
+            "address": "localhost",
+            "port": 9230,
+            "restart": false,
+            "localRoot": "${workspaceFolder}",
+            "remoteRoot": "/usr/src/app",
+            "skipFiles": [
+                "<node_internals>/**"
+            ]
+          },
+          {
             "name": "Attach by Process ID",
             "processId": "${command:PickProcess}",
             "request": "attach",
@@ -23,4 +49,5 @@
             "program": "${workspaceFolder}/src/index.js"
         }
     ]
+
 }

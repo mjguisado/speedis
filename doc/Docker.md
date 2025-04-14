@@ -22,7 +22,7 @@ Keycloak also requires TLS. The domain is keycloak.local
 ## **Start the environment**  
 Run the following command to start all services:  
 ```sh
-docker compose up --build -d
+docker compose --profile develop up --watch --build
 ```
 This will start:
 - **Redis**: In-memory shared data storage

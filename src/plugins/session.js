@@ -134,7 +134,8 @@ export default async function (server, opts) {
     // We set the tokenId in a cookie
     // https://github.com/fastify/fastify-cookie?tab=readme-ov-file#sending
     reply.header('set-cookie', `${opts.sessionIdCookieName}=${id_session}; Path=/; Secure; HttpOnly`)
-    return reply.redirect(opts.postAuthRedirectUrl)
+    return reply.send(tokens)
+    // return reply.redirect(opts.postAuthRedirectUrl)
   })
 
 }

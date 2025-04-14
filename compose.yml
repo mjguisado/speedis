@@ -21,7 +21,7 @@ services:
     volumes:
       - ./3rparties/grafana:/etc/grafana/provisioning/datasources
     depends_on:
-      - prometheus      
+      - prometheus 
   redis:
     image: redis/redis-stack-server
     container_name: redis
@@ -47,7 +47,7 @@ services:
       - keycloak_data:/opt/keycloak/data
     ports:
       - 8080:8080
-      - 8443:8443      
+      - 8443:8443
   mocks:
     image: mjguisado/mocks:latest
     pull_policy: build
@@ -69,12 +69,14 @@ services:
   speedis:
     image: mjguisado/speedis:latest
     pull_policy: build
-    build:  
+    build:
       context: .
       dockerfile: Dockerfile
-      target: production
+      target: development
     container_name: speedis
     restart: unless-stopped
+    profiles:
+      - develop
     develop:
       watch:
         - action: rebuild
@@ -82,17 +84,16 @@ services:
         - action: sync
           path: ./src
           target: /usr/src/app/src
-        - action: sync+restart
-          path: ./conf
-          target: /usr/src/app/conf       
     environment:
       - NODE_TLS_REJECT_UNAUTHORIZED=0
     ports:
       - 3001:3001
       - 3003:3003
-      - 9229:9229
+      - "9229-9249:9229-9249"
     depends_on:
+      - mocks
       - redis
+      - keycloak
   haproxy:
     image: haproxy:latest
     container_name: haproxy
@@ -104,8 +105,6 @@ services:
     volumes:
       - ./3rparties/haproxy/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg
       - ./3rparties/haproxy/certs:/usr/local/etc/haproxy/certs:ro
-    depends_on:
-      - speedis
 volumes:
   prom_data:
   keycloak_data:

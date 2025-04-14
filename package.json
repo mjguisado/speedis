@@ -6,7 +6,7 @@
   "type": "module",
   "scripts": {
     "dev": "nodemon src/index.js",
-    "debug": "node --inspect-brk src/index.js",
+    "debug": "node --inspect src/index.js",
     "test": "node --test",
     "start": "node src/index.js"
   },
@@ -23,6 +23,7 @@
   "dependencies": {
     "@fastify/cookie": "^11.0.2",
     "fastify": "^5.2.2",
+    "jose": "^6.0.10",
     "jsonpath": "^1.1.1",
     "jwt-decode": "^4.0.0",
     "openid-client": "^6.4.1",

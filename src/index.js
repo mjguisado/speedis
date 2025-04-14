@@ -6,6 +6,7 @@ import fastify from 'fastify'
 import { app } from './app.js'
 import { AggregatorRegistry,  } from 'prom-client'
 import Ajv from "ajv"
+import { open } from 'inspector';
 
 // Load the origin's configuration.
 const configurationFilename = path.join(process.cwd(), 'conf', 'speedis.json')
@@ -84,6 +85,11 @@ if (cluster.isPrimary) {
     }
   })
   
+  if (process.env.NODE_ENV === 'development') {
+    // Enable remote DEBUG
+    open(9229, '0.0.0.0');
+  }
+
   metricsServer.listen({ 
       host: '::', 
       port: config.metricServerPort?config.metricServerPort:3003
@@ -97,6 +103,11 @@ if (cluster.isPrimary) {
 
 } else {
 
+  if (process.env.NODE_ENV === 'development') {
+    // Enable remote DEBUG
+    open(9229 + cluster.worker.id, '0.0.0.0');
+  }
+  
   // See: https://fastify.dev/docs/latest/Guides/Testing/#separating-concerns-makes-testing-easy
 
   const server = await app({

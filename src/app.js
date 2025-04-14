@@ -137,6 +137,7 @@ export async function app(opts = {}, ajv = new Ajv({useDefaults: true})) {
                 servername: { type: "string" },
               }
             },
+            includeOriginIdInCacheKey: { type: "boolean", default: true },
             ignoredQueryParams: {
               type: "array",
               items: {
