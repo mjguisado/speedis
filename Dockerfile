@@ -1,5 +1,6 @@
 ARG NODE_VERSION=current
 FROM node:${NODE_VERSION}-alpine AS base
+RUN apk add --no-cache curl
 WORKDIR /usr/src/app
 
 FROM base AS development
@@ -12,7 +13,7 @@ RUN --mount=type=bind,source=package.json,target=package.json \
 USER node
 EXPOSE 3001 3003 9229
 COPY . .
-CMD  ["nodemon", "src/index.js"]
+CMD ["nodemon", "src/index.js"]
 
 FROM base AS production
 ENV NODE_ENV=production
