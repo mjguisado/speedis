@@ -87,7 +87,7 @@ if (cluster.isPrimary) {
   
   if (process.env.NODE_ENV === 'development') {
     // Enable remote DEBUG
-    open(9229, '0.0.0.0');
+    // open(9229, '0.0.0.0');
   }
 
   metricsServer.listen({ 

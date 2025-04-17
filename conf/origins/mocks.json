@@ -87,7 +87,17 @@
                     }
                 ]
             }
-        ]
+        ],
+        "accessControl": [
+            {
+                "urlPattern": "/users/1/",
+                "requiredScopes": ["profile", "email"]
+            },
+            {
+                "urlPattern": ".*/signature",
+                "requiredScopes": ["profile"]
+            }
+        ]  
     },
     "oauth2" :{
         "id": "mocks.oauth2",
@@ -99,7 +109,8 @@
         "authorizationServerMetadata": {
             "issuer":"https://keycloak:8443/realms/speedis",
             "authorization_endpoint":"https://keycloak:8443/realms/speedis/protocol/openid-connect/auth",
-            "token_endpoint":"https://keycloak:8443/realms/speedis/protocol/openid-connect/token"
+            "token_endpoint":"https://keycloak:8443/realms/speedis/protocol/openid-connect/token",
+            "jwks_uri": "https://keycloak:8443/realms/speedis/protocol/openid-connect/certs"
         },
         "authorizationRequest": {},
         "pkceEnabled": true,

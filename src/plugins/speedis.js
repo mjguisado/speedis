@@ -7,6 +7,8 @@ import { createClient } from 'redis'
 import CircuitBreaker from 'opossum'
 import * as utils from '../utils/utils.js'
 import sessionPlugin from './session.js'
+import { jwtVerify, createRemoteJWKSet } from 'jose'
+import * as openIdClient from 'openid-client'
 
 // TODO: https://www.rfc-editor.org/rfc/rfc9111.html#name-must-understand
 // TODO: https://www.rfc-editor.org/rfc/rfc9111.html#name-no-transform
@@ -22,34 +24,25 @@ import sessionPlugin from './session.js'
 
 export default async function (server, opts) {
 
-  const {id} = opts
-
-  server.decorate('id', opts.id)
-  server.decorate('exposeErrors', opts.exposeErrors)
-
-  if (Object.prototype.hasOwnProperty.call(opts, "oauth2")) {
-    server.register(sessionPlugin, opts.oauth2)
-  }
-
   // Connecting to Redis
   // See: https://redis.io/docs/latest/develop/clients/nodejs/produsage/#handling-reconnections
   const client = createClient(opts.redis.redisOptions)
   client.on('error', error => {
-    server.log.error(`Redis connection lost. Origin: ${id}.`, { cause: error })
+    server.log.error(`Redis connection lost. Origin: ${opts.id}.`, { cause: error })
   })
   try {
     await client.connect()
-    server.log.info(`Redis connection established. Origin: ${id}.`)
+    server.log.info(`Redis connection established. Origin: ${opts.id}.`)
   } catch (error) {
-    throw new Error(`Unable to connect to Redis during startup. Origin: ${id}.`, { cause: error })
+    throw new Error(`Unable to connect to Redis during startup. Origin: ${opts.id}.`, { cause: error })
   }
 
   /**
    * Wraps a Redis client so that any command you call on it will automatically have a timeout.
    * If the Redis command takes too long it will reject with a timeout error.
-   * 
+   *
    * @param {object} client - The original Redis client object.
-   * @param {number} timeout - Optional. The maximum time (in milliseconds) to wait for a Redis command to complete before timing out. Defaults to 1000ms 
+   * @param {number} timeout - Optional. The maximum time (in milliseconds) to wait for a Redis command to complete before timing out. Defaults to 1000ms
    * @returns {object} - Proxy object that behaves just like the original Redis client, but with a timeout behavior added to each command.
    */
   function wrapRedisWithTimeout(client, timeout) {
@@ -86,23 +79,53 @@ export default async function (server, opts) {
    * @param {Array<string|number>} args - The list of arguments for the Redis command.
    * @returns {Promise<any>} The result of the Redis command execution.
    */
-  function _sendCommandToRedis(command, args) {
+  function _sendCommandToRedis(command, args, options) {
     let cmd = null
-    switch (command) {
-      case 'json.get':
-        cmd = client.json.get(...args)
+    switch (command.toLowerCase()) {
+      case 'evalsha':
+        cmd = client.evalSha(...args, options)
         break
-      case 'json.set':
-        cmd = client.json.set(...args)
+      case 'expire':
+        cmd = client.expire(...args, options)
+        break
+      case 'expireat':
+        cmd = client.expireAt(...args, options)
+        break
+      case 'get':
+        cmd = client.get(...args, options)
+        break
+      case 'hset':
+        cmd = client.hSet(...args, options)
+        break
+      case 'hgetall':
+        cmd = client.hGetAll(...args, options)
+        break
+      case 'json.get':
+        cmd = client.json.get(...args, options)
         break
       case 'json.merge':
-        cmd = client.json.merge(...args)
+        cmd = client.json.merge(...args, options)
+        break
+      case 'json.set':
+        cmd = client.json.set(...args, options)
+        break
+      case 'script exists':
+        cmd = client.scriptExists(...args, options)
+        break
+      case 'script load':
+        cmd = client.scriptLoad(...args, options)
+        break
+      case 'set':
+        cmd = client.set(...args, options)
+        break
+      case 'unlink':
+        cmd = client.unlink(...args, options)
         break
       case 'sendCommand':
-        cmd = client.sendCommand(...args)
+        cmd = client.sendCommand(...args, options)
         break
       default:
-        cmd = client.sendCommand([command, ...args])
+        cmd = client.sendCommand([command, ...args], options)
         break
     }
     return cmd
@@ -115,7 +138,7 @@ export default async function (server, opts) {
       redisBreakerOptions = opts.redis.redisBreakerOptions
     }
     // Name of the Circuit Breaker
-    redisBreakerOptions['name'] = `redis-${id}`
+    redisBreakerOptions['name'] = `redis-${opts.id}`
     // Speedis implements its own coalescing mechanism so we disable the one from the circuit breaker.
     redisBreakerOptions['coalesce'] = false
     // Speedis itself implements a cache mechanism so we disable the one from the circuit breaker.
@@ -130,17 +153,17 @@ export default async function (server, opts) {
     server.breakersMetrics.add([redisBreaker])
 
     redisBreaker.on('open', () => {
-      // We will use this value to set the Retry-After header 
+      // We will use this value to set the Retry-After header
       let retryAfter = new Date()
       retryAfter.setSeconds(retryAfter.getSeconds() + redisBreaker.options.resetTimeout / 1000)
       redisBreaker['retryAfter'] = retryAfter.toUTCString()
-      server.log.error(`Redis Breaker OPEN: No commands will be execute. Origin ${id}.`)
+      server.log.error(`Redis Breaker OPEN: No commands will be execute. Origin ${opts.id}.`)
     })
     redisBreaker.on('halfOpen', () => {
-      server.log.warn(`Redis Breaker HALF OPEN: Commands are being tested. Origin ${id}.`)
+      server.log.warn(`Redis Breaker HALF OPEN: Commands are being tested. Origin ${opts.id}.`)
     })
     redisBreaker.on('close', () => {
-      server.log.info(`Redis Breaker CLOSED: Commands are being executed normally. Origin ${id}.`)
+      server.log.info(`Redis Breaker CLOSED: Commands are being executed normally. Origin ${opts.id}.`)
     })
 
     server.decorate('redis', client)
@@ -151,7 +174,6 @@ export default async function (server, opts) {
   } else {
     server.decorate('redis', client)
   }
-  server.decorate('disableOriginOnRedisOutage', opts.redis.disableOriginOnRedisOutage)
 
   /*
     * Initially, we are only going to support GET requests to the origin.
@@ -159,7 +181,7 @@ export default async function (server, opts) {
     */
   if (Object.prototype.hasOwnProperty.call(opts.origin.httpxOptions, 'method') &&
     opts.origin.httpxOptions.method !== 'GET') {
-    throw new Error(`Unsupported HTTP method: ${opts.origin.httpxOptions.method}. Only GET is supported. Origin: ${id}`)
+    throw new Error(`Unsupported HTTP method: ${opts.origin.httpxOptions.method}. Only GET is supported. Origin: ${opts.id}`)
   }
 
   // Ensuring the header array exists
@@ -180,16 +202,17 @@ export default async function (server, opts) {
   }
 
   // Agents are responsible for managing connections.
+  let agent = null
   if (Object.prototype.hasOwnProperty.call(opts.origin, 'agentOptions')) {
     // The default protocol is 'http:'
-    const agent = ('https:' === opts.origin.httpxOptions.protocol ? https : http)
+    agent = ('https:' === opts.origin.httpxOptions.protocol ? https : http)
       .Agent(opts.origin.agentOptions)
-    server.decorate('agent', agent)
   }
 
   // This Map storages the ongoing Fecth Operations
-  if (opts.origin.localRequestsCoalescing) server.decorate('ongoing', new Map())
+  const ongoing = opts.origin.localRequestsCoalescing ? new Map() : null
 
+  let originBreaker = null
   if (opts.origin.originBreaker) {
 
     let originBreakerOptions = []
@@ -198,7 +221,7 @@ export default async function (server, opts) {
     }
 
     // Name of the Circuit Breaker
-    originBreakerOptions['name'] = `fetch-${id}`
+    originBreakerOptions['name'] = `fetch-${opts.id}`
     // Speedis implements its own coalescing mechanism so we disable the one from the circuit breaker.
     originBreakerOptions['coalesce'] = false
     // Speedis itself implements a cache mechanism so we disable the one from the circuit breaker.
@@ -209,24 +232,22 @@ export default async function (server, opts) {
     }
 
     // Origin Breaker instance
-    const originBreaker = new CircuitBreaker(_fetch, originBreakerOptions)
+    originBreaker = new CircuitBreaker(_fetch, originBreakerOptions)
     server.breakersMetrics.add([originBreaker])
 
     originBreaker.on('open', () => {
-      // We will use this value to set the Retry-After header 
+      // We will use this value to set the Retry-After header
       let retryAfter = new Date()
       retryAfter.setSeconds(retryAfter.getSeconds() + originBreaker.options.resetTimeout / 1000)
       originBreaker['retryAfter'] = retryAfter.toUTCString()
-      server.log.error(`Origin Breaker OPEN: No requests will be made. Origin ${id}.`)
+      server.log.error(`Origin Breaker OPEN: No requests will be made. Origin ${opts.id}.`)
     })
     originBreaker.on('halfOpen', () => {
-      server.log.warn(`Origin Breaker HALF OPEN: Requests are being tested. Origin ${id}.`)
+      server.log.warn(`Origin Breaker HALF OPEN: Requests are being tested. Origin ${opts.id}.`)
     })
     originBreaker.on('close', () => {
-      server.log.info(`Origin Breaker CLOSED: Requests are being made normally. Origin ${id}.`)
+      server.log.info(`Origin Breaker CLOSED: Requests are being made normally. Origin ${opts.id}.`)
     })
-
-    server.decorate('originCircuit', originBreaker)
 
   }
 
@@ -256,12 +277,12 @@ export default async function (server, opts) {
           }
         })
       } catch (error) {
-        server.log.error(`Error importing the action library ${opts.origin.actionsLibraries[actionsLibraryKey]}. Origin: ${id}`)
-        throw new Error(`The transformation configuration is invalid. Origin: ${id}`)
+        server.log.error(`Error importing the action library ${opts.origin.actionsLibraries[actionsLibraryKey]}. Origin: ${opts.id}`)
+        throw new Error(`The transformation configuration is invalid. Origin: ${opts.id}`)
       }
     } else {
-      server.log.error(`The file ${opts.origin.actionsLibraries[actionsLibraryKey]} containing the action library must have a .js extension. Origin: ${id}`)
-      throw new Error(`The transformation configuration is invalid. Origin: ${id}`)
+      server.log.error(`The file ${opts.origin.actionsLibraries[actionsLibraryKey]} containing the action library must have a .js extension. Origin: ${opts.id}`)
+      throw new Error(`The transformation configuration is invalid. Origin: ${opts.id}`)
     }
   }
 
@@ -278,8 +299,8 @@ export default async function (server, opts) {
       try {
         transformation.re = new RegExp(transformation.urlPattern)
       } catch (error) {
-        server.log.error(`urlPattern ${transformation.urlPattern} is not a valid regular expresion. Origin: ${id}`)
-        throw new Error(`The transformation configuration is invalid. Origin: ${id}`)
+        server.log.error(`urlPattern ${transformation.urlPattern} is not a valid regular expresion. Origin: ${opts.id}`)
+        throw new Error(`The transformation configuration is invalid. Origin: ${opts.id}`)
       }
       transformation.actions.forEach(action => {
         const tokens = action.uses.split(':')
@@ -292,23 +313,89 @@ export default async function (server, opts) {
           library = tokens[0]
           func = tokens[1]
         } else {
-          server.log.error(`The name of the action ${action.uses} is not valid. The correct format is library:action. Origin: ${id}`)
-          throw new Error(`The transformation configuration is invalid. Origin: ${id}`)
+          server.log.error(`The name of the action ${action.uses} is not valid. The correct format is library:action. Origin: ${opts.id}`)
+          throw new Error(`The transformation configuration is invalid. Origin: ${opts.id}`)
         }
         if (!Object.prototype.hasOwnProperty.call(actionsRepository, library)
           || !Object.prototype.hasOwnProperty.call(actionsRepository[library], func)) {
-          server.log.error(`Function ${action.uses} was not found among the available actions. Origin: ${id}`)
-          throw new Error(`The transformation configuration is invalid. Origin: ${id}`)
+          server.log.error(`Function ${action.uses} was not found among the available actions. Origin: ${opts.id}`)
+          throw new Error(`The transformation configuration is invalid. Origin: ${opts.id}`)
         }
       })
     })
   }
 
-  server.decorate('origin', opts.origin)
+  if (Object.prototype.hasOwnProperty.call(opts, "oauth2")) {
+
+    // Configuration is an abstraction over the OAuth 2.0
+    // Authorization Server metadata and OAuth 2.0 Client metadata
+    let authServerConfiguration = null
+    // Configuration instances are obtained either through:
+    if (opts.oauth2.discoverySupported) {
+      // (RECOMMENDED) the discovery function that discovers the OAuth 2.0
+      // Authorization Server metadata using the Authorization Server's Issuer Identifier
+      authServerConfiguration = await openIdClient.discovery(
+        new URL(opts.oauth2.authorizationServerMetadataLocation),
+        opts.oauth2.clientId, opts.oauth2.clientSecret)
+    } else {
+      // The Configuration constructor if the OAuth 2.0 Authorization
+      // Server metadata is known upfront
+      authServerConfiguration = new openIdClient.Configuration(
+        opts.oauth2.authorizationServerMetadata, opts.oauth2.clientId, opts.oauth2.clientSecret
+      )
+    }
+    server.decorate("authServerConfiguration", authServerConfiguration)
+
+    // The JSON Web Key Set (JWKS) is a set of keys containing the public keys
+    // used to verify any JSON Web Token (JWT) issued by the Authorization Server
+    // and signed using the RS256 signing algorithm.
+    const jwksUri = new URL(authServerConfiguration.serverMetadata().jwks_uri)
+    const JWKS = createRemoteJWKSet(jwksUri)
+
+    // https://openid.net/specs/openid-connect-core-1_0.html#IDToken
+    const verifyAccessToken = async (accessToken) => {
+      try {
+        server.log.info(accessToken)
+        const { payload, protectedHeader } = await jwtVerify(accessToken, JWKS, {
+          issuer: authServerConfiguration.serverMetadata().issuer,
+          audience: opts.oauth2.clientId,
+        })
+        return payload
+      } catch (error) {
+        if (error.code === 'ERR_JWT_EXPIRED') {
+          console.log('Token expirado, hay que renovarlo')
+        } else {
+          console.error('Error al verificar el token:', error)
+        }
+        throw error
+      }
+    }
+
+    server.addHook('preValidation', async (request, reply) => {
+      if (request.headers?.cookie) {
+        const cookies = request.headers?.cookie
+          .split(';')
+          .map(cookie => cookie.trim().split('='))
+          .reduce((acc, [key, value]) => {
+            acc[key] = decodeURIComponent(value)
+            return acc
+          }, {})
+        if (cookies[opts.oauth2.sessionIdCookieName]) {
+          const tokens = server.redisBreaker
+            ? await server.redisBreaker.fire('hgetall', [cookies[opts.oauth2.sessionIdCookieName]])
+            : await server.redis.json.get(cookies[opts.oauth2.sessionIdCookieName])
+          request.tokens = tokens
+          if (Object.keys(tokens).length > 0) verifyAccessToken(tokens.access_token)
+        }
+      }
+    })
+    server.decorateRequest('tokens', null)
+    server.register(sessionPlugin, opts.oauth2)
+  }
 
   server.addHook('onClose', (server) => {
-    if (server.agent) server.agent.destroy()
-    if (server.ongoing) server.ongoing.clear()
+    if (agent) agent.destroy()
+    if (ongoing) ongoing.clear()
     if (server.redis) server.redis.quit()
   })
 
@@ -319,20 +406,21 @@ export default async function (server, opts) {
     handler: async function (request, reply) {
 
       server.httpRequestsTotal
-        .labels({ origin: id, method: 'GET' })
+        .labels({ origin: opts.id, method: 'GET' })
         .inc()
 
-      if (server.redisBreaker.opened && server.disableOriginOnRedisOutage) {
+      if (server.redisBreaker &&
+        server.redisBreaker.opened && 
+        opts.redis.disableOriginOnRedisOutage) {
         reply.code(503)
         reply.headers({
           date: new Date().toUTCString(),
           'x-speedis-cache-status': 'CACHE_REDIS_OUTAGE from ' + os.hostname()
         })
-        return reply.send(server.exposeErrors ?
+        return reply.send(opts.exposeErrors ?
           'Redis is temporarily unavailable. Please try again later.'
           : ''
         )
-
       }
 
       let response = null
@@ -343,13 +431,13 @@ export default async function (server, opts) {
         // If the previous _get execution returned -1, it means
         // that it couldn't acquire the lock to make a request to the
         // origin. Therefore, the origin has a lock mechanism enabled,
-        // and the opts.origin.distributedRequestsCoalescingOptions 
+        // and the opts.origin.distributedRequestsCoalescingOptions
         // should exist, with all its attributes being mandatory.
         while (response === -1
-          && tries < server.origin?.distributedRequestsCoalescingOptions?.retryCount
+          && tries < opts.origin?.distributedRequestsCoalescingOptions?.retryCount
           && !server.redisBreaker.opened) {
-          let delay = server.origin?.distributedRequestsCoalescingOptions?.retryDelay +
-            Math.round(Math.random() * server.origin?.distributedRequestsCoalescingOptions?.retryJitter)
+          let delay = opts.origin?.distributedRequestsCoalescingOptions?.retryDelay +
+            Math.round(Math.random() * opts.origin?.distributedRequestsCoalescingOptions?.retryJitter)
           await new Promise(resolve => setTimeout(resolve, delay))
           response = await _get(server, request, request.id)
           tries++
@@ -360,7 +448,7 @@ export default async function (server, opts) {
             date: new Date().toUTCString(),
             'x-speedis-cache-status': 'CACHE_NO_LOCK from ' + os.hostname()
           })
-          return reply.send(server.exposeErrors ?
+          return reply.send(opts.exposeErrors ?
             'Cache is temporarily unavailable due to lock acquisition failure. Please try again later.'
             : ''
           )
@@ -369,8 +457,8 @@ export default async function (server, opts) {
         // FIXME: Reaffirm that we want to use the default error handling.
         const msg =
           "Error requesting to the origin. " +
-          `Origin: ${server.id}. Url: ${request.url}. RID: ${request.id}.`
-        if (server.exposeErrors) { throw new Error(msg, { cause: error }) }
+          `Origin: ${opts.id}. Url: ${request.url}. RID: ${request.id}.`
+        if (opts.exposeErrors) { throw new Error(msg, { cause: error }) }
         else throw new Error(msg)
       }
 
@@ -383,7 +471,7 @@ export default async function (server, opts) {
       entity-tag = [ weak ] opaque-tag
       weak       = %s"W/"
       opaque-tag = DQUOTE *etagc DQUOTE
-      etagc      = %x21 / %x23-7E / obs-text 
+      etagc      = %x21 / %x23-7E / obs-text
         ; VCHAR except double quotes, plus obs-text
       entity-tag = (W/)*\x22([\x21\x23-\x7E\x80-\xFF])*\x22
       weak       = W/
@@ -417,7 +505,7 @@ export default async function (server, opts) {
             let weakCacheEtag = response.headers["etag"].startsWith('W/')
               ? response.headers["etag"].substring(2) : response.headers["etag"]
             for (let index = 0; index < etags.length; index++) {
-              // A recipient MUST use the weak comparison function when 
+              // A recipient MUST use the weak comparison function when
               // comparing entity tags for If-None-Match
               // https://www.rfc-editor.org/rfc/rfc9110.html#section-8.8.3.2
               let weakRequestETag = etags[index].startsWith('W/')
@@ -469,7 +557,7 @@ export default async function (server, opts) {
     url: '/*',
     handler: async function (request, reply) {
       server.httpRequestsTotal
-        .labels({ origin: id, method: 'DELETE' })
+        .labels({ origin: opts.id, method: 'DELETE' })
         .inc()
       const fieldNames = utils.parseVaryHeader(request)
       let cacheKey = generateCacheKey(server, request, fieldNames)
@@ -496,8 +584,8 @@ export default async function (server, opts) {
       } catch (error) {
         const msg =
           "Error deleting the cache in Redis. " +
-          `Origin: ${server.id}. Key: ${cacheKey}. RID: ${rid}.`
-        if (server.exposeErrors) { throw new Error(msg, { cause: error }) }
+          `Origin: ${opts.id}. Key: ${cacheKey}. RID: ${rid}.`
+        if (opts.exposeErrors) { throw new Error(msg, { cause: error }) }
         else throw new Error(msg)
       }
     }
@@ -513,11 +601,11 @@ export default async function (server, opts) {
     const [base, queryString] = path.split("?")
     if (queryString) {
       const params = new URLSearchParams(queryString)
-      if (Object.prototype.hasOwnProperty.call(server.origin, 'ignoredQueryParams')) {
-        server.origin.ignoredQueryParams.forEach(param => params.delete(param))
+      if (Object.prototype.hasOwnProperty.call(opts.origin, 'ignoredQueryParams')) {
+        opts.origin.ignoredQueryParams.forEach(param => params.delete(param))
       }
       if (params.size > 0) {
-        if (Object.prototype.hasOwnProperty.call(server.origin, 'sortQueryParams')) {
+        if (Object.prototype.hasOwnProperty.call(opts.origin, 'sortQueryParams')) {
           const sortedParams = [...params.entries()]
             .sort(([a], [b]) => a.localeCompare(b))
             .map(([key, value]) => `${key}=${value}`)
@@ -531,7 +619,7 @@ export default async function (server, opts) {
       }
     }
 
-    let cacheKey = server.origin.includeOriginIdInCacheKey?server.id:''
+    let cacheKey = opts.origin.includeOriginIdInCacheKey ? opts.id : ''
     cacheKey += path.replaceAll('/', ':')
     if (cacheKey.startsWith(':')) cacheKey = cacheKey.slice(1)
 
@@ -566,8 +654,8 @@ export default async function (server, opts) {
 
     // We create options for an HTTP/S request to the required path
     // based on the default ones that must not be modified.
-    const options = JSON.parse(JSON.stringify(server.origin.httpxOptions))
-    if (server.agent) options.agent = server.agent
+    const options = JSON.parse(JSON.stringify(opts.origin.httpxOptions))
+    if (agent) options.agent = agent
     options.path = path
 
     const clientCacheDirectives = utils.parseCacheControlHeader(request)
@@ -582,7 +670,7 @@ export default async function (server, opts) {
     } catch (error) {
       server.log.warn(error,
         "Error querying the cache entry in Redis. " +
-        `Origin: ${server.id}. Key: ${cacheKey}. RID: ${rid}.`)
+        `Origin: ${opts.id}. Key: ${cacheKey}. RID: ${rid}.`)
     }
 
     let cachedCacheDirectives = null
@@ -627,11 +715,11 @@ export default async function (server, opts) {
       }
 
       /*
-      * See: https://www.rfc-editor.org/rfc/rfc9111.html#name-no-cache 
+      * See: https://www.rfc-editor.org/rfc/rfc9111.html#name-no-cache
       * See: https://www.rfc-editor.org/rfc/rfc9111.html#name-no-cache-2
-      * See: https://www.rfc-editor.org/rfc/rfc9111.html#cache-request-directive.no-store 
-      * Note that if a request containing the no-store directive is 
-      * satisfied from a cache, the no-store request directive does 
+      * See: https://www.rfc-editor.org/rfc/rfc9111.html#cache-request-directive.no-store
+      * Note that if a request containing the no-store directive is
+      * satisfied from a cache, the no-store request directive does
       * not apply to the already stored response.
       */
       cachedCacheDirectives = utils.parseCacheControlHeader(cachedResponse)
@@ -639,7 +727,7 @@ export default async function (server, opts) {
       if (responseIsFresh
         && !Object.prototype.hasOwnProperty.call(clientCacheDirectives, 'no-cache')
         && (!Object.prototype.hasOwnProperty.call(cachedCacheDirectives, 'no-cache')
-          // The qualified form of the no-cache response directive 
+          // The qualified form of the no-cache response directive
           || cachedCacheDirectives['no-cache'] !== null)
         // https://www.rfc-editor.org/rfc/rfc9111.html#name-calculating-cache-keys-with
         // A stored response with a Vary header field value containing a member "*" always fails to match
@@ -662,7 +750,7 @@ export default async function (server, opts) {
     // Apply transformations to the request before sending it to the origin
     _transform(ORIGIN_REQUEST, options, server)
 
-    // If localRequestsCoalescing is enabled, only the first request 
+    // If localRequestsCoalescing is enabled, only the first request
     // will contact the origin to prevent overloading it.
     let amITheFetcher = false
 
@@ -677,32 +765,32 @@ export default async function (server, opts) {
 
       // Verify if there is an ongoing fetch operation
       let fetch = null
-      if (server.origin.localRequestsCoalescing) {
-        fetch = server.ongoing.get(cacheKey)
+      if (opts.origin.localRequestsCoalescing) {
+        fetch = ongoing.get(cacheKey)
       }
 
       if (!fetch) {
         // https://redis.io/docs/latest/develop/use/patterns/distributed-locks/#correct-implementation-with-a-single-instance
-        if (server.origin?.distributedRequestsCoalescing) {
+        if (opts.origin?.distributedRequestsCoalescing) {
           lockKey = `${cacheKey}.lock`
-          lockValue = `${process.pid}:${server.id}:${rid}:` + crypto.randomBytes(4).toString("hex")
+          lockValue = `${process.pid}:${opts.id}:${rid}:` + crypto.randomBytes(4).toString("hex")
           locked = await _adquireLock(server, lockKey, lockValue)
         }
 
-        if (server.origin?.distributedRequestsCoalescing && !locked) {
-          // At this point, we should have acquired a lock to make a request to 
-          // the origin, but we haven’t. So, we return -1 to indicate that the 
+        if (opts.origin?.distributedRequestsCoalescing && !locked) {
+          // At this point, we should have acquired a lock to make a request to
+          // the origin, but we haven’t. So, we return -1 to indicate that the
           // entire function should be retried, as another thread could have
           // modified the cache entry in the meantime.
           return -1
         }
 
-        if (server.originBreaker) {
-          fetch = server.originBreaker.fire(server, options)
+        if (originBreaker) {
+          fetch = originBreaker.fire(server, options)
         } else {
           fetch = _fetch(server, options)
         }
-        if (server.origin.localRequestsCoalescing) server.ongoing.set(cacheKey, fetch)
+        if (opts.origin.localRequestsCoalescing) ongoing.set(cacheKey, fetch)
         amITheFetcher = true
 
       }
@@ -731,13 +819,13 @@ export default async function (server, opts) {
 
     } catch (error) {
 
-      if (server.origin?.distributedRequestsCoalescing && locked) await _releaseLock(server, lockKey, lockValue)
-      if (amITheFetcher && server.origin.localRequestsCoalescing) server.ongoing.delete(cacheKey)
+      if (opts.origin?.distributedRequestsCoalescing && locked) await _releaseLock(server, lockKey, lockValue)
+      if (amITheFetcher && opts.origin.localRequestsCoalescing) ongoing.delete(cacheKey)
 
       delete options.agent
       server.log.error(error,
         "Error requesting to the origin. " +
-        `Origin: ${server.id}. Options: ` + JSON.stringify(options) + `. RID: ${rid}.`
+        `Origin: ${opts.id}. Options: ` + JSON.stringify(options) + `. RID: ${rid}.`
       )
       /*
       * If I was trying to refresh a cache entry,
@@ -749,7 +837,7 @@ export default async function (server, opts) {
         && !Object.prototype.hasOwnProperty.call(cachedCacheDirectives, 'proxy-revalidate')) {
         server.log.warn(error,
           "Serving stale content from cache. " +
-          `Origin: ${server.id}. Key: ${cacheKey}. RID: ${rid}.`)
+          `Origin: ${opts.id}. Key: ${cacheKey}. RID: ${rid}.`)
         utils.setCacheStatus('CACHE_HIT_NOT_REVALIDATED_STALE', cachedResponse)
         cachedResponse.headers['age'] = utils.calculateAge(cachedResponse)
         return cachedResponse
@@ -769,8 +857,8 @@ export default async function (server, opts) {
             break
           case 'EOPENBREAKER':
             generatedResponse.statusCode = 503
-            if (server.originBreaker.options.resetTimeout) {
-              generatedResponse.headers['retry-after'] = server.originBreaker.retryAfter
+            if (originBreaker.options.resetTimeout) {
+              generatedResponse.headers['retry-after'] = originBreaker.retryAfter
             }
             break
           default:
@@ -781,7 +869,7 @@ export default async function (server, opts) {
       }
     }
 
-    if (amITheFetcher && server.origin.localRequestsCoalescing) server.ongoing.delete(cacheKey)
+    if (amITheFetcher && opts.origin.localRequestsCoalescing) ongoing.delete(cacheKey)
 
     // Apply transformations to the response received from the origin
     originResponse.path = path
@@ -832,7 +920,7 @@ export default async function (server, opts) {
           server.redisBreaker
             ? await server.redisBreaker.fire('json.merge', [cacheKey, '$', payload])
             : await server.redis.json.merge(cacheKey, '$', payload)
-          // Set the TTL for the cache entry              
+          // Set the TTL for the cache entry           
           if (!Number.isNaN(ttl) && ttl > 0) {
             server.redisBreaker
               ? await server.redisBreaker.fire('expire', [cacheKey, ttl])
@@ -842,7 +930,7 @@ export default async function (server, opts) {
         } catch (error) {
           server.log.warn(error,
             "Error while updating the cache. " +
-            `Origin: ${server.id}. Key: ${cacheKey}. RID: ${rid}.`
+            `Origin: ${opts.id}. Key: ${cacheKey}. RID: ${rid}.`
           )
         }
       }
@@ -857,7 +945,7 @@ export default async function (server, opts) {
           server.redisBreaker
             ? await server.redisBreaker.fire('json.set', [cacheKey, '$', cacheEntry])
             : await server.redis.json.set(cacheKey, '$', cacheEntry)
-          // Set the TTL for the cache entry              
+          // Set the TTL for the cache entry           
           if (!Number.isNaN(ttl) && ttl > 0) {
             server.redisBreaker
               ? await server.redisBreaker.fire('expire', [cacheKey, ttl])
@@ -866,7 +954,7 @@ export default async function (server, opts) {
         } catch (error) {
           server.log.warn(error,
             "Error while storing in the cache. " +
-            `Origin: ${server.id}. Key: ${cacheKey}. RID: ${rid}.`
+            `Origin: ${opts.id}. Key: ${cacheKey}. RID: ${rid}.`
           )
         }
       }
@@ -877,14 +965,14 @@ export default async function (server, opts) {
     * If the origin server response included Cache-Control: no-store,
     * it should not have been stored in the cache at all.
     * If, by mistake, it was stored, you must delete it immediately.
-    * 
+    *
     * If the origin server response included Cache-Control: private,
     * a shared caches should not store it in the cache at all.
     * If a shared cache has already stored the response by mistake,
     * it is recommended to delete it to comply with the directive.
     */
     if (Object.prototype.hasOwnProperty.call(originCacheDirectives, 'no-store')
-      // The unqualified form of the private response directive 
+      // The unqualified form of the private response directive
       || (Object.prototype.hasOwnProperty.call(originCacheDirectives, 'private')
         && originCacheDirectives['private'] === null)) {
       try {
@@ -894,13 +982,13 @@ export default async function (server, opts) {
       } catch (error) {
         server.log.warn(error,
           "Error while removing private/no-store entry in the cache. " +
-          `Origin: ${server.id}. Key: ${cacheKey}. RID: ${rid}.`
+          `Origin: ${opts.id}. Key: ${cacheKey}. RID: ${rid}.`
         )
       }
     }
 
     // In this point the Cache Entry has been updated or deleted in Redis.
-    if (server.origin?.distributedRequestsCoalescing && locked) await _releaseLock(server, lockKey, lockValue)
+    if (opts.origin?.distributedRequestsCoalescing && locked) await _releaseLock(server, lockKey, lockValue)
 
     // See: https://www.rfc-editor.org/rfc/rfc9111.html#cache-request-directive.only-if-cached
     if (Object.prototype.hasOwnProperty.call(clientCacheDirectives, 'only-if-cached')
@@ -930,12 +1018,12 @@ export default async function (server, opts) {
   async function _adquireLock(server, lockKey, lockValue) {
 
     let lockTTL
-    if (Object.prototype.hasOwnProperty.call(server.origin, 'lockOptions')
-      && Object.prototype.hasOwnProperty.call(server.origin?.distributedRequestsCoalescingOptions, 'lockTTL')
-      && server.origin?.distributedRequestsCoalescingOptions?.lockTTL > 0) {
-      lockTTL = server.origin?.distributedRequestsCoalescingOptions?.lockTTL
-    } else if (server.origin.originTimeout && server.origin.originTimeout > 0) {
-      lockTTL = Math.round(server.origin.originTimeout * 1.2)
+    if (Object.prototype.hasOwnProperty.call(opts.origin, 'lockOptions')
+      && Object.prototype.hasOwnProperty.call(opts.origin?.distributedRequestsCoalescingOptions, 'lockTTL')
+      && opts.origin?.distributedRequestsCoalescingOptions?.lockTTL > 0) {
+      lockTTL = opts.origin?.distributedRequestsCoalescingOptions?.lockTTL
+    } else if (opts.origin.originTimeout && opts.origin.originTimeout > 0) {
+      lockTTL = Math.round(opts.origin.originTimeout * 1.2)
     } else {
       lockTTL = Math.round(Math.random() * 10000)
     }
@@ -943,20 +1031,20 @@ export default async function (server, opts) {
     let locked = false
     try {
       let lockResponse = server.redisBreaker
-        ? await server.redisBreaker.fire('set', [lockKey, lockValue, 'NX', 'PX', `${lockTTL}`])
+        ? await server.redisBreaker.fire('set', [lockKey, lockValue, { NX: true, PX: lockTTL }])
         : await server.redis.set(lockKey, lockValue, { NX: true, PX: lockTTL })
       locked = ('OK' === lockResponse)
     } catch (error) {
       server.log.warn(error,
         "Error acquiring the lock. " +
-        `Origin: ${server.id}. Key: ${lockKey}. Value: ${lockValue}. LockTTL: ${lockTTL}.`
+        `Origin: ${opts.id}. Key: ${lockKey}. Value: ${lockValue}. LockTTL: ${lockTTL}.`
       )
     } finally {
       return locked
     }
   }
 
-  // Remove the key only if it exists and the value stored at the  key 
+  // Remove the key only if it exists and the value stored at the  key
   // is exactly the one I expect to be
   const releaseLockScript = `
     if redis.call("get",KEYS[1]) == ARGV[1] then
@@ -969,28 +1057,40 @@ export default async function (server, opts) {
   async function _releaseLock(server, lockKey, lockValue) {
     try {
       const exists = server.redisBreaker
-        ? await server.redisBreaker.fire('SCRIPT', ['EXISTS', releaseLockScriptSHA1])
-        : await server.redis.sendCommand(['SCRIPT', 'EXISTS', releaseLockScriptSHA1])
-      if (exists[0] === 0) {
+        ? await server.redisBreaker.fire('script exists', [releaseLockScriptSHA1])
+        : await server.redis.scriptExists(releaseLockScriptSHA1)
+      if (!exists[0]) {
         server.redisBreaker
-          ? await server.redisBreaker.fire('SCRIPT', ['LOAD', releaseLockScript])
-          : await server.redis.sendCommand(['SCRIPT', 'LOAD', releaseLockScript])
+          ? await server.redisBreaker.fire('script load', [releaseLockScript])
+          : await server.redis.scriptLoad(releaseLockScript)
       }
       server.redisBreaker
-        ? await server.redisBreaker.fire('EVALSHA', [releaseLockScriptSHA1, '1', lockKey, lockValue])
-        : await server.redis.sendCommand(['EVALSHA', releaseLockScriptSHA1, '1', lockKey, lockValue])
+        ? await server.redisBreaker.fire('evalsha', [
+          releaseLockScriptSHA1, 
+          {
+            keys: [lockKey], 
+            arguments: [lockValue] 
+          }
+        ])
+        : await server.redis.evalSha( 
+          releaseLockScriptSHA1, 
+          {
+            keys: [lockKey], 
+            arguments: [lockValue] 
+          }
+        )
 
     } catch (error) {
       server.log.warn(error,
         "Error releasing the lock. " +
-        `Origin: ${server.id}. Key: ${lockKey}. Value: ${lockValue}.`
+        `Origin: ${opts.id}. Key: ${lockKey}. Value: ${lockValue}.`
       )
     }
   }
 
   function _transform(type, target, server) {
-    if (Object.prototype.hasOwnProperty.call(server.origin, 'transformations')) {
-      server.origin.transformations.forEach(transformation => {
+    if (Object.prototype.hasOwnProperty.call(opts.origin, 'transformations')) {
+      opts.origin.transformations.forEach(transformation => {
         if (transformation.re.test(target.path)) {
           transformation.actions.forEach(action => {
             if (action.phase === type) {
@@ -1017,12 +1117,12 @@ export default async function (server, opts) {
       // If we are using the Circuit Breaker the timeout is managed by it.
       // In other cases, we has to manage the timeout in the request.
       let signal, timeoutId = null
-      if (Object.prototype.hasOwnProperty.call(server.origin, "originTimeout") &&
+      if (Object.prototype.hasOwnProperty.call(opts.origin, "originTimeout") &&
         !Object.prototype.hasOwnProperty.call(options, "signal")) {
         const abortController = new AbortController()
         timeoutId = setTimeout(() => {
           abortController.abort()
-        }, server.origin.originTimeout)
+        }, opts.origin.originTimeout)
         signal = abortController.signal
         options.signal = signal
       }
@@ -1039,7 +1139,7 @@ export default async function (server, opts) {
 
       request.on('error', (err) => {
         if (signal && signal.aborted) {
-          const error = new Error(`Timed out after ${server.origin.originTimeout} ms`, { cause: err })
+          const error = new Error(`Timed out after ${opts.origin.originTimeout} ms`, { cause: err })
           error.code = 'ETIMEDOUT'
           reject(error)
         } else {
@@ -1061,8 +1161,8 @@ export default async function (server, opts) {
       // && originResponse.statusCode !== 304
 
       // TODOD: Implements support for the must-understand cache directive
-      // In this context, a cache has "understood" a request method or a 
-      // response status code if it recognizes it and implements all 
+      // In this context, a cache has "understood" a request method or a
+      // response status code if it recognizes it and implements all
       // specified caching-related behavior.
       // https://www.rfc-editor.org/rfc/rfc9111.html#cache-response-directive.must-understand
 

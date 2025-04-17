@@ -200,8 +200,27 @@ export async function app(opts = {}, ajv = new Ajv({useDefaults: true})) {
                   }
                 }
               }
+            },
+            accessControl: { 
+              type: "array",
+              items: {
+                type: "object",
+                minProperties: 2,
+                maxProperties: 2,
+                additionalProperties: false,
+                required: ["urlPattern", "requiredScopes"],
+                properties: {
+                  urlPattern: { type: "string" },
+                  requiredScopes: {
+                    type: "array",
+                    items: {
+                      type: "string",
+                    }
+                  } 
+                }
+              }
             }
-          }
+          }        
         },
         oauth2: {
           type: "object",

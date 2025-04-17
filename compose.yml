@@ -29,11 +29,16 @@ services:
       - 6379:6379
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
+      start_period: 10s
+      timeout: 2s
+      interval: 5s
       retries: 5
   keycloak:
-    image: quay.io/keycloak/keycloak:latest
+    image: mjguisado/keycloak:latest
+    pull_policy: build
+    build:
+      context: .
+      dockerfile: Dockerfile.keycloak
     container_name: keycloak
     command: start-dev
     environment:
@@ -48,6 +53,12 @@ services:
     ports:
       - 8080:8080
       - 8443:8443
+    healthcheck:
+      test: ["CMD", "curl", "-kf", "https://localhost:8443/realms/master"]
+      start_period: 10s
+      timeout: 2s
+      interval: 5s
+      retries: 5      
   mocks:
     image: mjguisado/mocks:latest
     pull_policy: build
@@ -65,7 +76,6 @@ services:
           target: /usr/src/app/mocks
     ports:
       - 3030:3030
-
   speedis:
     image: mjguisado/speedis:latest
     pull_policy: build
@@ -91,9 +101,12 @@ services:
       - 3003:3003
       - "9229-9249:9229-9249"
     depends_on:
-      - mocks
-      - redis
-      - keycloak
+      mocks:
+        condition: service_started
+      redis:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
   haproxy:
     image: haproxy:latest
     container_name: haproxy
@@ -105,6 +118,8 @@ services:
     volumes:
       - ./3rparties/haproxy/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg
       - ./3rparties/haproxy/certs:/usr/local/etc/haproxy/certs:ro
+    depends_on:
+      - speedis
 volumes:
   prom_data:
   keycloak_data:
