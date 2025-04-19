@@ -1,7 +1,7 @@
 import * as openidClient from 'openid-client'
 import * as crypto from 'crypto'
-import { jwtDecode } from "jwt-decode"
-
+import { storeSession } from './helpers.js'
+import { jwtVerify } from 'jose'
 
 // https://medium.com/google-cloud/understanding-oauth2-and-building-a-basic-authorization-server-of-your-own-a-beginners-guide-cf7451a16f66
 // https://skycloak.io/blog/keycloak-how-to-create-a-pkce-authorization-flow-client/
@@ -77,9 +77,12 @@ export default async function (server, opts) {
 
     let tokens = null
     try {
+      const index = request.raw.url.indexOf(opts.prefix);
+      const path = index !== -1 ? request.raw.url.slice(index) : request.raw.url;
+      const currentUrl = new URL(path, opts.baseUrl)
       tokens = await openidClient.authorizationCodeGrant(
         server.authServerConfiguration,
-        new URL(request.raw.url, opts.baseUrl),
+        currentUrl,
         checks
       )
     } catch (error) {
@@ -88,32 +91,47 @@ export default async function (server, opts) {
       )
       throw error
     }
-    
-    let token = jwtDecode(tokens.refresh_token?tokens.refresh_token:tokens.access_token)
-    const id_session = crypto.randomUUID()
-    try {
+
+    const id_session = await storeSession(server, tokens)
+    if (opts.pkceEnabled) {
       server.redisBreaker
-        ? await server.redisBreaker.fire('hSet', [id_session, tokens])
-        : await server.redis.hSet(id_session, tokens)
-      server.redisBreaker
-        ? await server.redisBreaker.fire('expireAt', [id_session, token.exp])
-        : await server.redis.expireAt(id_session, token.exp)
-      if (opts.pkceEnabled) { 
-        server.redisBreaker
           ? await server.redisBreaker.fire('unlink', [request.query['state']])
           : await server.redis.unlink(request.query['state'])
-      }
-    } catch (error) {
-      server.log.error(
-        `Error while storing the session.`, { cause: error }
-      )
-      throw error
     }
+
     // We set the tokenId in a cookie
     // https://github.com/fastify/fastify-cookie?tab=readme-ov-file#sending
     reply.header('set-cookie', `${opts.sessionIdCookieName}=${id_session}; Path=/; Secure; HttpOnly`)
     return reply.send(tokens)
     // return reply.redirect(opts.postAuthRedirectUrl)
+  })
+
+  server.post(opts.logoutPath, async (request, reply) => {
+    let id_session = null;
+    try {
+       const { payload } = await jwtVerify(
+        request.body, 
+        server.jwks,
+        {
+          issuer: server.authServerConfiguration.serverMetadata().issuer,
+        }
+      )
+      id_session = payload.sid
+    } catch (error) {
+      const msg = `Invalid logout token: ${request.body}. Origin: ${opts.id}.`
+      server.log.error(msg, { cause: error })
+      return reply.code(400).send(server.exposeErrors?msg:"")
+    }
+    try {
+      server.redisBreaker
+          ? await server.redisBreaker.fire('unlink', [id_session])
+          : await server.redis.unlink(id_session)
+    } catch (error) {
+      const msg = `Error while deleting the session ${id_session}. Origin: ${opts.id}.`
+      server.log.error(msg,{ cause: error })
+      return reply.code(500).send(server.exposeErrors?msg:"")
+    } 
+    reply.code(204).send()
   })
 
 }

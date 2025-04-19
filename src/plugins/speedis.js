@@ -9,7 +9,7 @@ import * as utils from '../utils/utils.js'
 import sessionPlugin from './session.js'
 import { jwtVerify, createRemoteJWKSet } from 'jose'
 import * as openIdClient from 'openid-client'
-
+import { storeSession } from './helpers.js'
 // TODO: https://www.rfc-editor.org/rfc/rfc9111.html#name-must-understand
 // TODO: https://www.rfc-editor.org/rfc/rfc9111.html#name-no-transform
 // TODO: https://www.rfc-editor.org/rfc/rfc9111.html#name-no-transform-2
@@ -23,6 +23,8 @@ import * as openIdClient from 'openid-client'
 // THINK ABOUT: Logs management (Kiabana). Fluentd or Central Logging (K8s)
 
 export default async function (server, opts) {
+
+  server.decorate('exposeErrors', opts.exposeErrors)
 
   // Connecting to Redis
   // See: https://redis.io/docs/latest/develop/clients/nodejs/produsage/#handling-reconnections
@@ -350,29 +352,17 @@ export default async function (server, opts) {
     // used to verify any JSON Web Token (JWT) issued by the Authorization Server
     // and signed using the RS256 signing algorithm.
     const jwksUri = new URL(authServerConfiguration.serverMetadata().jwks_uri)
-    const JWKS = createRemoteJWKSet(jwksUri)
+    const jwks = createRemoteJWKSet(jwksUri)
+    server.decorate('jwks', jwks)
 
-    // https://openid.net/specs/openid-connect-core-1_0.html#IDToken
-    const verifyAccessToken = async (accessToken) => {
-      try {
-        server.log.info(accessToken)
-        const { payload, protectedHeader } = await jwtVerify(accessToken, JWKS, {
-          issuer: authServerConfiguration.serverMetadata().issuer,
-          audience: opts.oauth2.clientId,
-        })
-        return payload
-      } catch (error) {
-        if (error.code === 'ERR_JWT_EXPIRED') {
-          console.log('Token expirado, hay que renovarlo')
-        } else {
-          console.error('Error al verificar el token:', error)
-        }
-        throw error
-      }
-    }
-
+    server.decorateRequest('access_token', null)
     server.addHook('preValidation', async (request, reply) => {
+
+      request.access_token = null
+      
+      // Checks if the cookie header is present
       if (request.headers?.cookie) {
+        // Parse the Cookie header
         const cookies = request.headers?.cookie
           .split(';')
           .map(cookie => cookie.trim().split('='))
@@ -380,17 +370,56 @@ export default async function (server, opts) {
             acc[key] = decodeURIComponent(value)
             return acc
           }, {})
+        // Checks if the session cookie is present
         if (cookies[opts.oauth2.sessionIdCookieName]) {
+          const id_session = cookies[opts.oauth2.sessionIdCookieName]
+          // Retrieve session information from Redis
           const tokens = server.redisBreaker
-            ? await server.redisBreaker.fire('hgetall', [cookies[opts.oauth2.sessionIdCookieName]])
-            : await server.redis.json.get(cookies[opts.oauth2.sessionIdCookieName])
-          request.tokens = tokens
-          if (Object.keys(tokens).length > 0) verifyAccessToken(tokens.access_token)
+            ? await server.redisBreaker.fire('hgetall', [id_session])
+            : await server.redis.json.get(id_session)
+          // Checks whether the information was stored in Redis
+          if (Object.keys(tokens).length > 0) {
+            // https://openid.net/specs/openid-connect-core-1_0.html#IDToken
+            try {
+              // Checks the validity of the access token
+              await jwtVerify(
+                tokens.access_token, 
+                jwks,
+                {
+                  issuer: authServerConfiguration.serverMetadata().issuer,
+                }
+              )
+              // If valid, decorate the request with the access token
+              request.access_token = tokens.access_token
+            } catch (error) {
+              if (error.code === 'ERR_JWT_EXPIRED') {
+                // If the access token has expired, attempt to renew it
+                try {
+                  const freshTokens = await openIdClient.refreshTokenGrant(
+                    authServerConfiguration,
+                    tokens.refresh_token
+                  )
+                  // If valid, decorate the request with the access token
+                  await storeSession(server, freshTokens)
+                  request.access_token = freshTokens.access_token
+                } catch (error) {
+                  const msg = `Error while refreshing the access token. Origin: ${opts.id}.`
+                  server.log.error(msg, { cause: error })
+                  return reply.code(500).send(opts.exposeErrors?msg:"")
+                }
+              } else {
+                const msg = `Invalid access token: ${tokens.access_token}. Origin: ${opts.id}.`
+                server.log.error(msg, { cause: error })
+                return reply.code(400).send(opts.exposeErrors?msg:"")
+              }
+            }
+          }
         }
       }
     })
-    server.decorateRequest('tokens', null)
+
     server.register(sessionPlugin, opts.oauth2)
+    
   }
 
   server.addHook('onClose', (server) => {
