@@ -8,8 +8,9 @@ The following table describes the supported fields.
 |`logLevel`|String|`false`|`info`|Logging level for the main service (`trace`, `debug`, `info`, `warn`, `error`, `fatal`).|
 |`metricServerPort`|Number|`false`|3003|The port on which the metrics service is running.|
 |`metricServerLogLevel`|String|`false`|`info`|Logging level for the metric service (`trace`, `debug`, `info`, `warn`, `error`, `fatal`).|
+
 # Origins configurations
-In Speedis, the remote server to be cached is referred to as an `origin`.
+In Speedis, the remote server is referred to as an `origin`.
 The configuration of Speedis’ behavior for each origin is defined in a configuration file which contains a JSON object and is located in ./conf/origin/.
 During initialization, Speedis will load all configuration files located in that folder.
 The following table describes the supported fields.
@@ -19,9 +20,11 @@ The following table describes the supported fields.
 |`prefix`|String|`true`||URL path prefix used to route incoming requests to this origin.|
 |`logLevel`|String|`false`|`info`|Logging level for this origin (`trace`, `debug`, `info`, `warn`, `error`, `fatal`).|
 |`exposeErrors`|Boolean|`false`|`false`|This parameter determines whether descriptive error messages are included in the response body (`true` or `false`).|
-|`redis`|Object|true||This object defines all the details related to the redis database. Its format is detailed below.|
+|`redis`|Object|`true` if cache of oauth2 is enabled||This object defines all the details related to the redis database. Its format is detailed below.|
 |`origin`|Object|true||This object defines all the details related to the origin management. Its format is detailed below.|
-|`oauth2`|Object|true||This object defines all the details related to the OAuth2-based Access Control. Its format is detailed below.|
+|`cache`|Object|false||This object defines all the details related to the cache management. Its format is detailed below.|
+|`bff`|Object|false||This object defines all the details related to the Backend-For-Frontend (BFF) management. Its format is detailed below.|
+|`oauth2`|Object|false||This object defines all the details related to the OAuth2-based Access Control. Its format is detailed below.|
 
 ## Redis configuration object
 The following table describes the supported fields in the redis configuration object.
@@ -39,17 +42,21 @@ The following table describes the supported fields in the origin configuration o
 |-----|----|---------|-------|-----------|
 |`httpxOptions`|Object|`true`||Speedis leverages Node’s native [http](https://nodejs.org/api/http.html)/[https](https://nodejs.org/api/https.html) libraries to make requests to the origin server. This field is used to define the request options. Its format is almost identical to the original [options](https://nodejs.org/api/http.html#httprequestoptions-callback). The main difference is that, since the configuration is in JSON format, parameters defined as JavaScript entities in the original options are not supported. Options in socket.connect() are not supported.|
 |`agentOptions`|Object|`false`||Speedis allows to use an [Agent](https://nodejs.org/api/https.html#class-httpsagent) to manage connection persistence and reuse for HTTP clients. This field is used to configure the agent. Its format is identical to the original [https options](https://nodejs.org/api/https.html#class-httpsagent) or [http options](https://nodejs.org/api/http.html#new-agentoptions).|
+|`originTimeout`|Number|`false`||Specifies the maximum time allowed for retrieving the resource from the origin server before the request is considered a failure.|
+|`originBreaker`|Boolean|`false`|`false`|Enables (`true`) or disables (`false`) the origin's circuit breaker mechanism.|
+|`originBreakerOptions`|Object|`true` if originBreaker is enabled||Speedis leverages [Opossum](https://nodeshift.dev/opossum/) to implement the circuit breaker mechanism. This field is used to define the circuit braker options. Its format is almost identical to the original [options](https://nodeshift.dev/opossum/#circuitbreaker). The main difference is that, since the configuration is in JSON format, parameters defined as JavaScript entities in the original options are not supported. Additionally, options related to caching and coalescing features are also not supported.|
+
+## Cache configuration object
+The following table describes the supported fields in the cache configuration object.
+|Field|Type|Mandatory|Default|Description|
+|-----|----|---------|-------|-----------|
 |`includeOriginIdInCacheKey`|Boolean|`false`|`true`|This field determines whether the id of the origin is used to generate the cache key for the entry (`true` or `false`).|
 |`ignoredQueryParams`|[String]|`false`||The cache key is generated based on the URL requested from the origin. This field defines a list of query string parameters that will be ignored when forming the cache key for the entry.|
 |`sortQueryParams`|Boolean|`false`|`false`|The cache key is generated based on the URL requested from the origin. This field determines whether the query string parameters should be sorted alphabetically before being used to generate the cache key for the entry (`true` or `false`). |
 |`localRequestsCoalescing`|Boolean|`false`|`true`|Enables (`true`) or disables (`false`) the request coalescing mechanism.|
 |`distributedRequestsCoalescing`|Boolean|`false`|`false`|Enables (`true`) or disables (`false`) the request coalescing functionality across multiple instances.|
 |`distributedRequestsCoalescingOptions`|Object|`true` if distributedRequestsCoalescing is enabled||Configure the distributed lock mechanism used to implements the requests coalescing functionality across multiple instances. Its format is detailed below.|
-|`originTimeout`|Number|`false`||Specifies the maximum time allowed for retrieving the resource from the origin server before the request is considered a failure.|
-|`originBreaker`|Boolean|`false`|`false`|Enables (`true`) or disables (`false`) the origin's circuit breaker mechanism.|
-|`originBreakerOptions`|Object|`true` if originBreaker is enabled||Speedis leverages [Opossum](https://nodeshift.dev/opossum/) to implement the circuit breaker mechanism. This field is used to define the circuit braker options. Its format is almost identical to the original [options](https://nodeshift.dev/opossum/#circuitbreaker). The main difference is that, since the configuration is in JSON format, parameters defined as JavaScript entities in the original options are not supported. Additionally, options related to caching and coalescing features are also not supported.|
-|`actionsLibraries`|Object|`false`||An array containing the full paths to custom action libraries that extend the default set provided out of the box.|
-|`transformations`|[Object]|`false`||Array of objects that define the set of transformations that Speedis can apply to requests and responses at different stages. Its format is detailed below.|
+
 ### Lock configuration object
 The following table describes the supported fields in the lock configuration object.
 |Field|Type|Mandatory|Default|Description|
@@ -58,6 +65,14 @@ The following table describes the supported fields in the lock configuration obj
 |`retryCount`|Number|`true`||(Number of retry attempts): Defines the maximum number of times the system will attempt to acquire the lock if the initial attempt fails.|
 |`retryDelay`|Number|`true`||(Base delay between retries): Sets the waiting time (in milliseconds) between consecutive lock acquisition attempts. This helps prevent excessive contention when multiple processes try to acquire the same lock.|
 |`retryJitter`|Number|`true`||(Randomized delay variation): Introduces a random variation (in milliseconds) to the retry delay to reduce the likelihood of multiple processes retrying at the same time, which can help prevent contention spikes.|
+
+## Backend-For-Frontend (BFF) configuration object
+The following table describes the supported fields in the Backend-For-Frontend configuration object.
+|Field|Type|Mandatory|Default|Description|
+|-----|----|---------|-------|-----------|
+|`actionsLibraries`|Object|`false`||An array containing the full paths to custom action libraries that extend the default set provided out of the box.|
+|`transformations`|[Object]|`false`||Array of objects that define the set of transformations that Speedis can apply to requests and responses at different stages. Its format is detailed below.|
+
 ### Transformations configuration
 Speedis allows transformations to be applied to requests and responses it handles at different phases of their lifecycle.
 |Phase|Description|
@@ -129,4 +144,4 @@ The following table describes the supported fields in the OAuth2-based Access Co
 |`authorizationCodeTtl`|Number|`false`|`300`|Defines the time-to-live (TTL) for the authorization code, indicating how long the code remains valid before it expires. This value is typically set to a short duration (e.g., 5-10 minutes) to ensure that the code is used promptly after issuance.|
 |`sessionIdCookieName`|String|`false`|`speedis_token_id`|Specifies the name of the cookie that the client uses to communicate the value of the ID token to the User-Agent.|
 |`postAuthRedirectUrl`|String|`true`||Specifies the URL to which the user will be redirected after successful authentication and the establishment of the authentication cookie. This page is typically a landing page or the main entry point to the application, ensuring that the user is directed to the appropriate location after login.|
-|`redis`|Object|`true`||Used to define the connection to Redis, the secure in-memory database that the client uses to store established sessions. Redis ensures fast and reliable storage of session data, providing efficient management of user authentication state. Its format follows the same structure as previously defined in the Redis configuration object.|
+

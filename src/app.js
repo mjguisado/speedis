@@ -6,13 +6,20 @@ import { collectDefaultMetrics, Counter, Histogram } from 'prom-client'
 import PrometheusMetrics from 'opossum-prometheus'
 import Ajv from "ajv"
 
-export async function app(opts = {}, ajv = new Ajv({useDefaults: true})) {
-  
+export async function app(opts = {}, ajv = new Ajv({ useDefaults: true })) {
+
   const validateOrigin = ajv.compile(
     {
       type: "object",
       additionalProperties: false,
-      required: ["id", "prefix", "redis", "origin"],
+      required: ["id", "prefix", "origin"],
+      if: { 
+        anyOf: [
+          { required: ["cache"] },
+          { required: ["oauth2"] }
+        ]
+      },
+      then: { required: ["redis"] },
       definitions: {
         circuitBreakerConfiguration: {
           type: "object",
@@ -58,13 +65,24 @@ export async function app(opts = {}, ajv = new Ajv({useDefaults: true})) {
           type: "object",
           additionalProperties: false,
           required: ["redisOptions"],
-          if: { properties: { redisBreaker: { const: true } } },
-          then: { required: ["redisBreakerOptions"] },
+          allOf: [
+            {
+              if: {
+                properties: {
+                  redisBreaker: { const: true }
+                },
+                required: ["redisBreaker"]
+              },
+              then: {
+                required: ["redisBreakerOptions"]
+              }
+            }
+          ],
           properties: {
             redisOptions: {
               type: "object",
             },
-            redisTimeout: { type: "integer" },        
+            redisTimeout: { type: "integer" },
             redisBreaker: { type: "boolean", default: false },
             redisBreakerOptions: { $ref: "#/definitions/circuitBreakerConfiguration" },
             disableOriginOnRedisOutage: { type: "boolean", default: false },
@@ -80,14 +98,23 @@ export async function app(opts = {}, ajv = new Ajv({useDefaults: true})) {
         },
         exposeErrors: { type: "boolean", default: false },
         redis: { $ref: "#/definitions/redisConfiguration" },
-        origin:{
+        origin: {
           type: "object",
           additionalProperties: false,
           required: ["httpxOptions"],
-          if: { properties: { distributedRequestsCoalescing: { const: true } } },
-          then: { required: ["distributedRequestsCoalescingOptions"] },
-          if: { properties: { originBreaker: { const: true } } },
-          then: { required: ["originBreakerOptions"] },
+          allOf: [
+            {
+              if: {
+                properties: {
+                  originBreaker: { const: true }
+                },
+                required: ["originBreaker"]
+              },
+              then: {
+                required: ["originBreakerOptions"]
+              }
+            }
+          ],
           properties: {
             // https://nodejs.org/api/http.html#httprequestoptions-callback
             httpxOptions: {
@@ -112,7 +139,7 @@ export async function app(opts = {}, ajv = new Ajv({useDefaults: true})) {
                 path: { type: "string", default: "/" },
                 port: { type: "integer", default: 80 },
                 protocol: { type: "string", default: "http:" },
-                setDefaultHeaders: { type: "boolean", default: true},
+                setDefaultHeaders: { type: "boolean", default: true },
                 setHost: { type: "boolean", default: true },
                 // signal: { type: "function" },
                 socketPath: { type: "string" },
@@ -137,6 +164,28 @@ export async function app(opts = {}, ajv = new Ajv({useDefaults: true})) {
                 servername: { type: "string" },
               }
             },
+            originTimeout: { type: "integer" },
+            originBreaker: { type: "boolean", default: false },
+            originBreakerOptions: { $ref: "#/definitions/circuitBreakerConfiguration" }
+          }
+        },
+        cache: {
+          type: "object",
+          additionalProperties: false,
+          allOf: [
+            {
+              if: {
+                properties: {
+                  distributedRequestsCoalescing: { const: true }
+                },
+                required: ["distributedRequestsCoalescing"]
+              },
+              then: {
+                required: ["distributedRequestsCoalescingOptions"]
+              }
+            }
+          ],
+          properties: {
             includeOriginIdInCacheKey: { type: "boolean", default: true },
             ignoredQueryParams: {
               type: "array",
@@ -158,10 +207,14 @@ export async function app(opts = {}, ajv = new Ajv({useDefaults: true})) {
                 retryDelay: { type: "integer" },
                 retryJitter: { type: "integer" }
               }
-            },
-            originTimeout: { type: "integer" },
-            originBreaker: { type: "boolean", default: false },
-            originBreakerOptions: { $ref: "#/definitions/circuitBreakerConfiguration" },
+            }
+          }
+        },
+        bff: {
+          type: "object",
+          additionalProperties: false,
+          required: ["transformations"],
+          properties: {
             actionsLibraries: {
               type: "object"
             },
@@ -201,42 +254,43 @@ export async function app(opts = {}, ajv = new Ajv({useDefaults: true})) {
                 }
               }
             },
-            accessControl: { 
-              type: "array",
-              items: {
-                type: "object",
-                minProperties: 2,
-                maxProperties: 2,
-                additionalProperties: false,
-                required: ["urlPattern", "requiredScopes"],
-                properties: {
-                  urlPattern: { type: "string" },
-                  requiredScopes: {
-                    type: "array",
-                    items: {
-                      type: "string",
-                    }
-                  } 
-                }
-              }
-            }
-          }        
+          }
         },
         oauth2: {
           type: "object",
           additionalProperties: false,
           required: [
             "id",
-            "baseUrl", 
-            "clientId", 
-            "clientSecret", 
+            "baseUrl",
+            "clientId",
+            "clientSecret",
             "discoverySupported",
             "postAuthRedirectUrl",
             "redis"],
-          if: { properties: { discoverySupported: { const: true } } },
-          then: { required: ["authorizationServerMetadataLocation"] },
-          if: { properties: { discoverySupported: { const: false } } },
-          then: { required: ["authorizationServerMetadata"] },
+          allOf: [
+            {
+              if: {
+                properties: {
+                  discoverySupported: { const: true }
+                },
+                required: ["discoverySupported"]
+              },
+              then: {
+                required: ["authorizationServerMetadataLocation"]
+              }
+            },
+            {
+              if: {
+                properties: {
+                  discoverySupported: { const: false }
+                },
+                required: ["discoverySupported"]
+              },
+              then: {
+                required: ["authorizationServerMetadata"]
+              }
+            }
+          ],
           properties: {
             id: { type: "string" },
             prefix: { type: "string", default: "/oauth2" },
@@ -252,10 +306,10 @@ export async function app(opts = {}, ajv = new Ajv({useDefaults: true})) {
             clientSecret: { type: "string" },
             discoverySupported: { type: "boolean" },
             authorizationServerMetadataLocation: { type: "string" },
-            authorizationServerMetadata: { 
+            authorizationServerMetadata: {
               type: "object",
               additionalProperties: true,
-              required: ["issuer","authorization_endpoint","token_endpoint"],
+              required: ["issuer", "authorization_endpoint", "token_endpoint"],
               properties: {
                 issuer: { type: "string" },
                 authorization_endpoint: { type: "string" },
@@ -266,19 +320,41 @@ export async function app(opts = {}, ajv = new Ajv({useDefaults: true})) {
                     type: "string"
                   }
                 }
-              }  
+              }
             },
             authorizationRequest: { type: "object", default: {} },
             pkceEnabled: { type: "boolean", default: false },
             authorizationCodeTtl: { type: "number", default: 300 },
             sessionIdCookieName: { type: "string", default: "speedis_token_id" },
-            postAuthRedirectUrl: { type: "string" }, 
-            redis: { $ref: "#/definitions/redisConfiguration" } 
+            postAuthRedirectUrl: { type: "string" },
           }
         }
       }
     }
   )
+
+  /*
+  accessControl: { 
+    type: "array",
+    items: {
+      type: "object",
+      minProperties: 2,
+      maxProperties: 2,
+      additionalProperties: false,
+      required: ["urlPattern", "requiredScopes"],
+      properties: {
+        urlPattern: { type: "string" },
+        requiredScopes: {
+          type: "array",
+          items: {
+            type: "string",
+          }
+        } 
+      }
+    }
+  }
+  */
+
 
   // Register the Prometheus metrics.
   const server = fastify(opts)
@@ -291,7 +367,7 @@ export async function app(opts = {}, ajv = new Ajv({useDefaults: true})) {
   const httpRequestsTotal = new Counter({
     name: 'http_requests_total',
     help: 'Total number of HTTP requests to Speedis',
-    labelNames: ['origin','method',]
+    labelNames: ['origin', 'method',]
   })
   server.decorate('httpRequestsTotal', httpRequestsTotal)
 
