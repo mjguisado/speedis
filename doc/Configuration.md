@@ -138,7 +138,7 @@ The following table describes the supported fields in the OAuth2-based Access Co
 |`pkceEnabled`|Boolean|`false`|`false`|Indicates whether PKCE (Proof Key for Code Exchange) is enabled. Although the client is considered Confidential, enabling PKCE provides an additional layer of security during the token exchange process.|
 |`authorizationCodeTtl`|Number|`false`|`300`|Defines the time-to-live (TTL) for the authorization code, indicating how long the code remains valid before it expires. This value is typically set to a short duration (e.g., 5-10 minutes) to ensure that the code is used promptly after issuance.|
 |`sessionIdCookieName`|String|`false`|`speedis_token_id`|Specifies the name of the cookie that the client uses to communicate the value of the ID token to the User-Agent.|
-|`postAuthRedirectUrl`|String|`true`||Specifies the URL to which the user will be redirected after successful authentication and the establishment of the authentication cookie. This page is typically a landing page or the main entry point to the application, ensuring that the user is directed to the appropriate location after login.|
+|`postAuthRedirectUri`|String|`true`||Specifies the URL to which the user will be redirected after successfully completing the authentication flow with the authorization server and the establishment of the authentication cookie. This page is typically a landing page or the main entry point to the application, ensuring that the user is directed to the appropriate location after login.|
 
 ## Redis configuration object
 The following table describes the supported fields in the redis configuration object.

@@ -86,7 +86,7 @@
             "scope": "openid profile email"
         },
         "pkceEnabled": true,
-        "postAuthRedirectUrl": "https://mocks/mocks/items/RealBetis?delay=300&cc=public,max-age=10&a=alfa&b=beta&c="
+        "postAuthRedirectUri": "https://mocks/mocks/items/RealBetis?delay=300&cc=public,max-age=10&a=alfa&b=beta&c="
     },    
     "redis": {
         "redisOptions": {
