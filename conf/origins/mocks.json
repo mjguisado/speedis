@@ -52,8 +52,14 @@
         ]
     },    
     "cache": {
-        "cacheableUrlPatterns": [
-            "/mocks/items/.*"
+        "cacheables": [
+            {
+                "urlPattern": "/mocks/items/foo.*"
+            },
+            {
+                "urlPattern": "/mocks/items/.*",
+                "perUser": true    
+            }
         ],
         "ignoredQueryParams": [
             "cc",
