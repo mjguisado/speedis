@@ -36,7 +36,7 @@ export default async function (server, opts) {
       try {
         server.redisBreaker
           ? await server.redisBreaker.fire('set', [parameters.state, codeVerifier, { EX: opts.authorizationCodeTtl } ])
-          : await server.redis.SET(parameters.state, codeVerifier, { EX: opts.authorizationCodeTtl })
+          : await server.redis.set(parameters.state, codeVerifier, { EX: opts.authorizationCodeTtl })
       } catch (error) {
         server.log.error(
           `Error while storing the code verifier. Origin: ${opts.id}.`, { cause: error }
@@ -44,6 +44,7 @@ export default async function (server, opts) {
         throw error
       }
     }
+
     try {
       const url = openidClient.buildAuthorizationUrl(server.authServerConfiguration, parameters)
       return reply.redirect(url)
@@ -64,7 +65,7 @@ export default async function (server, opts) {
       try {
         code_verifier = server.redisBreaker
           ? await server.redisBreaker.fire('get', [request.query['state']])
-          : await server.redis.GET(request.query['state'])
+          : await server.redis.get(request.query['state'])
       } catch (error) {
         server.log.error(
           `Error while retrieving the code verifier. Origin: ${opts.id}.`, { cause: error }
@@ -102,7 +103,10 @@ export default async function (server, opts) {
     // We set the tokenId in a cookie
     // https://github.com/fastify/fastify-cookie?tab=readme-ov-file#sending
     reply.header('set-cookie', `${opts.sessionIdCookieName}=${id_session}; Path=/; Secure; HttpOnly`)
-    return reply.send(tokens)
+    return reply
+      .code(200)
+      .headers({date: new Date().toUTCString()})
+      .send(tokens)
     // return reply.redirect(opts.postAuthRedirectUrl)
   })
 
@@ -120,7 +124,10 @@ export default async function (server, opts) {
     } catch (error) {
       const msg = `Invalid logout token: ${request.body}. Origin: ${opts.id}.`
       server.log.error(msg, { cause: error })
-      return reply.code(400).send(server.exposeErrors?msg:"")
+      return reply
+        .code(400)
+        .headers({date: new Date().toUTCString()})
+        .send(server.exposeErrors?msg:"")
     }
     try {
       server.redisBreaker
@@ -129,9 +136,15 @@ export default async function (server, opts) {
     } catch (error) {
       const msg = `Error while deleting the session ${id_session}. Origin: ${opts.id}.`
       server.log.error(msg,{ cause: error })
-      return reply.code(500).send(server.exposeErrors?msg:"")
+      return reply
+        .code(500)
+        .headers({date: new Date().toUTCString()})
+        .send(server.exposeErrors?msg:"")
     } 
-    reply.code(204).send()
-  })
+    return reply
+      .code(204)
+      .headers({date: new Date().toUTCString()})
+      .send()
+})
 
 }

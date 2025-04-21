@@ -30,6 +30,9 @@
         }
     },
     "cache": {
+        "cacheableUrlPatterns": [
+            "/mocks/items/.*"
+        ],
         "ignoredQueryParams": [
             "cc",
             "delay"

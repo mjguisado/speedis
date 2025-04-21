@@ -186,6 +186,14 @@ export async function app(opts = {}, ajv = new Ajv({ useDefaults: true })) {
             }
           ],
           properties: {
+            purgePath: { type: "string", default: "/purge" },
+            cacheableUrlPatterns: {
+              type: "array",
+              items: {
+                type: "string"
+              },
+              default: []
+            },
             includeOriginIdInCacheKey: { type: "boolean", default: true },
             ignoredQueryParams: {
               type: "array",

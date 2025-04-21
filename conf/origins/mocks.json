@@ -6,6 +6,46 @@
             "host": "mocks",
             "port": 3030,
             "timeout": 2000
+        },
+        "agentOptions": {
+            "keepAlive": true
+        },
+        "originTimeout": 2000,
+        "originBreaker": true,
+        "originBreakerOptions": {
+            "errorThresholdPercentage": 25,
+            "resetTimeout": 15000
         }
-    }
+    },
+    "cache": {
+        "cacheableUrlPatterns": [
+            "/mocks/items/.*"
+        ],
+        "ignoredQueryParams": [
+            "cc",
+            "delay"
+        ],
+        "includeOriginIdInCacheKey": false,
+        "sortQueryParams": true,
+        "localRequestsCoalescing": true,
+        "distributedRequestsCoalescing": true,
+        "distributedRequestsCoalescingOptions": {
+            "lockTTL": 750,
+            "retryCount": 3,
+            "retryDelay": 500,
+            "retryJitter": 250
+        }
+    },
+    "redis": {
+        "redisOptions": {
+            "url": "redis://redis:6379"
+        },
+        "redisTimeout": 500,
+        "redisBreaker": true,
+        "redisBreakerOptions": {
+            "errorThresholdPercentage": 25,
+            "resetTimeout": 5000
+        },
+        "disableOriginOnRedisOutage": true
+    }        
 }

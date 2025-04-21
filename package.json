@@ -22,6 +22,7 @@
   "homepage": "https://github.com/mjguisado/speedis#readme",
   "dependencies": {
     "fastify": "^5.2.2",
+    "fastify-raw-body": "^5.0.0",
     "jose": "^6.0.10",
     "jsonpath": "^1.1.1",
     "jwt-decode": "^4.0.0",
