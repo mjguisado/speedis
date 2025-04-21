@@ -11,7 +11,6 @@ import { storeSession } from './helpers.js'
 import * as utils from '../utils/utils.js'
 import * as crypto from 'crypto'
 
-
 export default async function (server, opts) {
 
   // This parameter determines whether descriptive error 
@@ -453,7 +452,6 @@ export default async function (server, opts) {
     if (ongoing) ongoing.clear()
     if (server.redis) server.redis.quit()
   })
-
 
   server.all('/*', async (request, reply) => {
 
@@ -1299,6 +1297,5 @@ export default async function (server, opts) {
       )
     return isTheResponseCacheable
   }
-
 
 }
