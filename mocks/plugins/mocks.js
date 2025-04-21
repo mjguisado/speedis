@@ -99,6 +99,8 @@ export default async function (server, opts) {
     ]
 
     async function common(request, reply) {
+        server.log.debug(`REQUEST: Id: ${request.id} - Method: ${request.method} - Url: ${request.url} - Headers: ${JSON.stringify(request.headers)} - Body: ${request.body}` )
+
         if (request.query['delay']) {
             let delay = parseInt(request.query['delay'])
             if (!Number.isNaN(delay) && delay > 0) {
@@ -123,14 +125,14 @@ export default async function (server, opts) {
         reply.headers(headers)
     }
 
-    server.get('/users/*', async (request, reply) => {
+    server.all('/users/*', async (request, reply) => {
         await common(request, reply)
-        reply.send(users)
+        return reply.send(users)
     })
 
-    server.get('/items/:uuid', async (request, reply) => {
+    server.all('/items/:uuid', async (request, reply) => {
         await common(request, reply)
-        reply.send({
+        return reply.send({
             id: request.params.uuid,
             name: `Item ${request.params.uuid}`
         })

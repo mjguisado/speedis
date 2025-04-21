@@ -11,7 +11,7 @@ RUN --mount=type=bind,source=package.json,target=package.json \
     --mount=type=cache,target=/root/.npm \
     npm ci --include=dev
 USER node
-EXPOSE 3001 3003 9229
+EXPOSE 3001 3003 9229-9249
 COPY . .
 CMD ["nodemon", "src/index.js"]
 

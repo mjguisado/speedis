@@ -7,7 +7,6 @@
 In the implementation, the guidelines established in [RFC 9110](https://www.rfc-editor.org/rfc/rfc9111.html) on HTTP Semantics and [RFC 9111](https://www.rfc-editor.org/rfc/rfc9111.html) on HTTP Caching have been followed.
 In the design of Speedis, special attention has been given to incorporating mechanisms to protect the origin servers against overloading.
 
-
 Implementing a shared HTTP cache provides benefits among which the following are highlighted:
 - **Reduced Latency**: A shared cache allows multiple clients or services to access the same cache, reducing the time spent fetching data from the origin server. This leads to faster response times and improved user experience.
 - **Decreased Load on Origin Servers**: By caching frequently requested content, a shared cache reduces the number of requests that need to reach the origin server, lowering its load and ensuring better resource utilization.
@@ -25,6 +24,14 @@ This framework allows users to extend its functionality by implementing [plugins
 The core of Speedis is developed as a Fastify plugin.
 Speedis creates an instance of the plugin for each origin configuration file.
 Requests are routed to the corresponding plugin instance using a prefix in the URL path.
+
+### Backend-For-Fronend (BFF)
+Speedis can apply various transformations to incoming requests and outgoing responses throughout their lifecycle.
+These transformations are designed to adapt the data and behavior of the origin server to meet the specific needs of different clients.
+The architecture follows a Backend For Frontend (BFF) pattern, allowing for client-specific optimizations.
+Speedis includes a set of functions, called actions, that allow changes to be made.
+To simplify management, these functions are grouped into libraries.
+Speedis allows easy extension of this model by adding custom actions libraries.
 
 ### Shared storage backend.
 In a distributed HTTP caching system, a common issue arises when new instances are added to the cache pool.
