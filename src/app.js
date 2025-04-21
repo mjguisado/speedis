@@ -13,7 +13,7 @@ export async function app(opts = {}, ajv = new Ajv({ useDefaults: true })) {
       type: "object",
       additionalProperties: false,
       required: ["id", "prefix", "origin"],
-      if: { 
+      if: {
         anyOf: [
           { required: ["cache"] },
           { required: ["oauth2"] }
@@ -21,7 +21,7 @@ export async function app(opts = {}, ajv = new Ajv({ useDefaults: true })) {
       },
       then: { required: ["redis"] },
       definitions: {
-        circuitBreakerConfiguration: {
+        circuitBreakerOptions: {
           type: "object",
           additionalProperties: false,
           // See: https://github.com/nodeshift/opossum/blob/main/lib/circuit.js
@@ -61,31 +61,52 @@ export async function app(opts = {}, ajv = new Ajv({ useDefaults: true })) {
             autoRenewAbortController: { type: "boolean", default: false }
           }
         },
-        redisConfiguration: {
+        requestOptions: {
           type: "object",
           additionalProperties: false,
-          required: ["redisOptions"],
-          allOf: [
-            {
-              if: {
-                properties: {
-                  redisBreaker: { const: true }
-                },
-                required: ["redisBreaker"]
-              },
-              then: {
-                required: ["redisBreakerOptions"]
-              }
-            }
-          ],
+          // https://nodejs.org/api/http.html#httprequestoptions-callback
           properties: {
-            redisOptions: {
-              type: "object",
-            },
-            redisTimeout: { type: "integer" },
-            redisBreaker: { type: "boolean", default: false },
-            redisBreakerOptions: { $ref: "#/definitions/circuitBreakerConfiguration" },
-            disableOriginOnRedisOutage: { type: "boolean", default: false },
+            auth: { type: "string" },
+            // createConnection: { type: "function" },
+            defaultPort: { type: "integer" },
+            family: { enum: [4, 6] },
+            headers: { type: "object", default: {} },
+            hints: { type: "integer" },
+            host: { type: "string", default: "localhost" },
+            hostname: { type: "string" },
+            insecureHTTPParser: { type: "boolean", default: false },
+            joinDuplicateHeaders: { type: "boolean", default: false },
+            localAddress: { type: "string" },
+            localPort: { type: "integer" },
+            // lookup: { type: "function" },
+            maxHeaderSize: { type: "integer", default: 16384 },
+            method: { type: "string", default: "GET" },
+            path: { type: "string", default: "/" },
+            port: { type: "integer", default: 80 },
+            protocol: { type: "string", default: "http:" },
+            setDefaultHeaders: { type: "boolean", default: true },
+            setHost: { type: "boolean", default: true },
+            // signal: { type: "function" },
+            socketPath: { type: "string" },
+            timeout: { type: "integer" },
+            uniqueHeaders: { type: "array" }
+          }
+        },
+        agentOptions: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            // See: https://nodejs.org/api/http.html#new-agentoptions
+            keepAlive: { type: "boolean", default: false },
+            keepAliveMsecs: { type: "integer", default: 1000 },
+            maxSockets: { type: "integer" },
+            maxTotalSockets: { type: "integer" },
+            maxFreeSockets: { type: "integer", default: 256 },
+            scheduling: { type: "string", enum: ["fifo", "lifo"], default: "lifo" },
+            timeout: { type: "integer" },
+            // See: https://nodejs.org/api/https.html#new-agentoptions
+            maxCachedSessions: { type: "integer", default: 100 },
+            servername: { type: "string" },
           }
         }
       },
@@ -97,7 +118,6 @@ export async function app(opts = {}, ajv = new Ajv({ useDefaults: true })) {
           default: "info"
         },
         exposeErrors: { type: "boolean", default: false },
-        redis: { $ref: "#/definitions/redisConfiguration" },
         origin: {
           type: "object",
           additionalProperties: false,
@@ -116,106 +136,11 @@ export async function app(opts = {}, ajv = new Ajv({ useDefaults: true })) {
             }
           ],
           properties: {
-            // https://nodejs.org/api/http.html#httprequestoptions-callback
-            httpxOptions: {
-              type: "object",
-              additionalProperties: false,
-              properties: {
-                auth: { type: "string" },
-                // createConnection: { type: "function" },
-                defaultPort: { type: "integer" },
-                family: { enum: [4, 6] },
-                headers: { type: "object", default: {} },
-                hints: { type: "integer" },
-                host: { type: "string", default: "localhost" },
-                hostname: { type: "string" },
-                insecureHTTPParser: { type: "boolean", default: false },
-                joinDuplicateHeaders: { type: "boolean", default: false },
-                localAddress: { type: "string" },
-                localPort: { type: "integer" },
-                // lookup: { type: "function" },
-                maxHeaderSize: { type: "integer", default: 16384 },
-                method: { type: "string", default: "GET" },
-                path: { type: "string", default: "/" },
-                port: { type: "integer", default: 80 },
-                protocol: { type: "string", default: "http:" },
-                setDefaultHeaders: { type: "boolean", default: true },
-                setHost: { type: "boolean", default: true },
-                // signal: { type: "function" },
-                socketPath: { type: "string" },
-                timeout: { type: "integer" },
-                uniqueHeaders: { type: "array" }
-              }
-            },
-            agentOptions: {
-              type: "object",
-              additionalProperties: false,
-              properties: {
-                // See: https://nodejs.org/api/http.html#new-agentoptions
-                keepAlive: { type: "boolean", default: false },
-                keepAliveMsecs: { type: "integer", default: 1000 },
-                maxSockets: { type: "integer" },
-                maxTotalSockets: { type: "integer" },
-                maxFreeSockets: { type: "integer", default: 256 },
-                scheduling: { type: "string", enum: ["fifo", "lifo"], default: "lifo" },
-                timeout: { type: "integer" },
-                // See: https://nodejs.org/api/https.html#new-agentoptions
-                maxCachedSessions: { type: "integer", default: 100 },
-                servername: { type: "string" },
-              }
-            },
+            httpxOptions: { $ref: "#/definitions/requestOptions" },
+            agentOptions: { $ref: "#/definitions/agentOptions" },
             originTimeout: { type: "integer" },
             originBreaker: { type: "boolean", default: false },
-            originBreakerOptions: { $ref: "#/definitions/circuitBreakerConfiguration" }
-          }
-        },
-        cache: {
-          type: "object",
-          additionalProperties: false,
-          allOf: [
-            {
-              if: {
-                properties: {
-                  distributedRequestsCoalescing: { const: true }
-                },
-                required: ["distributedRequestsCoalescing"]
-              },
-              then: {
-                required: ["distributedRequestsCoalescingOptions"]
-              }
-            }
-          ],
-          properties: {
-            purgePath: { type: "string", default: "/purge" },
-            cacheableUrlPatterns: {
-              type: "array",
-              items: {
-                type: "string"
-              },
-              default: []
-            },
-            includeOriginIdInCacheKey: { type: "boolean", default: true },
-            ignoredQueryParams: {
-              type: "array",
-              items: {
-                type: "string"
-              }
-            },
-            sortQueryParams: { type: "boolean", default: false },
-            localRequestsCoalescing: { type: "boolean", default: true },
-            distributedRequestsCoalescing: { type: "boolean", default: false },
-            distributedRequestsCoalescingOptions:
-            {
-              type: "object",
-              required: ["lockTTL", "retryCount", "retryDelay", "retryJitter"],
-              additionalProperties: false,
-              properties: {
-                lockTTL: { type: "integer" },
-                retryCount: { type: "integer" },
-                retryDelay: { type: "integer" },
-                retryJitter: { type: "integer" }
-              }
-            }
+            originBreakerOptions: { $ref: "#/definitions/circuitBreakerOptions" }
           }
         },
         bff: {
@@ -228,6 +153,7 @@ export async function app(opts = {}, ajv = new Ajv({ useDefaults: true })) {
             },
             transformations: {
               type: "array",
+              minItems: 1,
               items: {
                 type: "object",
                 minProperties: 2,
@@ -238,6 +164,7 @@ export async function app(opts = {}, ajv = new Ajv({ useDefaults: true })) {
                   urlPattern: { type: "string" },
                   actions: {
                     type: "array",
+                    minItems: 1,
                     items: {
                       type: "object",
                       minProperties: 2,
@@ -264,6 +191,56 @@ export async function app(opts = {}, ajv = new Ajv({ useDefaults: true })) {
             },
           }
         },
+        cache: {
+          type: "object",
+          additionalProperties: false,
+          required: ["purgePath", "cacheableUrlPatterns"],
+          allOf: [
+            {
+              if: {
+                properties: {
+                  distributedRequestsCoalescing: { const: true }
+                },
+                required: ["distributedRequestsCoalescing"]
+              },
+              then: {
+                required: ["distributedRequestsCoalescingOptions"]
+              }
+            }
+          ],
+          properties: {
+            purgePath: { type: "string", default: "/purge" },
+            cacheableUrlPatterns: {
+              type: "array",
+              minItems: 1,
+              items: {
+                type: "string"
+              }
+            },
+            includeOriginIdInCacheKey: { type: "boolean", default: true },
+            ignoredQueryParams: {
+              type: "array",
+              items: {
+                type: "string"
+              }
+            },
+            sortQueryParams: { type: "boolean", default: true },
+            localRequestsCoalescing: { type: "boolean", default: true },
+            distributedRequestsCoalescing: { type: "boolean", default: false },
+            distributedRequestsCoalescingOptions:
+            {
+              type: "object",
+              required: ["lockTTL", "retryCount", "retryDelay", "retryJitter"],
+              additionalProperties: false,
+              properties: {
+                lockTTL: { type: "integer" },
+                retryCount: { type: "integer" },
+                retryDelay: { type: "integer" },
+                retryJitter: { type: "integer" }
+              }
+            }
+          }
+        },
         oauth2: {
           type: "object",
           additionalProperties: false,
@@ -273,8 +250,7 @@ export async function app(opts = {}, ajv = new Ajv({ useDefaults: true })) {
             "clientId",
             "clientSecret",
             "discoverySupported",
-            "postAuthRedirectUrl",
-            "redis"],
+            "postAuthRedirectUrl"],
           allOf: [
             {
               if: {
@@ -317,17 +293,17 @@ export async function app(opts = {}, ajv = new Ajv({ useDefaults: true })) {
             authorizationServerMetadata: {
               type: "object",
               additionalProperties: true,
-              required: ["issuer", "authorization_endpoint", "token_endpoint"],
+              required: [
+                "issuer",
+                "authorization_endpoint",
+                "token_endpoint",
+                "jwks_uri"
+              ],
               properties: {
                 issuer: { type: "string" },
                 authorization_endpoint: { type: "string" },
                 token_endpoint: { type: "string" },
-                response_types_supported: {
-                  type: "array",
-                  items: {
-                    type: "string"
-                  }
-                }
+                jwks_uri: { type: "string" }
               }
             },
             authorizationRequest: { type: "object", default: {} },
@@ -336,33 +312,37 @@ export async function app(opts = {}, ajv = new Ajv({ useDefaults: true })) {
             sessionIdCookieName: { type: "string", default: "speedis_token_id" },
             postAuthRedirectUrl: { type: "string" },
           }
+        },
+        redis: {
+          type: "object",
+          additionalProperties: false,
+          required: ["redisOptions"],
+          allOf: [
+            {
+              if: {
+                properties: {
+                  redisBreaker: { const: true }
+                },
+                required: ["redisBreaker"]
+              },
+              then: {
+                required: ["redisBreakerOptions"]
+              }
+            }
+          ],
+          properties: {
+            redisOptions: {
+              type: "object",
+            },
+            redisTimeout: { type: "integer" },
+            redisBreaker: { type: "boolean", default: false },
+            redisBreakerOptions: { $ref: "#/definitions/circuitBreakerOptions" },
+            disableOriginOnRedisOutage: { type: "boolean", default: false },
+          }
         }
       }
     }
   )
-
-  /*
-  accessControl: { 
-    type: "array",
-    items: {
-      type: "object",
-      minProperties: 2,
-      maxProperties: 2,
-      additionalProperties: false,
-      required: ["urlPattern", "requiredScopes"],
-      properties: {
-        urlPattern: { type: "string" },
-        requiredScopes: {
-          type: "array",
-          items: {
-            type: "string",
-          }
-        } 
-      }
-    }
-  }
-  */
-
 
   // Register the Prometheus metrics.
   const server = fastify(opts)

@@ -481,6 +481,9 @@ export default async function (server, opts) {
         options.method = request.method
         options.path = generatePath(request)
         options.headers = request.headers
+        if (request.access_token) {
+          options.headers['authorization'] = `Bearer ${request.access_token}`
+        }
 
         const fetch = originBreaker
           ? originBreaker.fire(options, request.rawBody)
@@ -958,6 +961,9 @@ export default async function (server, opts) {
           return -1
         }
 
+        if (request.access_token) {
+          options.headers['authorization'] = `Bearer ${request.access_token}`
+        }
         if (originBreaker) {
           fetch = originBreaker.fire(options, request.body)
         } else {
