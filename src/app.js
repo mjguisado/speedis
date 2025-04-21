@@ -194,7 +194,7 @@ export async function app(opts = {}, ajv = new Ajv({ useDefaults: true })) {
         cache: {
           type: "object",
           additionalProperties: false,
-          required: ["purgePath", "cacheableUrlPatterns"],
+          required: ["purgePath", "cacheables"],
           allOf: [
             {
               if: {
@@ -210,11 +210,18 @@ export async function app(opts = {}, ajv = new Ajv({ useDefaults: true })) {
           ],
           properties: {
             purgePath: { type: "string", default: "/purge" },
-            cacheableUrlPatterns: {
+            cacheables: {
               type: "array",
               minItems: 1,
               items: {
-                type: "string"
+                type: "object",
+                minProperties: 1,
+                maxProperties: 2,
+                required: ["urlPattern"],
+                properties: {
+                  urlPattern: { type: "string" },
+                  perUser: { type: "boolean", default: false }
+                }
               }
             },
             includeOriginIdInCacheKey: { type: "boolean", default: true },
@@ -250,7 +257,7 @@ export async function app(opts = {}, ajv = new Ajv({ useDefaults: true })) {
             "clientId",
             "clientSecret",
             "discoverySupported",
-            "postAuthRedirectUrl"],
+            "postAuthRedirectUri"],
           allOf: [
             {
               if: {
@@ -310,7 +317,7 @@ export async function app(opts = {}, ajv = new Ajv({ useDefaults: true })) {
             pkceEnabled: { type: "boolean", default: false },
             authorizationCodeTtl: { type: "number", default: 300 },
             sessionIdCookieName: { type: "string", default: "speedis_token_id" },
-            postAuthRedirectUrl: { type: "string" },
+            postAuthRedirectUri: { type: "string" },
           }
         },
         redis: {

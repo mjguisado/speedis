@@ -86,25 +86,37 @@ export default async function (server, opts) {
       ? new Map()
       : null
     purgeUrlPrefix = path.join(opts.prefix, opts.cache.purgePath)
-    const cacheableUrls = []
-    opts.cache.cacheableUrlPatterns.forEach(cacheableUrlPattern => {
+    opts.cache.cacheables.forEach(cacheable => {
       try {
-        cacheableUrls.push(new RegExp(cacheableUrlPattern))
+        cacheable.re = new RegExp(cacheable.urlPattern)
       } catch (error) {
-        server.log.error(`cacheableUrlPattern ${cacheableUrlPattern} is not a valid regular expresion. Origin: ${opts.id}`)
+        server.log.error(`urlPattern ${cacheable.urlPattern} is not a valid regular expresion. Origin: ${opts.id}`)
         throw new Error(`The cache configuration is invalid. Origin: ${opts.id}`)
       }
     })
     server.decorateRequest('cacheable', false)
+    server.decorateRequest('cacheable_per_user', false)
     server.addHook('onRequest', async (request, reply) => {
       request.cacheable = false
+      request.cacheable_per_user = false
       if ('GET' === request.method) {
-        for (const cacheableUrl of cacheableUrls) {
-          if (cacheableUrl.test(request.raw.url)) {
+        for (const cacheable of opts.cache.cacheables) {
+          if (cacheable.re.test(request.raw.url)) {
             request.cacheable = true
+            request.cacheable_per_user = cacheable.perUser
             break
           }
         }
+      }
+    })
+    server.addHook('preValidation', async (request, reply) => {
+      if (request.cacheable_per_user && !request.oauth_sub) {
+        const msg = `This resource ${request.url.raw} is cacheable per user, but the user could not be determined. Origin: ${opts.id}.`
+        server.log.error(msg)
+        return reply
+          .code(400)
+          .headers({date: new Date().toUTCString()})
+          .send(opts.exposeErrors?msg:"")
       }
     })
   }
@@ -233,8 +245,10 @@ export default async function (server, opts) {
     server.decorate('jwks', jwks)
 
     server.decorateRequest('access_token', null)
-    server.addHook('preValidation', async (request, reply) => {
+    server.decorateRequest('oauth_sub', null)
+    server.addHook('onRequest', async (request, reply) => {
       request.access_token = null
+      request.oauth_sub = null
       // Checks if the cookie header is present
       if (request.headers?.cookie) {
         // Parse the Cookie header
@@ -257,7 +271,7 @@ export default async function (server, opts) {
             // https://openid.net/specs/openid-connect-core-1_0.html#IDToken
             try {
               // Checks the validity of the access token
-              await jwtVerify(
+              const { payload } = await jwtVerify(
                 tokens.access_token,
                 jwks,
                 {
@@ -266,6 +280,7 @@ export default async function (server, opts) {
               )
               // If valid, decorate the request with the access token
               request.access_token = tokens.access_token
+              request.oauth_sub = payload.sub
             } catch (error) {
               if (error.code === 'ERR_JWT_EXPIRED') {
                 // If the access token has expired, attempt to renew it
@@ -275,18 +290,31 @@ export default async function (server, opts) {
                     tokens.refresh_token
                   )
                   // If valid, decorate the request with the access token
+                  const { payload } = await jwtVerify(
+                    freshTokens.access_token,
+                    jwks,
+                    {
+                      issuer: authServerConfiguration.serverMetadata().issuer,
+                    }
+                  )
                   await storeSession(server, freshTokens)
                   request.access_token = freshTokens.access_token
+                  request.oauth_sub = payload.sub
                 } catch (error) {
                   const msg = `Error while refreshing the access token. Origin: ${opts.id}.`
                   server.log.error(msg, { cause: error })
-                  espera
-                  return reply.code(500).send(opts.exposeErrors ? msg : "")
+                  return reply
+                    .code(500)
+                    .headers({date: new Date().toUTCString()})
+                    .send(opts.exposeErrors?msg:"")
                 }
               } else {
                 const msg = `Invalid access token: ${tokens.access_token}. Origin: ${opts.id}.`
                 server.log.error(msg, { cause: error })
-                return reply.code(400).send(opts.exposeErrors ? msg : "")
+                return reply
+                  .code(400)
+                  .headers({date: new Date().toUTCString()})
+                  .send(opts.exposeErrors?msg:"")
               }
             }
           }
@@ -563,7 +591,6 @@ export default async function (server, opts) {
         return reply.code(404).headers({ date: now }).send()
       }
     } catch (error) {
-      reply.code(500)
       const msg =
         "Error purgin the cache in Redis. " +
         `Origin: ${opts.id}. Key: ${cacheKey}. RID: ${request.id}.`
@@ -810,6 +837,9 @@ export default async function (server, opts) {
     }
 
     let cacheKey = opts.cache.includeOriginIdInCacheKey ? opts.id : ''
+    if (request.cacheable_per_user) {
+      cacheKey += (cacheKey.length>0 ? ':' : '') + request.oauth_sub
+    }
     cacheKey += path.replaceAll('/', ':')
     if (cacheKey.startsWith(':')) cacheKey = cacheKey.slice(1)
 

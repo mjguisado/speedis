@@ -101,13 +101,20 @@ The following table describes the supported fields in the cache configuration ob
 |Field|Type|Mandatory|Default|Description|
 |-----|----|---------|-------|-----------|
 |`purgePath`|String|`false`|`/purge`|URL path prefix used to trigger cache purge requests. Any DELETE request whose path starts with this prefix will be interpreted as a cache purge operation.|
-|`cacheableUrlPatterns`|[String]|`true`||List of URL patterns that are considered cacheable. Only request with method GET can be cached.|
+|`cacheables`|[Object]|`true`||List of URL patterns that are considered cacheable. Only request with method GET can be cached. Its format is detailed below.|
 |`includeOriginIdInCacheKey`|Boolean|`false`|`true`|This field determines whether the id of the origin is used to generate the cache key for the entry (`true` or `false`).|
 |`ignoredQueryParams`|[String]|`false`||The cache key is generated based on the URL requested from the origin. This field defines a list of query string parameters that will be ignored when forming the cache key for the entry.|
 |`sortQueryParams`|Boolean|`false`|`true`|The cache key is generated based on the URL requested from the origin. This field determines whether the query string parameters should be sorted alphabetically before being used to generate the cache key for the entry (`true` or `false`). |
 |`localRequestsCoalescing`|Boolean|`false`|`true`|Enables (`true`) or disables (`false`) the request coalescing mechanism.|
 |`distributedRequestsCoalescing`|Boolean|`false`|`false`|Enables (`true`) or disables (`false`) the request coalescing functionality across multiple instances.|
 |`distributedRequestsCoalescingOptions`|Object|`true` if distributedRequestsCoalescing is `true`||Configure the distributed lock mechanism used to implements the requests coalescing functionality across multiple instances. Its format is detailed below.|
+
+## Cacheable configuration object
+The following table describes the supported fields in the cacheable configuration object.
+|Field|Type|Mandatory|Default|Description|
+|-----|----|---------|-------|-----------|
+|`urlPattern`|String|`true`||URL patterns that are considered cacheable.|
+|`perUser`|Boolean|`false`|`false`|Indicates whether the response for a given URL should be cached separately for each authenticated user.|
 
 ### Lock configuration object
 The following table describes the supported fields in the lock configuration object.
@@ -138,7 +145,7 @@ The following table describes the supported fields in the OAuth2-based Access Co
 |`pkceEnabled`|Boolean|`false`|`false`|Indicates whether PKCE (Proof Key for Code Exchange) is enabled. Although the client is considered Confidential, enabling PKCE provides an additional layer of security during the token exchange process.|
 |`authorizationCodeTtl`|Number|`false`|`300`|Defines the time-to-live (TTL) for the authorization code, indicating how long the code remains valid before it expires. This value is typically set to a short duration (e.g., 5-10 minutes) to ensure that the code is used promptly after issuance.|
 |`sessionIdCookieName`|String|`false`|`speedis_token_id`|Specifies the name of the cookie that the client uses to communicate the value of the ID token to the User-Agent.|
-|`postAuthRedirectUrl`|String|`true`||Specifies the URL to which the user will be redirected after successful authentication and the establishment of the authentication cookie. This page is typically a landing page or the main entry point to the application, ensuring that the user is directed to the appropriate location after login.|
+|`postAuthRedirectUri`|String|`true`||Specifies the URL to which the user will be redirected after successfully completing the authentication flow with the authorization server and the establishment of the authentication cookie. This page is typically a landing page or the main entry point to the application, ensuring that the user is directed to the appropriate location after login.|
 
 ## Redis configuration object
 The following table describes the supported fields in the redis configuration object.
