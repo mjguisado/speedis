@@ -110,7 +110,7 @@ export default async function (server, opts) {
       }
     })
     server.addHook('preValidation', async (request, reply) => {
-      if (request.cacheable_per_user && !request.oauth_sub) {
+      if (request.cacheable_per_user && !request.session?.sub) {
         const msg = `This resource ${request.url.raw} is cacheable per user, but the user could not be determined. Origin: ${opts.id}.`
         server.log.error(msg)
         return reply
@@ -244,11 +244,44 @@ export default async function (server, opts) {
     const jwks = createRemoteJWKSet(jwksUri)
     server.decorate('jwks', jwks)
 
-    server.decorateRequest('access_token', null)
-    server.decorateRequest('oauth_sub', null)
+    server.decorateRequest('session', null)
+
+    async function decorateRequestWithSessionData(request, tokens) {
+
+      if ((tokens.token_type || '').toLowerCase() !== 'bearer') {
+        throw new Error(`Unsupported token_type: ${tokens.token_type}`)
+      }
+
+      const session = {}
+      // Checks whether we have a id_token (OpenID).
+      if (tokens.id_token) {
+        const { payload } = await jwtVerify(
+          tokens.id_token,
+          jwks,
+          {
+            issuer: authServerConfiguration.serverMetadata().issuer,
+          }
+        )
+        session.id_token = tokens.id_token
+        session.sub = payload.sub
+      }
+      // Checks the validity of the access token
+      const { payload } = await jwtVerify(
+        tokens.access_token,
+        jwks,
+        {
+          issuer: authServerConfiguration.serverMetadata().issuer,
+        }
+      )
+      // If valid, decorate the request with the access token
+      session.access_token = tokens.access_token
+      if (!session.sub) session.sub = payload.sub
+
+      request.session = session
+
+    }
+
     server.addHook('onRequest', async (request, reply) => {
-      request.access_token = null
-      request.oauth_sub = null
       // Checks if the cookie header is present
       if (request.headers?.cookie) {
         // Parse the Cookie header
@@ -268,19 +301,8 @@ export default async function (server, opts) {
             : await server.redis.json.get(id_session)
           // Checks whether the information was stored in Redis
           if (Object.keys(tokens).length > 0) {
-            // https://openid.net/specs/openid-connect-core-1_0.html#IDToken
             try {
-              // Checks the validity of the access token
-              const { payload } = await jwtVerify(
-                tokens.access_token,
-                jwks,
-                {
-                  issuer: authServerConfiguration.serverMetadata().issuer,
-                }
-              )
-              // If valid, decorate the request with the access token
-              request.access_token = tokens.access_token
-              request.oauth_sub = payload.sub
+              await decorateRequestWithSessionData(request, tokens)
             } catch (error) {
               if (error.code === 'ERR_JWT_EXPIRED') {
                 // If the access token has expired, attempt to renew it
@@ -289,17 +311,8 @@ export default async function (server, opts) {
                     authServerConfiguration,
                     tokens.refresh_token
                   )
-                  // If valid, decorate the request with the access token
-                  const { payload } = await jwtVerify(
-                    freshTokens.access_token,
-                    jwks,
-                    {
-                      issuer: authServerConfiguration.serverMetadata().issuer,
-                    }
-                  )
                   await storeSession(server, freshTokens)
-                  request.access_token = freshTokens.access_token
-                  request.oauth_sub = payload.sub
+                  await decorateRequestWithSessionData(request, freshTokens)
                 } catch (error) {
                   const msg = `Error while refreshing the access token. Origin: ${opts.id}.`
                   server.log.error(msg, { cause: error })
@@ -309,7 +322,9 @@ export default async function (server, opts) {
                     .send(opts.exposeErrors?msg:"")
                 }
               } else {
-                const msg = `Invalid access token: ${tokens.access_token}. Origin: ${opts.id}.`
+                const msg = "Invalid stored session."
+                if (tokens.id_token) msg += ` ID Token: ${tokens.id_token}.`
+                msg += ` Access Token: ${tokens.access_token}. . Origin: ${opts.id}.`  
                 server.log.error(msg, { cause: error })
                 return reply
                   .code(400)
@@ -509,8 +524,8 @@ export default async function (server, opts) {
         options.method = request.method
         options.path = generatePath(request)
         options.headers = request.headers
-        if (request.access_token) {
-          options.headers['authorization'] = `Bearer ${request.access_token}`
+        if (request.session?.access_token) {
+          options.headers['authorization'] = `Bearer ${request.session.access_token}`
         }
 
         const fetch = originBreaker
@@ -838,7 +853,7 @@ export default async function (server, opts) {
 
     let cacheKey = opts.cache.includeOriginIdInCacheKey ? opts.id : ''
     if (request.cacheable_per_user) {
-      cacheKey += (cacheKey.length>0 ? ':' : '') + request.oauth_sub
+      cacheKey += (cacheKey.length>0 ? ':' : '') + request.session.sub
     }
     cacheKey += path.replaceAll('/', ':')
     if (cacheKey.startsWith(':')) cacheKey = cacheKey.slice(1)
@@ -991,8 +1006,8 @@ export default async function (server, opts) {
           return -1
         }
 
-        if (request.access_token) {
-          options.headers['authorization'] = `Bearer ${request.access_token}`
+        if (request.session?.access_token) {
+          options.headers['authorization'] = `Bearer ${request.session.access_token}`
         }
         if (originBreaker) {
           fetch = originBreaker.fire(options, request.body)
