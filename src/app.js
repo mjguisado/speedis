@@ -316,7 +316,7 @@ export async function app(opts = {}, ajv = new Ajv({ useDefaults: true })) {
             authorizationRequest: { type: "object", default: {} },
             pkceEnabled: { type: "boolean", default: false },
             authorizationCodeTtl: { type: "number", default: 300 },
-            sessionIdCookieName: { type: "string", default: "speedis_token_id" },
+            sessionIdCookieName: { type: "string", default: "speedis_session" },
             postAuthRedirectUri: { type: "string" },
           }
         },
