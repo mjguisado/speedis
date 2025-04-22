@@ -54,6 +54,7 @@ export default async function (server, opts) {
       )
       throw error
     }
+
   })
 
   server.get(opts.callbackPath, async (request, reply) => {
@@ -141,6 +142,5 @@ export default async function (server, opts) {
       .code(204)
       .headers({date: new Date().toUTCString()})
       .send()
-})
-
+  })
 }

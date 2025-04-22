@@ -50,7 +50,7 @@
                 ]
             }
         ]
-    },    
+    },
     "cache": {
         "cacheables": [
             {
@@ -58,7 +58,7 @@
             },
             {
                 "urlPattern": "/mocks/items/.*",
-                "perUser": true    
+                "perUser": true
             }
         ],
         "ignoredQueryParams": [
@@ -93,7 +93,7 @@
         },
         "pkceEnabled": true,
         "postAuthRedirectUri": "https://mocks/mocks/items/RealBetis?delay=300&cc=public,max-age=10&a=alfa&b=beta&c="
-    },    
+    },
     "redis": {
         "redisOptions": {
             "url": "redis://redis:6379"
@@ -105,5 +105,5 @@
             "resetTimeout": 5000
         },
         "disableOriginOnRedisOutage": true
-    }        
+    }
 }
