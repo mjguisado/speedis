@@ -55,7 +55,7 @@
     "cache": {
         "cacheables": [
             {
-                "urlPattern": "/mocks/items/test-.*"
+                "urlPattern": "/mocks/items/public-.*"
             },
             {
                 "urlPattern": "/mocks/items/.*",
@@ -93,7 +93,10 @@
             "scope": "openid profile email"
         },
         "pkceEnabled": true,
-        "postAuthRedirectUri": "https://mocks/mocks/items/RealBetis?delay=300&cc=public,max-age=10&a=alfa&b=beta&c="
+        "postAuthRedirectUri": "https://mocks/mocks/items/RealBetis?delay=300&cc=public,max-age=10&a=alfa&b=beta&c=",
+        "logoutRequest": {
+            "post_logout_redirect_uri": "https://mocks/mocks/users/1"
+        }
     },
     "redis": {
         "redisOptions": {

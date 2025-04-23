@@ -3,7 +3,7 @@ import https from 'https'
 import path from 'path'
 import os from 'os'
 import { createClient, SchemaFieldTypes } from 'redis'
-import { SESSION_INDEX_NAME, SESSION_PREFIX, storeSession } from './helpers.js'
+import * as helpers from './helpers.js'
 import CircuitBreaker from 'opossum'
 import sessionPlugin from './session.js'
 import { jwtVerify, createRemoteJWKSet } from 'jose'
@@ -99,7 +99,7 @@ export default async function (server, opts) {
       try {
         // Documentation: https://redis.io/commands/ft.create/
         await client.ft.create(
-          SESSION_INDEX_NAME, 
+          helpers.SESSION_INDEX_NAME, 
           {
             sub: SchemaFieldTypes.TAG,
             iat: {
@@ -109,7 +109,7 @@ export default async function (server, opts) {
           },
           {
           ON: 'HASH',
-          PREFIX: SESSION_PREFIX
+          PREFIX: helpers.SESSION_PREFIX
           }
         )
       } catch (error) {
@@ -294,7 +294,7 @@ export default async function (server, opts) {
         const msg = `This resource ${request.url.raw} is cacheable per user, but the user could not be determined. Origin: ${opts.id}.`
         server.log.error(msg)
         return reply
-          .code(400)
+          .code(401)
           .headers({date: new Date().toUTCString()})
           .send(opts.exposeErrors?msg:"")
       }
@@ -462,57 +462,62 @@ export default async function (server, opts) {
     }
 
     server.addHook('onRequest', async (request, reply) => {
-      // Checks if the cookie header is present
+      let tokens = {}
       if (request.headers?.cookie) {
         // Parse the Cookie header
         const cookies = request.headers?.cookie
-          .split(';')
-          .map(cookie => cookie.trim().split('='))
-          .reduce((acc, [key, value]) => {
-            acc[key] = decodeURIComponent(value)
-            return acc
-          }, {})
-        // Checks if the session cookie is present
+            .split(';')
+            .map(cookie => cookie.trim().split('='))
+            .reduce((acc, [key, value]) => {
+                acc[key] = decodeURIComponent(value)
+                return acc
+            }, {})
         if (cookies[opts.oauth2.sessionIdCookieName]) {
-          const id_session = cookies[opts.oauth2.sessionIdCookieName]
           // Retrieve session information from Redis
-          const sessionKey = SESSION_PREFIX + id_session
-          const tokens = server.redisBreaker
-            ? await server.redisBreaker.fire('hGetAll', [sessionKey])
-            : await server.redis.hGetAll(sessionKey)
-          // Checks whether the information was stored in Redis
-          if (Object.keys(tokens).length > 0) {
+          const id_session = cookies[opts.oauth2.sessionIdCookieName]
+          const sessionKey = helpers.SESSION_PREFIX + id_session
+          try {
+            tokens = server.redisBreaker
+              ? await server.redisBreaker.fire('hGetAll', [sessionKey])
+              : await server.redis.hGetAll(sessionKey)
+          } catch (error) {
+            const msg = "An error occurred while retrieving the stored session."
+            server.log.error(msg, { cause: error })
+            return reply
+              .code(500)
+              .headers({date: new Date().toUTCString()})
+              .send(opts.exposeErrors?msg:"")
+          }
+        }
+      }
+      if (Object.keys(tokens).length > 0) {
+        try {
+          await decorateRequestWithSessionData(request, tokens)
+        } catch (error) {
+          if (error.code === 'ERR_JWT_EXPIRED') {
+            // If the access token has expired, attempt to renew it
             try {
-              await decorateRequestWithSessionData(request, tokens)
+              const freshTokens = await openIdClient.refreshTokenGrant(
+                authServerConfiguration,
+                tokens.refresh_token
+              )
+              await helpers.storeSession(server, freshTokens)
+              await decorateRequestWithSessionData(request, freshTokens)
             } catch (error) {
-              if (error.code === 'ERR_JWT_EXPIRED') {
-                // If the access token has expired, attempt to renew it
-                try {
-                  const freshTokens = await openIdClient.refreshTokenGrant(
-                    authServerConfiguration,
-                    tokens.refresh_token
-                  )
-                  await storeSession(server, freshTokens)
-                  await decorateRequestWithSessionData(request, freshTokens)
-                } catch (error) {
-                  const msg = `Error while refreshing the access token. Origin: ${opts.id}.`
-                  server.log.error(msg, { cause: error })
-                  return reply
-                    .code(500)
-                    .headers({date: new Date().toUTCString()})
-                    .send(opts.exposeErrors?msg:"")
-                }
-              } else {
-                const msg = "Invalid stored session."
-                if (tokens.id_token) msg += ` ID Token: ${tokens.id_token}.`
-                msg += ` Access Token: ${tokens.access_token}. . Origin: ${opts.id}.`  
-                server.log.error(msg, { cause: error })
-                return reply
-                  .code(400)
-                  .headers({date: new Date().toUTCString()})
-                  .send(opts.exposeErrors?msg:"")
-              }
+              const msg = "Error while refreshing the access token."
+              server.log.error(msg, { cause: error })
+              return reply
+                .code(500)
+                .headers({date: new Date().toUTCString()})
+                .send(opts.exposeErrors?msg:"")
             }
+          } else {
+            const msg = "Invalid stored session."
+            server.log.error(msg, { cause: error })
+            return reply
+              .code(500)
+              .headers({date: new Date().toUTCString()})
+              .send(opts.exposeErrors?msg:"")
           }
         }
       }

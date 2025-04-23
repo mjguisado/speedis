@@ -21,7 +21,7 @@ suite('Speedis', async () => {
 
         test('DELETE 404', async (t) => {
             t.plan(1)
-            let url = '/mocks/mocks/items/test-' + crypto.randomUUID()
+            let url = '/mocks/mocks/items/public-' + crypto.randomUUID()
             let response = await fastifyServer.inject({
                 method: 'DELETE',
                 url: url.replace('/mocks/mocks/','/mocks/purge/mocks/')
@@ -31,7 +31,7 @@ suite('Speedis', async () => {
        
         test('DELETE 204', async (t) => {
             t.plan(2)
-            let url = '/mocks/mocks/items/test-' + crypto.randomUUID()
+            let url = '/mocks/mocks/items/public-' + crypto.randomUUID()
 
             url += '?cc=' + encodeURIComponent('public,max-age=60')
             let response = await fastifyServer.inject({
@@ -52,7 +52,7 @@ suite('Speedis', async () => {
             let clientmaxage = 2
             let originmaxage = clientmaxage * 2
 
-            let url = '/mocks/mocks/items/test-' + crypto.randomUUID()
+            let url = '/mocks/mocks/items/public-' + crypto.randomUUID()
             url += '?cc=' + encodeURIComponent(`public,max-age=${originmaxage}`)
             let response = await fastifyServer.inject({
                 method: 'GET',
@@ -114,7 +114,7 @@ suite('Speedis', async () => {
             let clientminfresh = 2
             let originmaxage = clientminfresh * 2
 
-            let url = '/mocks/mocks/items/test-' + crypto.randomUUID()
+            let url = '/mocks/mocks/items/public-' + crypto.randomUUID()
             url += '?cc=' + encodeURIComponent(`public,max-age=${originmaxage}`)
             let response = await fastifyServer.inject({
                 method: 'GET',
@@ -176,7 +176,7 @@ suite('Speedis', async () => {
             let clientmaxstale = 2
             let originmaxage = clientmaxstale
 
-            let url = '/mocks/mocks/items/test-' + crypto.randomUUID()
+            let url = '/mocks/mocks/items/public-' + crypto.randomUUID()
             url += '?cc=' + encodeURIComponent(`public,max-age=${originmaxage}`)
             let response = await fastifyServer.inject({
                 method: 'GET',
@@ -253,7 +253,7 @@ suite('Speedis', async () => {
 
             let originmaxage = 4
 
-            let url = '/mocks/mocks/items/test-' + crypto.randomUUID()
+            let url = '/mocks/mocks/items/public-' + crypto.randomUUID()
             url += '?cc=' + encodeURIComponent(`public,max-age=${originmaxage}`)
             let response = await fastifyServer.inject({
                 method: 'GET',
@@ -294,7 +294,7 @@ suite('Speedis', async () => {
 
             let originmaxage = 2
 
-            let url = '/mocks/mocks/items/test-' + crypto.randomUUID()
+            let url = '/mocks/mocks/items/public-' + crypto.randomUUID()
             url += '?cc=' + encodeURIComponent(`public,max-age=${originmaxage}`)
             let response = await fastifyServer.inject({
                 method: 'GET',
@@ -323,7 +323,7 @@ suite('Speedis', async () => {
 
             let originmaxage = 4
 
-            let url = '/mocks/mocks/items/test-' + crypto.randomUUID()
+            let url = '/mocks/mocks/items/public-' + crypto.randomUUID()
             url += '?cc=' + encodeURIComponent(`public,max-age=${originmaxage},no-cache`)
             let response = await fastifyServer.inject({
                 method: 'GET',
@@ -350,7 +350,7 @@ suite('Speedis', async () => {
 
             let originmaxage = 4
 
-            let url = '/mocks/mocks/items/test-' + crypto.randomUUID()
+            let url = '/mocks/mocks/items/public-' + crypto.randomUUID()
             url += '?cc=' + encodeURIComponent(`public,max-age=${originmaxage},private`)
             let response = await fastifyServer.inject({
                 method: 'GET',
@@ -377,7 +377,7 @@ suite('Speedis', async () => {
 
             let originmaxage = 4
 
-            let url = '/mocks/mocks/items/test-' + crypto.randomUUID()
+            let url = '/mocks/mocks/items/public-' + crypto.randomUUID()
             url += '?cc=' + encodeURIComponent(`public,max-age=${originmaxage},private="x-mocks-custom-header-1,x-mocks-custom-header-2"`)
             let response = await fastifyServer.inject({
                 method: 'GET',
@@ -411,7 +411,7 @@ suite('Speedis', async () => {
 
             let originmaxage = 4
 
-            let url = '/mocks/mocks/items/test-' + crypto.randomUUID()
+            let url = '/mocks/mocks/items/public-' + crypto.randomUUID()
             url += '?cc=' + encodeURIComponent(`public,max-age=${originmaxage},no-cache="x-mocks-custom-header-1,x-mocks-custom-header-2"`)
             let response = await fastifyServer.inject({
                 method: 'GET',
@@ -444,13 +444,13 @@ suite('Speedis', async () => {
             t.plan(1)
             let originmaxage = 4
             const uuid = crypto.randomUUID()
-            let url = '/mocks/mocks/items/test-' + uuid 
+            let url = '/mocks/mocks/items/public-' + uuid 
             url += '?cc=' + encodeURIComponent(`public,max-age=${originmaxage}`)
             let response = await fastifyServer.inject({
                 method: 'GET',
                 url: url,
                 headers: {
-                    'if-none-match': 'W/"' + crypto.randomUUID() + `", W/"test-${uuid}"`
+                    'if-none-match': 'W/"' + crypto.randomUUID() + `", W/"public-${uuid}"`
                 }
             })
             t.assert.strictEqual(response.statusCode, 304)
@@ -462,7 +462,7 @@ suite('Speedis', async () => {
 
             let maxage = 3
 
-            let url = '/mocks/mocks/items/test-' + crypto.randomUUID()
+            let url = '/mocks/mocks/items/public-' + crypto.randomUUID()
             url += '?cc=' + encodeURIComponent(`public,max-age=${maxage}`)
             let response = await fastifyServer.inject({
                 method: 'GET',

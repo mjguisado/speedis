@@ -143,6 +143,8 @@ The following table describes the supported fields in the OAuth2-based Access Co
 |`authorizationCodeTtl`|Number|`false`|`300`|Defines the time-to-live (TTL) for the authorization code, indicating how long the code remains valid before it expires. This value is typically set to a short duration (e.g., 5-10 minutes) to ensure that the code is used promptly after issuance.|
 |`sessionIdCookieName`|String|`false`|`speedis_session`|Specifies the name of the cookie that the client uses to communicate the value of the ID token to the User-Agent.|
 |`postAuthRedirectUri`|String|`true`||Specifies the URL to which the user will be redirected after successfully completing the authentication flow with the authorization server and the establishment of the authentication cookie. This page is typically a landing page or the main entry point to the application, ensuring that the user is directed to the appropriate location after login.|
+|`logoutRequest`|Object|`false`|{}|Allows the definition of values for the parameters that will be included in the query component of the [OpenID Provider's Logout Endpoint](https://openid.net/specs/openid-connect-rpinitiated-1_0.html).|
+|`postLogoutRedirectUri`|String|`false`||Specifies the URL to which the user will be redirected after successfully completing the logout flow with the OpenID Provider. This page is typically a landing page or the main entry point to the application, ensuring that the user is directed to the appropriate location after logout.|
 
 ## Redis configuration object
 The following table describes the supported fields in the redis configuration object.
@@ -153,6 +155,3 @@ The following table describes the supported fields in the redis configuration ob
 |`redisBreaker`|Boolean|`false`|`false`|Enables (`true`) or disables (`false`) the redis's circuit breaker mechanism.|
 |`redisBreakerOptions`|Object|`true` if redisBreaker is enabled||Speedis leverages [Opossum](https://nodeshift.dev/opossum/) to implement the circuit breaker mechanism. This field is used to define the circuit braker options. Its format is almost identical to the original [options](https://nodeshift.dev/opossum/#circuitbreaker). The main difference is that, since the configuration is in JSON format, parameters defined as JavaScript entities in the original options are not supported. Additionally, options related to caching and coalescing features are also not supported.
 |`disableOriginOnRedisOutage`|Boolean|`false`|`false`|When set to `true` Speedis will not forward requests to the origin server if Redis becomes unavailable.|
-
-
-

@@ -257,7 +257,8 @@ export async function app(opts = {}, ajv = new Ajv({ useDefaults: true })) {
             "clientId",
             "clientSecret",
             "discoverySupported",
-            "postAuthRedirectUri"],
+            "postAuthRedirectUri",
+          ],
           allOf: [
             {
               if: {
@@ -315,6 +316,7 @@ export async function app(opts = {}, ajv = new Ajv({ useDefaults: true })) {
             authorizationCodeTtl: { type: "number", default: 300 },
             sessionIdCookieName: { type: "string", default: "speedis_session" },
             postAuthRedirectUri: { type: "string" },
+            logoutRequest: { type: "object", default: {} },
           }
         },
         redis: {

@@ -22,3 +22,29 @@ export async function storeSession(server, tokens) {
         throw error
     }
 }
+
+export async function getSession(server, request, sessionIdCookieName) {
+    let tokens = {}
+    // Checks if the cookie header is present
+    if (request.headers?.cookie) {
+        // Parse the Cookie header
+        const cookies = request.headers?.cookie
+            .split(';')
+            .map(cookie => cookie.trim().split('='))
+            .reduce((acc, [key, value]) => {
+                acc[key] = decodeURIComponent(value)
+                return acc
+            }, {})
+        if (cookies[sessionIdCookieName]) {
+            // Retrieve session information from Redis
+            const id_session = cookies[sessionIdCookieName]
+            const sessionKey = SESSION_PREFIX + id_session
+            tokens = server.redisBreaker
+                ? await server.redisBreaker.fire('hGetAll', [sessionKey])
+                : await server.redis.hGetAll(sessionKey)
+        }
+    }
+    return Object.keys(tokens).length > 0
+        ? tokens
+        : false
+}

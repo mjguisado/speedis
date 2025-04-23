@@ -1,6 +1,6 @@
 import * as openidClient from 'openid-client'
 import * as crypto from 'crypto'
-import { SESSION_INDEX_NAME, SESSION_PREFIX, storeSession } from './helpers.js'
+import * as helpers from './helpers.js'
 
 // https://medium.com/google-cloud/understanding-oauth2-and-building-a-basic-authorization-server-of-your-own-a-beginners-guide-cf7451a16f66
 // https://skycloak.io/blog/keycloak-how-to-create-a-pkce-authorization-flow-client/
@@ -93,7 +93,7 @@ export default async function (server, opts) {
       throw error
     }
 
-    const id_session = await storeSession(server, tokens)
+    const id_session = await helpers.storeSession(server, tokens)
     if (opts.pkceEnabled) {
       server.redisBreaker
           ? await server.redisBreaker.fire('unlink', [request.query['state']])
@@ -104,6 +104,30 @@ export default async function (server, opts) {
     // https://github.com/fastify/fastify-cookie?tab=readme-ov-file#sending
     reply.header('set-cookie', `${opts.sessionIdCookieName}=${id_session}; Path=/; Secure; HttpOnly`)
     return reply.redirect(opts.postAuthRedirectUri)
+  })
+
+  server.get('/logout', async (request, reply) => {
+    let postLogoutRedirectUri = opts.logoutRequest.post_logout_redirect_uri
+    if (request.session?.id_token) {
+      const parameters = {
+        ... opts.logoutRequest,
+        id_token_hint: request.session.id_token,
+      }
+      try {
+        postLogoutRedirectUri = openidClient.buildEndSessionUrl(
+          server.authServerConfiguration, 
+          parameters
+        )
+      } catch (error) {
+        server.log.error(
+          `Error while building end session url. Origin: ${opts.id}.`, { cause: error }
+        )
+        throw error
+      }
+    }
+    return reply
+      .header('set-cookie', `${opts.sessionIdCookieName}=; Path=/; Secure; HttpOnly; Max-Age=0`)
+      .redirect(postLogoutRedirectUri)   
   })
 
   async function invalidateSession(sessionKey, tokens) {
@@ -131,7 +155,7 @@ export default async function (server, opts) {
 
   server.post('/sessions/:id_session/invalidate', async (request, reply) => {
     const { id_session } = request.params
-    const sessionKey = SESSION_PREFIX + id_session
+    const sessionKey = helpers.SESSION_PREFIX + id_session
     const now = new Date().toUTCString()
     try {
       if (await invalidateSession(sessionKey)) {
@@ -157,7 +181,7 @@ export default async function (server, opts) {
     try {
       const sessions = server.redisBreaker
         ? await server.redisBreaker.fire('ft.search', [
-            SESSION_INDEX_NAME, 
+            helpers.SESSION_INDEX_NAME, 
             `@sub:{${sub}}`,
             {
               SORTBY: {
@@ -167,7 +191,7 @@ export default async function (server, opts) {
             }
           ])
         : await server.redis.ft.search(
-          SESSION_INDEX_NAME, 
+          helpers.SESSION_INDEX_NAME, 
           `@sub:{\"${sub}\"}`,
             {
               SORTBY: {
@@ -187,7 +211,7 @@ export default async function (server, opts) {
         const invalidations = await Promise.allSettled(sessionsToInvalidate)
         invalidations.forEach((invalidation, i) => {
           if (invalidation.status === 'rejected') {
-            server.log.warn(`Failed to invalidate session ${sessions.documents[i].id.replace(SESSION_PREFIX,'')}:`, invalidation.reason)
+            server.log.warn(`Failed to invalidate session ${sessions.documents[i].id.replace(helpers.SESSION_PREFIX,'')}:`, invalidation.reason)
           }
         })
         reply.code(204).headers({ date: now }).send()
