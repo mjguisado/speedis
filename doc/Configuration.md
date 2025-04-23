@@ -133,9 +133,6 @@ The following table describes the supported fields in the OAuth2-based Access Co
 |`prefix`|String|`false`|`/oauth2`|URL path prefix used to route incoming requests to the OAuth2 plugin.|
 |`logLevel`|String|`false`|`info`|Logging level for the OAuth2 (`trace`, `debug`, `info`, `warn`, `error`, `fatal`).|
 |`baseUrl`|String|`true`||Since Speedis can serve multiple domains, this variable is used to specify the domain currently in use for yhe current origin.|
-|`redirectPath`|String|`false`|`/login`|Indicates the final part of the URL of the client that the User-Agent will use to redirect the Resource Owner to the Authentication endpoint of the Authorization Server, initiating the OAuth2 authentication flow.|
-|`callbackPath`|String|`false`|`/callback`|Indicates the final part of the client’s URL where the authorization server redirects the User-Agent back to the client after completing the OAuth2 authentication flow.|
-|`logoutPath`|String|`false`|`/logout`|Indicates the final part of the client’s URL that will handle logout requests initiated by the Authorization Server.|
 |`clientId`|String|`true`||The client identifier issued to the client during the registration process|
 |`clientSecret`|String|`true`||The client secret.|
 |`discoverySupported`|Boolean|`true`||If `true`, this indicates that the Authorization Server exposes a metadata document, allowing the client to automatically retrieve endpoint URLs and other configuration details. If `false`, all necessary endpoints and settings must be provided manually.|

@@ -290,9 +290,6 @@ export async function app(opts = {}, ajv = new Ajv({ useDefaults: true })) {
               default: "info"
             },
             baseUrl: { type: "string" },
-            redirectPath: { type: "string", default: "/login" },
-            callbackPath: { type: "string", default: "/callback" },
-            logoutPath: { type: "string", default: "/logout" },
             clientId: { type: "string" },
             clientSecret: { type: "string" },
             discoverySupported: { type: "boolean" },

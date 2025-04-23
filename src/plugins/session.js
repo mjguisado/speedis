@@ -1,7 +1,6 @@
 import * as openidClient from 'openid-client'
 import * as crypto from 'crypto'
-import { storeSession } from './helpers.js'
-import { jwtVerify } from 'jose'
+import { SESSION_INDEX_NAME, SESSION_PREFIX, storeSession } from './helpers.js'
 
 // https://medium.com/google-cloud/understanding-oauth2-and-building-a-basic-authorization-server-of-your-own-a-beginners-guide-cf7451a16f66
 // https://skycloak.io/blog/keycloak-how-to-create-a-pkce-authorization-flow-client/
@@ -13,7 +12,7 @@ import { jwtVerify } from 'jose'
 
 export default async function (server, opts) {
 
-  server.get(opts.redirectPath, async (request, reply) => {
+  server.get('/login', async (request, reply) => {
     /*
     The client initiates the flow by directing the resource owner's
     user-agent to the authorization endpoint.  The client includes
@@ -57,7 +56,7 @@ export default async function (server, opts) {
 
   })
 
-  server.get(opts.callbackPath, async (request, reply) => {
+  server.get('/callback', async (request, reply) => {
  
     const checks = {}
 
@@ -79,8 +78,8 @@ export default async function (server, opts) {
 
     let tokens = null
     try {
-      const index = request.raw.url.indexOf(opts.prefix);
-      const path = index !== -1 ? request.raw.url.slice(index) : request.raw.url;
+      const index = request.raw.url.indexOf(opts.prefix)
+      const path = index !== -1 ? request.raw.url.slice(index) : request.raw.url
       const currentUrl = new URL(path, opts.baseUrl)
       tokens = await openidClient.authorizationCodeGrant(
         server.authServerConfiguration,
@@ -107,8 +106,109 @@ export default async function (server, opts) {
     return reply.redirect(opts.postAuthRedirectUri)
   })
 
+  async function invalidateSession(sessionKey, tokens) {
+    if (!tokens) {
+      tokens = server.redisBreaker
+        ? await server.redisBreaker.fire('hGetAll', [sessionKey])
+        : await server.redis.hGetAll(sessionKey)
+    }
+    if (Object.keys(tokens).length > 0) {
+      await openidClient.tokenRevocation(
+        server.authServerConfiguration, 
+        tokens.access_token,
+        { token_type_hint: 'access_token'}
+      )
+      await openidClient.tokenRevocation(
+        server.authServerConfiguration, 
+        tokens.refresh_token,
+        { token_type_hint: 'refresh_token'}
+      )
+    }
+    return server.redisBreaker
+      ? await server.redisBreaker.fire('unlink', [sessionKey])
+      : await server.redis.unlink(sessionKey)
+  }
+
+  server.post('/sessions/:id_session/invalidate', async (request, reply) => {
+    const { id_session } = request.params
+    const sessionKey = SESSION_PREFIX + id_session
+    const now = new Date().toUTCString()
+    try {
+      if (await invalidateSession(sessionKey)) {
+        return reply.code(204).headers({ date: now }).send()
+      } else {
+        return reply.code(404).headers({ date: now }).send()
+      }
+    } catch (error) {
+      const msg = "Error invalidating the session. " +
+        `Origin: ${opts.id}. Session ID: ${id_session}. RID: ${request.id}.`
+      server.log.error(msg, { cause: error })
+      if (opts.exposeErrors) { 
+        return reply.code(500).headers({ date: now }).send(msg)
+      } else {
+        return reply.code(500).headers({ date: now }).send()
+      }        
+    }
+  })
+
+  server.post('/users/:sub/sessions/invalidate', async (request, reply) => {
+    const { sub } = request.params
+    const now = new Date().toUTCString()
+    try {
+      const sessions = server.redisBreaker
+        ? await server.redisBreaker.fire('ft.search', [
+            SESSION_INDEX_NAME, 
+            `@sub:{${sub}}`,
+            {
+              SORTBY: {
+                BY: 'iat',
+                DIRECTION: 'DESC' // or 'ASC (default if DIRECTION is not present)
+              }
+            }
+          ])
+        : await server.redis.ft.search(
+          SESSION_INDEX_NAME, 
+          `@sub:{\"${sub}\"}`,
+            {
+              SORTBY: {
+              BY: 'iat',
+              DIRECTION: 'DESC' // or 'ASC (default if DIRECTION is not present)
+            }, 
+            DIALECT: 2
+          }
+        )
+      if (sessions.total > 0) {
+        const sessionsToInvalidate = []
+        for (const session of sessions.documents) {
+          sessionsToInvalidate.push(
+            invalidateSession(session.id, session.value)
+          )
+        }
+        const invalidations = await Promise.allSettled(sessionsToInvalidate)
+        invalidations.forEach((invalidation, i) => {
+          if (invalidation.status === 'rejected') {
+            server.log.warn(`Failed to invalidate session ${sessions.documents[i].id.replace(SESSION_PREFIX,'')}:`, invalidation.reason)
+          }
+        })
+        reply.code(204).headers({ date: now }).send()
+      } else {
+        return reply.code(404).headers({ date: now }).send()
+      }
+    } catch (error) {
+      const msg = "Error invalidating the user’s sessions. " +
+        `Origin: ${opts.id}. User ID: ${sub}. RID: ${request.id}.`
+      server.log.error(msg, { cause: error })
+      if (opts.exposeErrors) { 
+        return reply.code(500).headers({ date: now }).send(msg)
+      } else {
+        return reply.code(500).headers({ date: now }).send()
+      }
+    }
+  })
+
+  /*
   server.post(opts.logoutPath, async (request, reply) => {
-    let id_session = null;
+    let id_session = null
     try {
        const { payload } = await jwtVerify(
         request.body, 
@@ -143,4 +243,6 @@ export default async function (server, opts) {
       .headers({date: new Date().toUTCString()})
       .send()
   })
+  */
+
 }

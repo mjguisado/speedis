@@ -1,6 +1,7 @@
 {
     "id": "mocks",
     "prefix": "/mocks",
+    "exposeErrors": true,
     "origin": {
         "httpxOptions": {
             "host": "mocks",
@@ -54,7 +55,7 @@
     "cache": {
         "cacheables": [
             {
-                "urlPattern": "/mocks/items/foo.*"
+                "urlPattern": "/mocks/items/test-.*"
             },
             {
                 "urlPattern": "/mocks/items/.*",
@@ -99,7 +100,7 @@
             "url": "redis://redis:6379"
         },
         "redisTimeout": 500,
-        "redisBreaker": true,
+        "redisBreaker": false,
         "redisBreakerOptions": {
             "errorThresholdPercentage": 25,
             "resetTimeout": 5000

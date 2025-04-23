@@ -2,12 +2,12 @@ import http from 'http'
 import https from 'https'
 import path from 'path'
 import os from 'os'
-import { createClient } from 'redis'
+import { createClient, SchemaFieldTypes } from 'redis'
+import { SESSION_INDEX_NAME, SESSION_PREFIX, storeSession } from './helpers.js'
 import CircuitBreaker from 'opossum'
 import sessionPlugin from './session.js'
 import { jwtVerify, createRemoteJWKSet } from 'jose'
 import * as openIdClient from 'openid-client'
-import { storeSession } from './helpers.js'
 import * as utils from '../utils/utils.js'
 import * as crypto from 'crypto'
 
@@ -77,6 +77,186 @@ export default async function (server, opts) {
   await server.register(import('fastify-raw-body'), {
     encoding: false
   })
+
+  if (opts.redis) {
+
+    // Connecting to Redis
+    // See: https://redis.io/docs/latest/develop/clients/nodejs/produsage/#handling-reconnections
+    const client = createClient(opts.redis.redisOptions)
+    client.on('error', error => {
+      server.log.error(`Redis connection lost. Origin: ${opts.id}.`, { cause: error })
+    })
+    try {
+      await client.connect()
+      server.log.info(`Redis connection established. Origin: ${opts.id}.`)
+    } catch (error) {
+      throw new Error(`Unable to connect to Redis during startup. Origin: ${opts.id}.`, { cause: error })
+    }
+    if (opts.oauth2) {
+      // The index creation process can take a considerable amount of time, 
+      // which is why it is created using the Redis client before setting 
+      // the per-operation timeouts.
+      try {
+        // Documentation: https://redis.io/commands/ft.create/
+        await client.ft.create(
+          SESSION_INDEX_NAME, 
+          {
+            sub: SchemaFieldTypes.TAG,
+            iat: {
+              type: SchemaFieldTypes.NUMERIC,
+              SORTABLE: true
+            }
+          },
+          {
+          ON: 'HASH',
+          PREFIX: SESSION_PREFIX
+          }
+        )
+      } catch (error) {
+        if (error.message === 'Index already exists') {
+          server.log.info('Index exists already, skipped creation.')
+        } else {
+          // Something went wrong, perhaps RediSearch isn't installed...
+          throw new Error(`Session index creation failed. Origin: ${opts.id}.`, { cause: error }) }
+      }
+    }
+
+    /**
+     * Wraps a Redis client so that any command you call on it will automatically have a timeout.
+     * If the Redis command takes too long it will reject with a timeout error.
+     *
+     * @param {object} client - The original Redis client object.
+     * @param {number} timeout - Optional. The maximum time (in milliseconds) to wait for a Redis command to complete before timing out. Defaults to 1000ms
+     * @returns {object} - Proxy object that behaves just like the original Redis client, but with a timeout behavior added to each command.
+     */
+    function wrapRedisWithTimeout(client, timeout) {
+      const handler = {
+        get(target, prop, receiver) {
+          const original = target[prop]
+          // Module JSON is a special case, we need to wrap its methods
+          if ('object' === typeof original && ('json' === prop || 'ft' === prop)) {
+            return wrapRedisWithTimeout(original, timeout)
+          }
+          if (typeof original !== 'function') return original
+          return (...args) => {
+            const command = Promise.race([
+              original.apply(target, args),
+              new Promise((_, reject) =>
+                setTimeout(() => reject(
+                  new Error(`Redis command "${prop}" timed out after ${timeout} ms`)
+                ), timeout)
+              )
+            ])
+            return command
+          }
+        }
+      }
+      return new Proxy(client, handler)
+    }
+
+    /**
+     * Executes a Redis command with support for both standard and RedisJSON operations.
+     * This function serves as an abstraction layer to integrate with a Circuit Breaker
+     * implemented using Opossum, in order to monitor and manage Redis availability.
+     *
+     * @function _sendCommandToRedis
+     * @param {string} command - The Redis command to execute (e.g., 'json.get', 'json.set', 'set', 'get', etc.).
+     * @param {Array<string|number>} args - The list of arguments for the Redis command.
+     * @returns {Promise<any>} The result of the Redis command execution.
+     */
+    function _sendCommandToRedis(command, args, options) {
+      let cmd = null
+      switch (command.toLowerCase()) {
+        case 'evalsha':
+          cmd = client.evalSha(...args, options)
+          break
+        case 'expire':
+          cmd = client.expire(...args, options)
+          break
+        case 'expireat':
+          cmd = client.expireAt(...args, options)
+          break
+        case 'get':
+          cmd = client.get(...args, options)
+          break
+        case 'hset':
+          cmd = client.hSet(...args, options)
+          break
+        case 'hgetall':
+          cmd = client.hGetAll(...args, options)
+          break
+        case 'json.get':
+          cmd = client.json.get(...args, options)
+          break
+        case 'json.merge':
+          cmd = client.json.merge(...args, options)
+          break
+        case 'json.set':
+          cmd = client.json.set(...args, options)
+          break
+        case 'ft.search':
+          cmd = client.ft.search(...args, options)
+          break
+        case 'script exists':
+          cmd = client.scriptExists(...args, options)
+          break
+        case 'script load':
+          cmd = client.scriptLoad(...args, options)
+          break
+        case 'set':
+          cmd = client.set(...args, options)
+          break
+        case 'unlink':
+          cmd = client.unlink(...args, options)
+          break
+        default:
+          throw new Error(`Command ${command} not supported.`)
+      }
+      return cmd
+    }
+
+    if (opts.redis.redisBreaker) {
+
+      let redisBreakerOptions = opts.redis.redisBreakerOptions
+      // Name of the Circuit Breaker
+      redisBreakerOptions['name'] = `redis-${opts.id}`
+      // Speedis implements its own coalescing mechanism so we disable the one from the circuit breaker.
+      redisBreakerOptions['coalesce'] = false
+      // Speedis itself implements a cache mechanism so we disable the one from the circuit breaker.
+      redisBreakerOptions['cache'] = false
+      // Timeout for the Circuit Breaker
+      if (opts.redis.redisTimeout) {
+        redisBreakerOptions['timeout'] = opts.redis.redisTimeout
+      }
+
+      // Redis Breaker instance
+      const redisBreaker = new CircuitBreaker(_sendCommandToRedis, redisBreakerOptions)
+      server.breakersMetrics.add([redisBreaker])
+
+      redisBreaker.on('open', () => {
+        // We will use this value to set the Retry-After header
+        let retryAfter = new Date()
+        retryAfter.setSeconds(retryAfter.getSeconds() + redisBreaker.options.resetTimeout / 1000)
+        redisBreaker['retryAfter'] = retryAfter.toUTCString()
+        server.log.error(`Redis Breaker OPEN: No commands will be execute. Origin ${opts.id}.`)
+      })
+      redisBreaker.on('halfOpen', () => {
+        server.log.warn(`Redis Breaker HALF OPEN: Commands are being tested. Origin ${opts.id}.`)
+      })
+      redisBreaker.on('close', () => {
+        server.log.info(`Redis Breaker CLOSED: Commands are being executed normally. Origin ${opts.id}.`)
+      })
+
+      server.decorate('redis', client)
+      server.decorate('redisBreaker', redisBreaker)
+
+    } else if (opts.redis.redisTimeout) {
+      server.decorate('redis', wrapRedisWithTimeout(client, opts.redis.redisTimeout))
+    } else {
+      server.decorate('redis', client)
+    }
+
+  }
 
   let ongoing = null
   let purgeUrlPrefix = null
@@ -296,9 +476,10 @@ export default async function (server, opts) {
         if (cookies[opts.oauth2.sessionIdCookieName]) {
           const id_session = cookies[opts.oauth2.sessionIdCookieName]
           // Retrieve session information from Redis
+          const sessionKey = SESSION_PREFIX + id_session
           const tokens = server.redisBreaker
-            ? await server.redisBreaker.fire('hGetAll', [id_session])
-            : await server.redis.json.get(id_session)
+            ? await server.redisBreaker.fire('hGetAll', [sessionKey])
+            : await server.redis.hGetAll(sessionKey)
           // Checks whether the information was stored in Redis
           if (Object.keys(tokens).length > 0) {
             try {
@@ -341,155 +522,6 @@ export default async function (server, opts) {
 
   }
 
-  if (opts.redis) {
-
-    // Connecting to Redis
-    // See: https://redis.io/docs/latest/develop/clients/nodejs/produsage/#handling-reconnections
-    const client = createClient(opts.redis.redisOptions)
-    client.on('error', error => {
-      server.log.error(`Redis connection lost. Origin: ${opts.id}.`, { cause: error })
-    })
-    try {
-      await client.connect()
-      server.log.info(`Redis connection established. Origin: ${opts.id}.`)
-    } catch (error) {
-      throw new Error(`Unable to connect to Redis during startup. Origin: ${opts.id}.`, { cause: error })
-    }
-
-    /**
-     * Wraps a Redis client so that any command you call on it will automatically have a timeout.
-     * If the Redis command takes too long it will reject with a timeout error.
-     *
-     * @param {object} client - The original Redis client object.
-     * @param {number} timeout - Optional. The maximum time (in milliseconds) to wait for a Redis command to complete before timing out. Defaults to 1000ms
-     * @returns {object} - Proxy object that behaves just like the original Redis client, but with a timeout behavior added to each command.
-     */
-    function wrapRedisWithTimeout(client, timeout) {
-      const handler = {
-        get(target, prop, receiver) {
-          const original = target[prop]
-          // Module JSON is a special case, we need to wrap its methods
-          if ('object' === typeof original && 'json' === prop) {
-            return wrapRedisWithTimeout(original, timeout)
-          }
-          if (typeof original !== 'function') return original
-          return (...args) => {
-            const command = Promise.race([
-              original.apply(target, args),
-              new Promise((_, reject) =>
-                setTimeout(() => reject(
-                  new Error(`Redis command "${prop}" timed out after ${timeout} ms`)
-                ), timeout)
-              )
-            ])
-            return command
-          }
-        }
-      }
-      return new Proxy(client, handler)
-    }
-
-    /**
-     * Executes a Redis command with support for both standard and RedisJSON operations.
-     * This function serves as an abstraction layer to integrate with a Circuit Breaker
-     * implemented using Opossum, in order to monitor and manage Redis availability.
-     *
-     * @function _sendCommandToRedis
-     * @param {string} command - The Redis command to execute (e.g., 'json.get', 'json.set', 'set', 'get', etc.).
-     * @param {Array<string|number>} args - The list of arguments for the Redis command.
-     * @returns {Promise<any>} The result of the Redis command execution.
-     */
-    function _sendCommandToRedis(command, args, options) {
-      let cmd = null
-      switch (command.toLowerCase()) {
-        case 'evalsha':
-          cmd = client.evalSha(...args, options)
-          break
-        case 'expire':
-          cmd = client.expire(...args, options)
-          break
-        case 'expireat':
-          cmd = client.expireAt(...args, options)
-          break
-        case 'get':
-          cmd = client.get(...args, options)
-          break
-        case 'hset':
-          cmd = client.hSet(...args, options)
-          break
-        case 'hgetall':
-          cmd = client.hGetAll(...args, options)
-          break
-        case 'json.get':
-          cmd = client.json.get(...args, options)
-          break
-        case 'json.merge':
-          cmd = client.json.merge(...args, options)
-          break
-        case 'json.set':
-          cmd = client.json.set(...args, options)
-          break
-        case 'script exists':
-          cmd = client.scriptExists(...args, options)
-          break
-        case 'script load':
-          cmd = client.scriptLoad(...args, options)
-          break
-        case 'set':
-          cmd = client.set(...args, options)
-          break
-        case 'unlink':
-          cmd = client.unlink(...args, options)
-          break
-        default:
-          throw new Error(`Command ${command} not supported.`)
-      }
-      return cmd
-    }
-
-    if (opts.redis.redisBreaker) {
-
-      let redisBreakerOptions = opts.redis.redisBreakerOptions
-      // Name of the Circuit Breaker
-      redisBreakerOptions['name'] = `redis-${opts.id}`
-      // Speedis implements its own coalescing mechanism so we disable the one from the circuit breaker.
-      redisBreakerOptions['coalesce'] = false
-      // Speedis itself implements a cache mechanism so we disable the one from the circuit breaker.
-      redisBreakerOptions['cache'] = false
-      // Timeout for the Circuit Breaker
-      if (opts.redis.redisTimeout) {
-        redisBreakerOptions['timeout'] = opts.redis.redisTimeout
-      }
-
-      // Redis Breaker instance
-      const redisBreaker = new CircuitBreaker(_sendCommandToRedis, redisBreakerOptions)
-      server.breakersMetrics.add([redisBreaker])
-
-      redisBreaker.on('open', () => {
-        // We will use this value to set the Retry-After header
-        let retryAfter = new Date()
-        retryAfter.setSeconds(retryAfter.getSeconds() + redisBreaker.options.resetTimeout / 1000)
-        redisBreaker['retryAfter'] = retryAfter.toUTCString()
-        server.log.error(`Redis Breaker OPEN: No commands will be execute. Origin ${opts.id}.`)
-      })
-      redisBreaker.on('halfOpen', () => {
-        server.log.warn(`Redis Breaker HALF OPEN: Commands are being tested. Origin ${opts.id}.`)
-      })
-      redisBreaker.on('close', () => {
-        server.log.info(`Redis Breaker CLOSED: Commands are being executed normally. Origin ${opts.id}.`)
-      })
-
-      server.decorate('redis', client)
-      server.decorate('redisBreaker', redisBreaker)
-
-    } else if (opts.redis.redisTimeout) {
-      server.decorate('redis', wrapRedisWithTimeout(client, opts.redis.redisTimeout))
-    } else {
-      server.decorate('redis', client)
-    }
-
-  }
-
   server.addHook('onClose', (server) => {
     if (agent) agent.destroy()
     if (ongoing) ongoing.clear()
@@ -517,7 +549,7 @@ export default async function (server, opts) {
         return purge(request, reply)
       }
 
-      let response = null;
+      let response = null
       if (!request.cacheable) {
 
         const options = { ...opts.origin.httpxOptions }
@@ -607,9 +639,9 @@ export default async function (server, opts) {
       }
     } catch (error) {
       const msg =
-        "Error purgin the cache in Redis. " +
+        "Error purging the cache in Redis. " +
         `Origin: ${opts.id}. Key: ${cacheKey}. RID: ${request.id}.`
-      server.log.error(msg, msg, { cause: error })
+      server.log.error(msg, { cause: error })
       if (opts.exposeErrors) { 
         return reply.code(500).headers({ date: now }).send(msg)
       } else {
@@ -698,7 +730,7 @@ export default async function (server, opts) {
       return response
     }
 
-    let remoteResponse = null;
+    let remoteResponse = null
     try {
       let tries = 1
       remoteResponse = await _get(request)
@@ -779,9 +811,9 @@ export default async function (server, opts) {
           ifNoneMatchCondition = false
         }
       } else {
-        if (Object.prototype.hasOwnProperty.call(response.headers, 'etag')) {
-          let weakCacheEtag = response.headers["etag"].startsWith('W/')
-            ? response.headers["etag"].substring(2) : response.headers["etag"]
+        if (Object.prototype.hasOwnProperty.call(remoteResponse.headers, 'etag')) {
+          let weakCacheEtag = remoteResponse.headers["etag"].startsWith('W/')
+            ? remoteResponse.headers["etag"].substring(2) : remoteResponse.headers["etag"]
           for (let index = 0; index < etags.length; index++) {
             // A recipient MUST use the weak comparison function when
             // comparing entity tags for If-None-Match
