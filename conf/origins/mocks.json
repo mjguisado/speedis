@@ -78,8 +78,8 @@
     "oauth2": {
         "id": "mocks.oauth2",
         "baseUrl": "https://mocks",
-        "clientId": "confiable",
-        "clientSecret": "L9KrGcHNphproz4rquzBY8ZfIqMP7igL",
+        "clientId": "speedis-client",
+        "clientSecret": "3sBLsgSHC8guhDIWExsMed4zu9TlkMfC",
         "discoverySupported": true,
         "authorizationServerMetadataLocation": "https://keycloak:8443/realms/speedis/.well-known/oauth-authorization-server",
         "authorizationServerMetadata": {
