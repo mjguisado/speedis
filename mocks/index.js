@@ -3,7 +3,7 @@ import mocksPlugin from './plugins/mocks.js'
 import { collectDefaultMetrics, register, Counter, Histogram } from 'prom-client'
 
 const mockServer = fastify({
-    logger: { level: 'debug' }
+    logger: { level: 'warn' }
 })
 
 const httpRequestsTotal = new Counter({
