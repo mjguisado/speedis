@@ -224,7 +224,7 @@ export async function app(opts = {}, ajv = new Ajv({ useDefaults: true })) {
                 }
               }
             },
-            includeOriginIdInCacheKey: { type: "boolean", default: true },
+            includeOriginIdInUrlKey: { type: "boolean", default: true },
             ignoredQueryParams: {
               type: "array",
               items: {

@@ -16,7 +16,6 @@ export default async function (server, opts) {
   // This parameter determines whether descriptive error 
   // messages are included in the response body
   server.decorate('exposeErrors', opts.exposeErrors)
-
   const remoteBaseUrl = `${opts.origin.httpxOptions.protocol}//${opts.origin.httpxOptions.host}:${opts.origin.httpxOptions.port}`
 
   /*
@@ -78,11 +77,12 @@ export default async function (server, opts) {
     encoding: false
   })
 
+  let client = null;
   if (opts.redis) {
 
     // Connecting to Redis
     // See: https://redis.io/docs/latest/develop/clients/nodejs/produsage/#handling-reconnections
-    const client = createClient(opts.redis.redisOptions)
+    client = createClient(opts.redis.redisOptions)
     client.on('error', error => {
       server.log.error(`Origin: ${opts.id}. Redis connection lost.`, { cause: error })
     })
@@ -244,6 +244,7 @@ export default async function (server, opts) {
 
   let ongoing = null
   let purgeUrlPrefix = null
+
   if (opts.cache) {
     ongoing = opts.cache.localRequestsCoalescing
       ? new Map()
@@ -523,10 +524,55 @@ export default async function (server, opts) {
     if (server.redis) server.redis.quit()
   })
 
-  server.all('/*', async (request, reply) => {
+  function generatePath(request) {
+    const prefix = request.routeOptions.url.replace("/*", "")
+    return request.url.replace(prefix, "")
+  }
 
-    // Lógica de los BFF al Hook
-    //       if (opts.bff) _transform(CLIENT_REQUEST, request)
+  function generateUrlKey(request, fieldNames = utils.parseVaryHeader(request)) {
+    let path = generatePath(request)
+    const [base, queryString] = path.split("?")
+    if (queryString) {
+      const params = new URLSearchParams(queryString)
+      if (opts.cache.ignoredQueryParams) {
+        opts.cache.ignoredQueryParams.forEach(param => params.delete(param))
+      }
+      if (params.size > 0) {
+        if (opts.cache.sortQueryParams) {
+          const sortedParams = [...params.entries()]
+            .sort(([a], [b]) => a.localeCompare(b))
+            .map(([key, value]) => `${key}=${value}`)
+            .join("&")
+          path = `${base}?${sortedParams.toString()}`
+        } else {
+          path = `${base}?${params.toString()}`
+        }
+      } else {
+        path = base
+      }
+    }
+
+    let urlKey = opts.cache.includeOriginIdInUrlKey ? opts.id : ''
+    if (request.cacheable_per_user) {
+      urlKey += (urlKey.length>0 ? ':' : '') + request.session.sub
+    }
+    urlKey += path.replaceAll('/', ':')
+    if (urlKey.startsWith(':')) urlKey = urlKey.slice(1)
+
+    // See: https://www.rfc-editor.org/rfc/rfc9111.html#name-calculating-cache-keys-with
+    fieldNames.forEach(fieldName => {
+      if (fieldName === '*') urlKey += ':*'
+      else if (Object.prototype.hasOwnProperty.call(request.headers, fieldName)) {
+        urlKey += ':' + fieldName
+          + ':' + ((request.headers[fieldName]) ? request.headers[fieldName] : '')
+      }
+    })
+    return urlKey
+  }
+
+  server.decorateRequest("urlKey", null)
+
+  server.all('/*', async (request, reply) => {
 
     // Métricas
     /*
@@ -536,6 +582,11 @@ export default async function (server, opts) {
     */
 
     try {
+
+      // Lógica de los BFF al Hook
+      //       if (opts.bff) _transform(CLIENT_REQUEST, request)
+
+      request.urlKey = generateUrlKey(request)
 
       if (opts.cache
         && request.method === "DELETE"
@@ -593,26 +644,24 @@ export default async function (server, opts) {
     }
   })
 
-  async function purge (request, reply) {
-    const fieldNames = utils.parseVaryHeader(request)
-    let cacheKey = generateCacheKey(request, fieldNames)
-    let toTrash = opts.cache.purgePath.slice(1) + ':'
-    cacheKey = cacheKey.replace(toTrash,"")
+  const toTrash = opts.cache.purgePath.slice(1) + ':'
+  async function purge (request, reply) {  
+    const cacheEviction = request.urlKey.replace(toTrash,"")
     const now = new Date().toUTCString()
     try {
       let result = 0
       // See: https://antirez.com/news/93
-      if (cacheKey.indexOf('*') > -1) {
+      if (cacheEviction.indexOf('*') > -1) {
         // See: https://github.com/redis/node-redis/blob/master/docs/scan-iterators.md
         // See: https://github.com/redis/node-redis/blob/master/docs/v4-to-v5.md#scan-iterators
-        for await (const toTrash of server.redis.scanIterator({
-          MATCH: cacheKey,
+        for await (const entry of client.scanIterator({
+          MATCH: cacheEviction,
           COUNT: 100
         })) {
-          result += await server.redis.unlink((toTrash))
+          result += await server.redis.unlink((entry))
         }
       } else {
-        result = await server.redis.unlink(cacheKey)
+        result = await server.redis.unlink(cacheEviction)
       }
       if (result) {
         return reply.code(204).headers({ date: now }).send()
@@ -622,15 +671,10 @@ export default async function (server, opts) {
     } catch (error) {
       const msg =
         `Origin: ${opts.id}. Error purging the cache in Redis. ` +
-        `RID: ${request.id}. Cache key pattern: ${cacheKey}.`
+        `RID: ${request.id}. URL Key pattern: ${cacheEviction}.`
       server.log.error(msg, { cause: error })
       return helpers.errorHandler(reply, 500, msg, opts.exposeErrors, error)
     }
-  }
-
-  function generatePath(request) {
-    const prefix = request.routeOptions.url.replace("/*", "")
-    return request.url.replace(prefix, "")
   }
 
   function _fetch(options, body) {
@@ -837,47 +881,6 @@ export default async function (server, opts) {
     }
   }
 
-  function generateCacheKey(request, fieldNames = utils.parseVaryHeader(request)) {
-    let path = generatePath(request)
-    const [base, queryString] = path.split("?")
-    if (queryString) {
-      const params = new URLSearchParams(queryString)
-      if (opts.cache.ignoredQueryParams) {
-        opts.cache.ignoredQueryParams.forEach(param => params.delete(param))
-      }
-      if (params.size > 0) {
-        if (opts.cache.sortQueryParams) {
-          const sortedParams = [...params.entries()]
-            .sort(([a], [b]) => a.localeCompare(b))
-            .map(([key, value]) => `${key}=${value}`)
-            .join("&")
-          path = `${base}?${sortedParams.toString()}`
-        } else {
-          path = `${base}?${params.toString()}`
-        }
-      } else {
-        path = base
-      }
-    }
-
-    let cacheKey = opts.cache.includeOriginIdInCacheKey ? opts.id : ''
-    if (request.cacheable_per_user) {
-      cacheKey += (cacheKey.length>0 ? ':' : '') + request.session.sub
-    }
-    cacheKey += path.replaceAll('/', ':')
-    if (cacheKey.startsWith(':')) cacheKey = cacheKey.slice(1)
-
-    // See: https://www.rfc-editor.org/rfc/rfc9111.html#name-calculating-cache-keys-with
-    fieldNames.forEach(fieldName => {
-      if (fieldName === '*') cacheKey += ':*'
-      else if (Object.prototype.hasOwnProperty.call(request.headers, fieldName)) {
-        cacheKey += ':' + fieldName
-          + ':' + ((request.headers[fieldName]) ? request.headers[fieldName] : '')
-      }
-    })
-    return cacheKey
-  }
-
   async function _get(request) {
 
     const path = generatePath(request)
@@ -887,20 +890,19 @@ export default async function (server, opts) {
     const options = { ...opts.origin.httpxOptions }
     if (agent) options.agent = agent
     options.path = path
-
+    
     const clientCacheDirectives = utils.parseCacheControlHeader(request)
     const fieldNames = utils.parseVaryHeader(request)
-    let cacheKey = generateCacheKey(request, fieldNames)
 
     let cachedResponse = null
     try {
       cachedResponse = server.redisBreaker
-        ? await server.redisBreaker.fire('json.get', [cacheKey])
-        : await server.redis.json.get(cacheKey)
+        ? await server.redisBreaker.fire('json.get', [request.urlKey])
+        : await server.redis.json.get(request.urlKey)
     } catch (error) {
       server.log.warn(
         `Origin: ${opts.id}. Error querying the cache entry in Redis. ` +
-        `RID: ${request.id}. Cache key: ${cacheKey}.`,
+        `RID: ${request.id}. URL Key: ${request.urlKey}.`,
         { cause: error })
     }
 
@@ -994,13 +996,13 @@ export default async function (server, opts) {
       // Verify if there is an ongoing fetch operation
       let fetch = null
       if (opts.cache.localRequestsCoalescing) {
-        fetch = ongoing.get(cacheKey)
+        fetch = ongoing.get(request.urlKey)
       }
 
       if (!fetch) {
         // https://redis.io/docs/latest/develop/use/patterns/distributed-locks/#correct-implementation-with-a-single-instance
         if (opts.cache.distributedRequestsCoalescing) {
-          lockKey = `${cacheKey}.lock`
+          lockKey = `${request.urlKey}.lock`
           lockValue = `${process.pid}:${opts.id}:${request.id}:` + crypto.randomBytes(4).toString("hex")
           locked = await _adquireLock(lockKey, lockValue)
         }
@@ -1024,7 +1026,7 @@ export default async function (server, opts) {
         } else {
           fetch = _fetch(options, request.body)
         }
-        if (opts.cache.localRequestsCoalescing) ongoing.set(cacheKey, fetch)
+        if (opts.cache.localRequestsCoalescing) ongoing.set(request.urlKey, fetch)
         amITheFetcher = true
       }
 
@@ -1057,7 +1059,7 @@ export default async function (server, opts) {
     } catch (error) {
 
       if (opts.cache.distributedRequestsCoalescing && locked) await _releaseLock(lockKey, lockValue)
-      if (amITheFetcher && opts.cache.localRequestsCoalescing) ongoing.delete(cacheKey)
+      if (amITheFetcher && opts.cache.localRequestsCoalescing) ongoing.delete(request.urlKey)
       delete options.agent
 
       server.log.error(
@@ -1076,7 +1078,7 @@ export default async function (server, opts) {
         && !Object.prototype.hasOwnProperty.call(cachedCacheDirectives, 'proxy-revalidate')) {
         server.log.warn(
           `Origin: ${opts.id}. Serving stale content from cache. ` +
-          `RID: ${request.id}. Cache key: ${cacheKey}.`
+          `RID: ${request.id}. URL Key: ${request.urlKey}.`
         )
         utils.setCacheStatus('CACHE_HIT_NOT_REVALIDATED_STALE', cachedResponse)
         cachedResponse.headers['age'] = utils.calculateAge(cachedResponse)
@@ -1110,7 +1112,7 @@ export default async function (server, opts) {
     }
 
     if (amITheFetcher && opts.cache.localRequestsCoalescing) {
-      ongoing.delete(cacheKey)
+      ongoing.delete(request.urlKey)
     }
 
     // We parse the Cache-Control header to extract cache directives.
@@ -1155,18 +1157,18 @@ export default async function (server, opts) {
             headers: cachedResponse.headers
           }
           server.redisBreaker
-            ? await server.redisBreaker.fire('json.merge', [cacheKey, '$', payload])
-            : await server.redis.json.merge(cacheKey, '$', payload)
+            ? await server.redisBreaker.fire('json.merge', [request.urlKey, '$', payload])
+            : await server.redis.json.merge(request.urlKey, '$', payload)
           // Set the TTL for the cache entry           
           if (!Number.isNaN(ttl) && ttl > 0) {
             server.redisBreaker
-              ? await server.redisBreaker.fire('expire', [cacheKey, ttl])
-              : await server.redis.expire(cacheKey, ttl)
+              ? await server.redisBreaker.fire('expire', [request.urlKey, ttl])
+              : await server.redis.expire(request.urlKey, ttl)
           }
         } catch (error) {
           server.log.warn(
             `Origin: ${opts.id}. Error while updating the cache. ` +
-            `RID: ${request.id}. Cache key: ${cacheKey}.`,
+            `RID: ${request.id}. URL Key: ${request.urlKey}.`,
             { cause: error }
           )
         }
@@ -1179,18 +1181,18 @@ export default async function (server, opts) {
         const ttl = parseInt(cacheEntry.ttl)
         try {
           server.redisBreaker
-            ? await server.redisBreaker.fire('json.set', [cacheKey, '$', cacheEntry])
-            : await server.redis.json.set(cacheKey, '$', cacheEntry)
+            ? await server.redisBreaker.fire('json.set', [request.urlKey, '$', cacheEntry])
+            : await server.redis.json.set(request.urlKey, '$', cacheEntry)
           // Set the TTL for the cache entry           
           if (!Number.isNaN(ttl) && ttl > 0) {
             server.redisBreaker
-              ? await server.redisBreaker.fire('expire', [cacheKey, ttl])
-              : await server.redis.expire(cacheKey, ttl)
+              ? await server.redisBreaker.fire('expire', [request.urlKey, ttl])
+              : await server.redis.expire(request.urlKey, ttl)
           }
         } catch (error) {
           server.log.warn(
             `Origin: ${opts.id}. Error while storing in the cache. ` +
-            `RID: ${request.id}. Cache key: ${cacheKey}.`,
+            `RID: ${request.id}. URL Key: ${request.urlKey}.`,
             { cause: error }
           )
         }
@@ -1214,12 +1216,12 @@ export default async function (server, opts) {
         && originCacheDirectives['private'] === null)) {
       try {
         server.redisBreaker
-          ? await server.redisBreaker.fire('unlink', [cacheKey])
-          : await server.redis.unlink(cacheKey)
+          ? await server.redisBreaker.fire('unlink', [request.urlKey])
+          : await server.redis.unlink(request.urlKey)
       } catch (error) {
         server.log.warn(
           `Origin: ${opts.id}. Error while removing private/no-store entry in the cache. ` +
-          `RID: ${request.id}. Cache key: ${cacheKey}.`,
+          `RID: ${request.id}. URL Key: ${request.urlKey}.`,
           { cause: error }
         )
       }
