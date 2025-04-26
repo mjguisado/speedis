@@ -39,7 +39,7 @@
                 "urlPattern": "/mocks/users/2",
                 "actions": [
                     {
-                        "phase": "OriginResponse",
+                        "phase": "VariantsTracker",
                         "uses": "json:keepJsonPaths",
                         "with": {
                             "jsonpaths": [
@@ -50,11 +50,12 @@
                     }
                 ]
             }
+
         ]
     },
-    "variantTracker": {
+    "variantsTracker": {
         "urlPatterns": [
-            "/mocks/items/*"
+            "/mocks/users/*"
         ]
     },    
     "cache": {

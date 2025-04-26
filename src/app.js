@@ -177,7 +177,8 @@ export async function app(opts = {}, ajv = new Ajv({ useDefaults: true })) {
                             "OriginRequest",
                             "OriginResponse",
                             "CacheRequest",
-                            "CacheResponse"
+                            "CacheResponse",
+                            "VariantsTracker"
                           ]
                         },
                         uses: { type: "string" },
@@ -190,7 +191,7 @@ export async function app(opts = {}, ajv = new Ajv({ useDefaults: true })) {
             },
           }
         },
-        variantTracker: {
+        variantsTracker: {
           type: "object",
           additionalProperties: false,
           required: ["urlPatterns"],

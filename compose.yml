@@ -94,6 +94,9 @@ services:
         - action: sync
           path: ./src
           target: /usr/src/app/src
+        - action: sync+restart
+          path: ./conf
+          target: /usr/src/app/conf
     environment:
       - NODE_TLS_REJECT_UNAUTHORIZED=0
     ports:
