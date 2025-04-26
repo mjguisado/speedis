@@ -54,8 +54,6 @@ export default async function (server, opts) {
 
     // Origin Breaker instance
     originBreaker = new CircuitBreaker(_fetch, opts.origin.originBreakerOptions)
-    server.breakersMetrics.add([originBreaker])
-
     originBreaker.on('open', () => {
       // We will use this value to set the Retry-After header
       let retryAfter = new Date()
@@ -217,8 +215,6 @@ export default async function (server, opts) {
 
       // Redis Breaker instance
       const redisBreaker = new CircuitBreaker(_sendCommandToRedis, redisBreakerOptions)
-      server.breakersMetrics.add([redisBreaker])
-
       redisBreaker.on('open', () => {
         // We will use this value to set the Retry-After header
         let retryAfter = new Date()
