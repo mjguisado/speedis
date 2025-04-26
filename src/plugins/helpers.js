@@ -63,3 +63,34 @@ export function errorHandler(reply, code, msg, exposeErrors, cause) {
     }
     return reply
 }
+
+export function _normalizeComplexObject(obj) {
+    if (Array.isArray(obj)) {
+        return obj.map(_normalizeComplexObject)
+    } else if (obj !== null && typeof obj === 'object') {
+        return Object.keys(obj).sort().reduce((result, key) => {
+            result[key] = _normalizeComplexObject(obj[key])
+            return result
+        }, {})
+    }
+    return obj
+}
+
+export function _normalizeSimpleObject(obj) {
+    if (Array.isArray(obj)) {
+      return obj.map(_normalizeSimpleObject)
+    } else if (obj !== null && typeof obj === 'object') {
+      const normalized = {}
+      for (const key of Object.keys(obj).sort()) {
+        normalized[key] = _normalizeSimpleObject(obj[key])
+      }
+      return normalized
+    }
+    return obj
+}
+
+export function isPurgeRequest(opts, request, purgeUrlPrefix) {
+    return opts.cache
+        && request.method === "DELETE"
+        && request.raw.url.startsWith(purgeUrlPrefix)
+}

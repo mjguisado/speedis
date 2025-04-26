@@ -194,6 +194,8 @@ export default async function (server, opts) {
           return client.set(...args, options)
         case 'unlink':
           return client.unlink(...args, options)
+        case 'zincrby':
+          return client.zIncrBy(...args, options)
         default:
           throw new Error(`Origin: ${opts.id}. Redis command ${command} not supported.`)
       }
@@ -262,7 +264,6 @@ export default async function (server, opts) {
         throw new Error(`Origin: ${opts.id}. The cache configuration is invalid.`)
       }
     })
-
 
     server.decorateRequest('cacheable')
     server.decorateRequest('cacheable_per_user')
@@ -571,6 +572,74 @@ export default async function (server, opts) {
   }
 
   server.decorateRequest("urlKey", null)
+ 
+  if (opts.variantTracker) {
+
+    const trakedUrlPatterns = []
+    opts.variantTracker.urlPatterns.forEach(urlPattern => {
+      try {
+        trakedUrlPatterns.push(new RegExp(urlPattern))
+      } catch (error) {
+        server.log.fatal(
+          `Origin: ${opts.id}. urlPattern ${urlPattern} is not a valid regular expresion.`,
+          { cause: error }
+        )
+        throw new Error(`Origin: ${opts.id}. The variant tracker configuration is invalid.`)
+      }
+    })
+    server.decorateReply("fingerprint", null)
+    // https://fastify.dev/docs/latest/Reference/Reply/#type-of-the-final-payload
+    // https://fastify.dev/docs/latest/Reference/Reply/#senddata
+
+    server.addHook('onSend', async (request, reply, payload) => {
+      
+      if (helpers.isPurgeRequest(opts, request, purgeUrlPrefix)) return
+      if (request.raw.url.startsWith(path.join(opts.prefix,opts.oauth2.prefix))) return
+
+      let urlTracked = false
+      for (const urlPattern of trakedUrlPatterns) {
+        if (urlPattern.test(request.raw.url)) {
+          urlTracked = true
+          break
+        }
+      }
+
+      if (urlTracked) {
+        if (payload) {
+          let content = payload
+          if (typeof payload === 'string' && 
+            reply.getHeader('content-type')?.toLowerCase().includes('application/json')) {
+            content = JSON.parse(payload)
+          }
+          content = JSON.stringify(helpers._normalizeSimpleObject(content))
+          reply.fingerprint =
+            crypto.createHash("md5").update(JSON.stringify(content)).digest("hex")
+          reply.header("etag", 'W/"' + reply.fingerprint + '"')
+        } else {
+          server.log.warn(`Origin: ${opts.id}. Tracket URL ${request.raw.url} without payload.`)
+        }
+      }
+
+    })
+  
+    // The onResponse hook is executed when a response has been sent, 
+    // so you will not be able to send more data to the client. 
+    // It can however be useful for sending data to external services, 
+    // for example, to gather statistics.
+    server.addHook('onResponse', async (request, reply) => {
+      if (reply.fingerprint) {
+        const counters = 'vary:' + request.urlKey
+        try {
+          tokens = server.redisBreaker
+            ? await server.redisBreaker.fire('zIncrBy', [counters, 1, reply.fingerprint])
+            : await server.redis.zIncrBy(counters, 1, reply.fingerprint)
+        } catch (error) {
+          const msg = `Origin: ${opts.id}. An error occurred while counting the variants ${counters} - ${reply.fingerprint}.`
+          server.log.warn(msg, { cause: error })
+        }
+      }
+    })
+  }
 
   server.all('/*', async (request, reply) => {
 
@@ -588,15 +657,11 @@ export default async function (server, opts) {
 
       request.urlKey = generateUrlKey(request)
 
-      if (opts.cache
-        && request.method === "DELETE"
-        && request.raw.url.startsWith(purgeUrlPrefix)
-      ) {
+      if (helpers.isPurgeRequest(opts, request, purgeUrlPrefix)) {
         return purge(request, reply)
       }
 
       let response = null
-
       if (!request.cacheable) {
 
         const options = { ...opts.origin.httpxOptions }

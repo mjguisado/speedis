@@ -52,6 +52,11 @@
             }
         ]
     },
+    "variantTracker": {
+        "urlPatterns": [
+            "/mocks/items/*"
+        ]
+    },    
     "cache": {
         "cacheables": [
             {
@@ -103,7 +108,7 @@
             "url": "redis://redis:6379"
         },
         "redisTimeout": 500,
-        "redisBreaker": false,
+        "redisBreaker": true,
         "redisBreakerOptions": {
             "errorThresholdPercentage": 25,
             "resetTimeout": 5000
