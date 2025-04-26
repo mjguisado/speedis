@@ -3,7 +3,6 @@ import path from 'path'
 import fs from 'fs/promises'
 import speedisPlugin from './plugins/speedis.js'
 import { collectDefaultMetrics, Counter, Histogram } from 'prom-client'
-import PrometheusMetrics from 'opossum-prometheus'
 import Ajv from "ajv"
 
 export async function app(opts = {}, ajv = new Ajv({ useDefaults: true })) {
@@ -178,7 +177,8 @@ export async function app(opts = {}, ajv = new Ajv({ useDefaults: true })) {
                             "OriginRequest",
                             "OriginResponse",
                             "CacheRequest",
-                            "CacheResponse"
+                            "CacheResponse",
+                            "VariantsTracker"
                           ]
                         },
                         uses: { type: "string" },
@@ -191,7 +191,7 @@ export async function app(opts = {}, ajv = new Ajv({ useDefaults: true })) {
             },
           }
         },
-        variantTracker: {
+        variantsTracker: {
           type: "object",
           additionalProperties: false,
           required: ["urlPatterns"],
@@ -366,9 +366,6 @@ export async function app(opts = {}, ajv = new Ajv({ useDefaults: true })) {
   const server = fastify(opts)
 
   collectDefaultMetrics()
-
-  const breakersMetrics = new PrometheusMetrics({})
-  server.decorate('breakersMetrics', breakersMetrics)
 
   const httpRequestsTotal = new Counter({
     name: 'http_requests_total',

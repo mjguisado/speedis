@@ -56,6 +56,7 @@ Speedis allows transformations to be applied to requests and responses it handle
 |`OriginResponse`|Apply transformations to the response received by Speedis from the origin server.|
 |`CacheRequest`|Apply transformations to the request sent by Speedis to the cache (Redis).|
 |`CacheResponse`|Apply transformations to the response received by Speedis from the cache (Redis).|
+|`VariantsTracker`|Apply transformations to the response before calculating its fingerprinting. Theses transformations don't affect to the response sent to the client.|
 
 Speedis includes a set of functions, called actions, that allow changes to be made.
 To simplify management, these functions are grouped into libraries.

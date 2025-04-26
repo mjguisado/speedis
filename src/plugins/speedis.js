@@ -54,8 +54,6 @@ export default async function (server, opts) {
 
     // Origin Breaker instance
     originBreaker = new CircuitBreaker(_fetch, opts.origin.originBreakerOptions)
-    server.breakersMetrics.add([originBreaker])
-
     originBreaker.on('open', () => {
       // We will use this value to set the Retry-After header
       let retryAfter = new Date()
@@ -217,8 +215,6 @@ export default async function (server, opts) {
 
       // Redis Breaker instance
       const redisBreaker = new CircuitBreaker(_sendCommandToRedis, redisBreakerOptions)
-      server.breakersMetrics.add([redisBreaker])
-
       redisBreaker.on('open', () => {
         // We will use this value to set the Retry-After header
         let retryAfter = new Date()
@@ -293,7 +289,7 @@ export default async function (server, opts) {
 
   // Backend-For-Frontend
   // Load actions libraries
-  let actionsRepository = {}
+  let bffActionsRepository = {}
   if (opts.bff) {
     // Init the catalog of available actions.
     if (!opts.bff.actionsLibraries) { opts.bff.actionsLibraries = {} }
@@ -311,10 +307,10 @@ export default async function (server, opts) {
           const library = await import(`file://${opts.bff.actionsLibraries[actionsLibraryKey]}`)
           Object.entries(library).forEach(([key, value]) => {
             if (typeof value === 'function') {
-              if (!actionsRepository[actionsLibraryKey]) {
-                actionsRepository[actionsLibraryKey] = {}
+              if (!bffActionsRepository[actionsLibraryKey]) {
+                bffActionsRepository[actionsLibraryKey] = {}
               }
-              actionsRepository[actionsLibraryKey][key] = value
+              bffActionsRepository[actionsLibraryKey][key] = value
             }
           })
         } catch (error) {
@@ -350,7 +346,7 @@ export default async function (server, opts) {
           server.log.fatal(`Origin: ${opts.id}. The name of the action ${action.uses} is not valid. The correct format is library:action.`)
           throw new Error(`Origin: ${opts.id}. The transformation configuration is invalid.`)
         }
-        if (!actionsRepository[library] || !actionsRepository[library][func]) {
+        if (!bffActionsRepository[library] || !bffActionsRepository[library][func]) {
           server.log.fatal(`Origin: ${opts.id}. Function ${action.uses} was not found among the available actions.`)
           throw new Error(`Origin: ${opts.id}. The transformation configuration is invalid.`)
         }
@@ -363,7 +359,7 @@ export default async function (server, opts) {
   const ORIGIN_REQUEST = "OriginRequest"
   const ORIGIN_RESPONSE = "OriginResponse"
   const CACHE_REQUEST = "CacheRequest"
-  const CACHE_RESPONSE = "CacheResponse"
+  const VARIANTS_TRACKER = "VariantsTracker"
 
   function _transform(type, target) {
     opts.bff.transformations.forEach(transformation => {
@@ -380,7 +376,7 @@ export default async function (server, opts) {
               library = tokens[0]
               func = tokens[1]
             }
-            actionsRepository[library][func](target, action.with ? action.with : null)
+            bffActionsRepository[library][func](target, action.with ? action.with : null)
           }
         })
       }
@@ -573,15 +569,15 @@ export default async function (server, opts) {
 
   server.decorateRequest("urlKey", null)
  
-  if (opts.variantTracker) {
+  if (opts.variantsTracker) {
 
     const trakedUrlPatterns = []
-    opts.variantTracker.urlPatterns.forEach(urlPattern => {
+    opts.variantsTracker.urlPatterns.forEach(trakedUrlPattern => {
       try {
-        trakedUrlPatterns.push(new RegExp(urlPattern))
+        trakedUrlPatterns.push(new RegExp(trakedUrlPattern))
       } catch (error) {
         server.log.fatal(
-          `Origin: ${opts.id}. urlPattern ${urlPattern} is not a valid regular expresion.`,
+          `Origin: ${opts.id}. urlPattern ${trakedUrlPattern} is not a valid regular expresion.`,
           { cause: error }
         )
         throw new Error(`Origin: ${opts.id}. The variant tracker configuration is invalid.`)
@@ -593,8 +589,9 @@ export default async function (server, opts) {
 
     server.addHook('onSend', async (request, reply, payload) => {
       
-      if (helpers.isPurgeRequest(opts, request, purgeUrlPrefix)) return
-      if (request.raw.url.startsWith(path.join(opts.prefix,opts.oauth2.prefix))) return
+      if (helpers.isPurgeRequest(opts, request, purgeUrlPrefix)
+        || request.raw.url.startsWith(path.join(opts.prefix,opts.oauth2.prefix))
+      ) return
 
       let urlTracked = false
       for (const urlPattern of trakedUrlPatterns) {
@@ -605,21 +602,38 @@ export default async function (server, opts) {
       }
 
       if (urlTracked) {
-        if (payload) {
-          let content = payload
-          if (typeof payload === 'string' && 
-            reply.getHeader('content-type')?.toLowerCase().includes('application/json')) {
-            content = JSON.parse(payload)
+        // Transformations are performed using actions that work with targets 
+        // of type request or response. Therefore, we build a response that 
+        // can hold the data to be transformed.
+        const mockResponse = {
+          path: generatePath(request),
+          statusCode: reply.statusCode,
+          headers: reply.getHeaders(),
+          body: payload
+        }
+        if (opts.bff) _transform(VARIANTS_TRACKER, mockResponse)
+
+        const typeOfBody = typeof mockResponse.body
+        // https://fastify.dev/docs/latest/Reference/Reply/#type-of-the-final-payload
+        if ("string" === typeOfBody ) {
+          if (reply.getHeader('content-type')?.toLowerCase().includes('application/json')) {
+            try {
+              const json = JSON.parse(mockResponse.body)
+              const normalized = helpers._normalizeSimpleObject(json)
+              mockResponse.body = JSON.stringify(normalized)
+            } catch (error) {
+              server.log.error(
+                `Origin: ${opts.id}. URL ${request.raw.url}. An error occurred while normalizing the JSON ${mockResponse.body}.`, 
+                { cause: error }
+              )
+            }
           }
-          content = JSON.stringify(helpers._normalizeSimpleObject(content))
-          reply.fingerprint =
-            crypto.createHash("md5").update(JSON.stringify(content)).digest("hex")
+          reply.fingerprint = crypto.createHash("md5").update(mockResponse.body).digest("hex")
           reply.header("etag", 'W/"' + reply.fingerprint + '"')
         } else {
-          server.log.warn(`Origin: ${opts.id}. Tracket URL ${request.raw.url} without payload.`)
+          server.log.warn(`Origin: ${opts.id}. URL ${request.raw.url} has a not supported type of body ${typeOfBody}.`)  
         }
       }
-
     })
   
     // The onResponse hook is executed when a response has been sent, 
