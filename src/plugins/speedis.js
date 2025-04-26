@@ -16,7 +16,6 @@ export default async function (server, opts) {
   // This parameter determines whether descriptive error 
   // messages are included in the response body
   server.decorate('exposeErrors', opts.exposeErrors)
-
   const remoteBaseUrl = `${opts.origin.httpxOptions.protocol}//${opts.origin.httpxOptions.host}:${opts.origin.httpxOptions.port}`
 
   /*
@@ -62,13 +61,13 @@ export default async function (server, opts) {
       let retryAfter = new Date()
       retryAfter.setSeconds(retryAfter.getSeconds() + originBreaker.options.resetTimeout / 1000)
       originBreaker['retryAfter'] = retryAfter.toUTCString()
-      server.log.error(`Origin Breaker OPEN: No requests will be made. Origin ${opts.id}.`)
+      server.log.error(`Origin ${opts.id}. Origin Breaker OPEN: No requests will be made.`)
     })
     originBreaker.on('halfOpen', () => {
-      server.log.warn(`Origin Breaker HALF OPEN: Requests are being tested. Origin ${opts.id}.`)
+      server.log.warn(`Origin ${opts.id}. Origin Breaker HALF OPEN: Requests are being tested.`)
     })
     originBreaker.on('close', () => {
-      server.log.info(`Origin Breaker CLOSED: Requests are being made normally. Origin ${opts.id}.`)
+      server.log.info(`Origin ${opts.id}. Origin Breaker CLOSED: Requests are being made normally.`)
     })
 
   }
@@ -78,19 +77,20 @@ export default async function (server, opts) {
     encoding: false
   })
 
+  let client = null;
   if (opts.redis) {
 
     // Connecting to Redis
     // See: https://redis.io/docs/latest/develop/clients/nodejs/produsage/#handling-reconnections
-    const client = createClient(opts.redis.redisOptions)
+    client = createClient(opts.redis.redisOptions)
     client.on('error', error => {
-      server.log.error(`Redis connection lost. Origin: ${opts.id}.`, { cause: error })
+      server.log.error(`Origin: ${opts.id}. Redis connection lost.`, { cause: error })
     })
     try {
       await client.connect()
-      server.log.info(`Redis connection established. Origin: ${opts.id}.`)
+      server.log.info(`Origin: ${opts.id}. Redis connection established.`)
     } catch (error) {
-      throw new Error(`Unable to connect to Redis during startup. Origin: ${opts.id}.`, { cause: error })
+      throw new Error(`Origin: ${opts.id}. Unable to connect to Redis during startup.`, { cause: error })
     }
     if (opts.oauth2) {
       // The index creation process can take a considerable amount of time, 
@@ -114,10 +114,10 @@ export default async function (server, opts) {
         )
       } catch (error) {
         if (error.message === 'Index already exists') {
-          server.log.info('Index exists already, skipped creation.')
+          server.log.info(`Origin: ${opts.id}. Index exists already, skipped creation.`)
         } else {
           // Something went wrong, perhaps RediSearch isn't installed...
-          throw new Error(`Session index creation failed. Origin: ${opts.id}.`, { cause: error }) }
+          throw new Error(`Origin: ${opts.id}. Session index creation failed.`, { cause: error }) }
       }
     }
 
@@ -143,7 +143,7 @@ export default async function (server, opts) {
               original.apply(target, args),
               new Promise((_, reject) =>
                 setTimeout(() => reject(
-                  new Error(`Redis command "${prop}" timed out after ${timeout} ms`)
+                  new Error(`Origin: ${opts.id}. Redis command ${prop} timed out after ${timeout} ms.`)
                 ), timeout)
               )
             ])
@@ -165,54 +165,40 @@ export default async function (server, opts) {
      * @returns {Promise<any>} The result of the Redis command execution.
      */
     function _sendCommandToRedis(command, args, options) {
-      let cmd = null
       switch (command.toLowerCase()) {
         case 'evalsha':
-          cmd = client.evalSha(...args, options)
-          break
+          return client.evalSha(...args, options)
         case 'expire':
-          cmd = client.expire(...args, options)
-          break
+          return client.expire(...args, options)
         case 'expireat':
-          cmd = client.expireAt(...args, options)
-          break
+          return client.expireAt(...args, options)
         case 'get':
-          cmd = client.get(...args, options)
-          break
+          return client.get(...args, options)
         case 'hset':
-          cmd = client.hSet(...args, options)
-          break
+          return client.hSet(...args, options)
         case 'hgetall':
-          cmd = client.hGetAll(...args, options)
-          break
+          return client.hGetAll(...args, options)
         case 'json.get':
-          cmd = client.json.get(...args, options)
-          break
+          return client.json.get(...args, options)
         case 'json.merge':
-          cmd = client.json.merge(...args, options)
-          break
+          return client.json.merge(...args, options)
         case 'json.set':
-          cmd = client.json.set(...args, options)
-          break
+          return client.json.set(...args, options)
         case 'ft.search':
-          cmd = client.ft.search(...args, options)
-          break
+          return client.ft.search(...args, options)
         case 'script exists':
-          cmd = client.scriptExists(...args, options)
-          break
+          return client.scriptExists(...args, options)
         case 'script load':
-          cmd = client.scriptLoad(...args, options)
-          break
+          return client.scriptLoad(...args, options)
         case 'set':
-          cmd = client.set(...args, options)
-          break
+          return client.set(...args, options)
         case 'unlink':
-          cmd = client.unlink(...args, options)
-          break
+          return client.unlink(...args, options)
+        case 'zincrby':
+          return client.zIncrBy(...args, options)
         default:
-          throw new Error(`Command ${command} not supported.`)
+          throw new Error(`Origin: ${opts.id}. Redis command ${command} not supported.`)
       }
-      return cmd
     }
 
     if (opts.redis.redisBreaker) {
@@ -238,13 +224,13 @@ export default async function (server, opts) {
         let retryAfter = new Date()
         retryAfter.setSeconds(retryAfter.getSeconds() + redisBreaker.options.resetTimeout / 1000)
         redisBreaker['retryAfter'] = retryAfter.toUTCString()
-        server.log.error(`Redis Breaker OPEN: No commands will be execute. Origin ${opts.id}.`)
+        server.log.error(`Origin ${opts.id}. Redis Breaker OPEN: No commands will be execute.`)
       })
       redisBreaker.on('halfOpen', () => {
-        server.log.warn(`Redis Breaker HALF OPEN: Commands are being tested. Origin ${opts.id}.`)
+        server.log.warn(`Origin ${opts.id}. Redis Breaker HALF OPEN: Commands are being tested.`)
       })
       redisBreaker.on('close', () => {
-        server.log.info(`Redis Breaker CLOSED: Commands are being executed normally. Origin ${opts.id}.`)
+        server.log.info(`Origin ${opts.id}. Redis Breaker CLOSED: Commands are being executed normally.`)
       })
 
       server.decorate('redis', client)
@@ -260,22 +246,27 @@ export default async function (server, opts) {
 
   let ongoing = null
   let purgeUrlPrefix = null
-  
+
   if (opts.cache) {
     ongoing = opts.cache.localRequestsCoalescing
       ? new Map()
       : null
     purgeUrlPrefix = path.join(opts.prefix, opts.cache.purgePath)
+
     opts.cache.cacheables.forEach(cacheable => {
       try {
         cacheable.re = new RegExp(cacheable.urlPattern)
       } catch (error) {
-        server.log.error(`urlPattern ${cacheable.urlPattern} is not a valid regular expresion. Origin: ${opts.id}`)
-        throw new Error(`The cache configuration is invalid. Origin: ${opts.id}`)
+        server.log.fatal(
+          `Origin: ${opts.id}. urlPattern ${cacheable.urlPattern} is not a valid regular expresion.`,
+          { cause: error }
+        )
+        throw new Error(`Origin: ${opts.id}. The cache configuration is invalid.`)
       }
     })
-    server.decorateRequest('cacheable', false)
-    server.decorateRequest('cacheable_per_user', false)
+
+    server.decorateRequest('cacheable')
+    server.decorateRequest('cacheable_per_user')
     server.addHook('onRequest', async (request, reply) => {
       request.cacheable = false
       request.cacheable_per_user = false
@@ -289,16 +280,15 @@ export default async function (server, opts) {
         }
       }
     })
+
     server.addHook('preValidation', async (request, reply) => {
       if (request.cacheable_per_user && !request.session?.sub) {
-        const msg = `This resource ${request.url.raw} is cacheable per user, but the user could not be determined. Origin: ${opts.id}.`
+        const msg = `Origin: ${opts.id}. This resource ${request.raw.url} is cacheable per user, but the user could not be determined.`
         server.log.error(msg)
-        return reply
-          .code(401)
-          .headers({date: new Date().toUTCString()})
-          .send(opts.exposeErrors?msg:"")
+        return helpers.errorHandler(reply, 401, msg, opts.exposeErrors)
       }
     })
+
   }
 
   // Backend-For-Frontend
@@ -328,12 +318,12 @@ export default async function (server, opts) {
             }
           })
         } catch (error) {
-          server.log.error(`Error importing the action library ${opts.bff.actionsLibraries[actionsLibraryKey]}. Origin: ${opts.id}`)
-          throw new Error(`The transformation configuration is invalid. Origin: ${opts.id}`)
+          server.log.fatal(`Origin: ${opts.id}. Error importing the action library ${opts.bff.actionsLibraries[actionsLibraryKey]}.`, { cause: error })
+          throw new Error(`Origin: ${opts.id}. The transformation configuration is invalid.`)
         }
       } else {
-        server.log.error(`The file ${opts.bff.actionsLibraries[actionsLibraryKey]} containing the action library must have a .js extension. Origin: ${opts.id}`)
-        throw new Error(`The transformation configuration is invalid. Origin: ${opts.id}`)
+        server.log.fatal(`Origin: ${opts.id}. The file ${opts.bff.actionsLibraries[actionsLibraryKey]} containing the action library must have a .js extension.`)
+        throw new Error(`Origin: ${opts.id}. The transformation configuration is invalid.`)
       }
     }
 
@@ -343,8 +333,8 @@ export default async function (server, opts) {
       try {
         transformation.re = new RegExp(transformation.urlPattern)
       } catch (error) {
-        server.log.error(`urlPattern ${transformation.urlPattern} is not a valid regular expresion. Origin: ${opts.id}`)
-        throw new Error(`The transformation configuration is invalid. Origin: ${opts.id}`)
+        server.log.fatal(`Origin: ${opts.id}. urlPattern ${transformation.urlPattern} is not a valid regular expresion.`, { cause: error })
+        throw new Error(`Origin: ${opts.id}. The transformation configuration is invalid.`)
       }
       transformation.actions.forEach(action => {
         const tokens = action.uses.split(':')
@@ -357,12 +347,12 @@ export default async function (server, opts) {
           library = tokens[0]
           func = tokens[1]
         } else {
-          server.log.error(`The name of the action ${action.uses} is not valid. The correct format is library:action. Origin: ${opts.id}`)
-          throw new Error(`The transformation configuration is invalid. Origin: ${opts.id}`)
+          server.log.fatal(`Origin: ${opts.id}. The name of the action ${action.uses} is not valid. The correct format is library:action.`)
+          throw new Error(`Origin: ${opts.id}. The transformation configuration is invalid.`)
         }
         if (!actionsRepository[library] || !actionsRepository[library][func]) {
-          server.log.error(`Function ${action.uses} was not found among the available actions. Origin: ${opts.id}`)
-          throw new Error(`The transformation configuration is invalid. Origin: ${opts.id}`)
+          server.log.fatal(`Origin: ${opts.id}. Function ${action.uses} was not found among the available actions.`)
+          throw new Error(`Origin: ${opts.id}. The transformation configuration is invalid.`)
         }
       })
     })
@@ -405,9 +395,14 @@ export default async function (server, opts) {
     if (opts.oauth2.discoverySupported) {
       // (RECOMMENDED) the discovery function that discovers the OAuth 2.0
       // Authorization Server metadata using the Authorization Server's Issuer Identifier
-      authServerConfiguration = await openIdClient.discovery(
-        new URL(opts.oauth2.authorizationServerMetadataLocation),
-        opts.oauth2.clientId, opts.oauth2.clientSecret)
+      try {
+        authServerConfiguration = await openIdClient.discovery(
+          new URL(opts.oauth2.authorizationServerMetadataLocation),
+          opts.oauth2.clientId, opts.oauth2.clientSecret)
+      } catch (error) {
+        server.log.fatal(`Origin: ${opts.id}. Unable to get the Authorization Server metadata.`, { cause: error })
+        throw new Error(`Origin: ${opts.id}. Unable to get the Authorization Server metadata.`, { cause: error })
+      }
     } else {
       // The Configuration constructor if the OAuth 2.0 Authorization
       // Server metadata is known upfront
@@ -424,12 +419,11 @@ export default async function (server, opts) {
     const jwks = createRemoteJWKSet(jwksUri)
     server.decorate('jwks', jwks)
 
-    server.decorateRequest('session', null)
-
+    server.decorateRequest('session')
     async function decorateRequestWithSessionData(request, tokens) {
 
       if ((tokens.token_type || '').toLowerCase() !== 'bearer') {
-        throw new Error(`Unsupported token_type: ${tokens.token_type}`)
+        throw new Error(`Origin: ${opts.id}. Unsupported token_type ${tokens.token_type}.`)
       }
 
       const session = {}
@@ -463,6 +457,7 @@ export default async function (server, opts) {
 
     server.addHook('onRequest', async (request, reply) => {
       let tokens = {}
+      let id_session = null
       if (request.headers?.cookie) {
         // Parse the Cookie header
         const cookies = request.headers?.cookie
@@ -474,19 +469,16 @@ export default async function (server, opts) {
             }, {})
         if (cookies[opts.oauth2.sessionIdCookieName]) {
           // Retrieve session information from Redis
-          const id_session = cookies[opts.oauth2.sessionIdCookieName]
+          id_session = cookies[opts.oauth2.sessionIdCookieName]
           const sessionKey = helpers.SESSION_PREFIX + id_session
           try {
             tokens = server.redisBreaker
               ? await server.redisBreaker.fire('hGetAll', [sessionKey])
               : await server.redis.hGetAll(sessionKey)
           } catch (error) {
-            const msg = "An error occurred while retrieving the stored session."
+            const msg = `Origin: ${opts.id}. An error occurred while retrieving the stored session ${id_session}.`
             server.log.error(msg, { cause: error })
-            return reply
-              .code(500)
-              .headers({date: new Date().toUTCString()})
-              .send(opts.exposeErrors?msg:"")
+            return helpers.errorHandler(reply, 500, msg, opts.exposeErrors, error)
           }
         }
       }
@@ -501,23 +493,23 @@ export default async function (server, opts) {
                 authServerConfiguration,
                 tokens.refresh_token
               )
-              await helpers.storeSession(server, freshTokens)
               await decorateRequestWithSessionData(request, freshTokens)
+              try {
+                await helpers.storeSession(server, freshTokens)
+              } catch (error) {
+                const msg = `Origin: ${opts.id}. An error occurred while storing the session.`
+                server.log.error(msg, { cause: error })
+                // return helpers.errorHandler(reply, 500, msg, opts.exposeErrors, error)
+              }
             } catch (error) {
-              const msg = "Error while refreshing the access token."
+              const msg = `Origin: ${opts.id}. Error while refreshing the access token.`
               server.log.error(msg, { cause: error })
-              return reply
-                .code(500)
-                .headers({date: new Date().toUTCString()})
-                .send(opts.exposeErrors?msg:"")
+              return helpers.errorHandler(reply, 500, msg, opts.exposeErrors, error)
             }
           } else {
-            const msg = "Invalid stored session."
+            const msg = `Origin: ${opts.id}. Invalid stored session ${id_session}.`
             server.log.error(msg, { cause: error })
-            return reply
-              .code(500)
-              .headers({date: new Date().toUTCString()})
-              .send(opts.exposeErrors?msg:"")
+            return helpers.errorHandler(reply, 500, msg, opts.exposeErrors, error)
           }
         }
       }
@@ -533,10 +525,123 @@ export default async function (server, opts) {
     if (server.redis) server.redis.quit()
   })
 
-  server.all('/*', async (request, reply) => {
+  function generatePath(request) {
+    const prefix = request.routeOptions.url.replace("/*", "")
+    return request.url.replace(prefix, "")
+  }
 
-    // Lógica de los BFF al Hook
-    //       if (opts.bff) _transform(CLIENT_REQUEST, request)
+  function generateUrlKey(request, fieldNames = utils.parseVaryHeader(request)) {
+    let path = generatePath(request)
+    const [base, queryString] = path.split("?")
+    if (queryString) {
+      const params = new URLSearchParams(queryString)
+      if (opts.cache.ignoredQueryParams) {
+        opts.cache.ignoredQueryParams.forEach(param => params.delete(param))
+      }
+      if (params.size > 0) {
+        if (opts.cache.sortQueryParams) {
+          const sortedParams = [...params.entries()]
+            .sort(([a], [b]) => a.localeCompare(b))
+            .map(([key, value]) => `${key}=${value}`)
+            .join("&")
+          path = `${base}?${sortedParams.toString()}`
+        } else {
+          path = `${base}?${params.toString()}`
+        }
+      } else {
+        path = base
+      }
+    }
+
+    let urlKey = opts.cache.includeOriginIdInUrlKey ? opts.id : ''
+    if (request.cacheable_per_user) {
+      urlKey += (urlKey.length>0 ? ':' : '') + request.session.sub
+    }
+    urlKey += path.replaceAll('/', ':')
+    if (urlKey.startsWith(':')) urlKey = urlKey.slice(1)
+
+    // See: https://www.rfc-editor.org/rfc/rfc9111.html#name-calculating-cache-keys-with
+    fieldNames.forEach(fieldName => {
+      if (fieldName === '*') urlKey += ':*'
+      else if (Object.prototype.hasOwnProperty.call(request.headers, fieldName)) {
+        urlKey += ':' + fieldName
+          + ':' + ((request.headers[fieldName]) ? request.headers[fieldName] : '')
+      }
+    })
+    return urlKey
+  }
+
+  server.decorateRequest("urlKey", null)
+ 
+  if (opts.variantTracker) {
+
+    const trakedUrlPatterns = []
+    opts.variantTracker.urlPatterns.forEach(urlPattern => {
+      try {
+        trakedUrlPatterns.push(new RegExp(urlPattern))
+      } catch (error) {
+        server.log.fatal(
+          `Origin: ${opts.id}. urlPattern ${urlPattern} is not a valid regular expresion.`,
+          { cause: error }
+        )
+        throw new Error(`Origin: ${opts.id}. The variant tracker configuration is invalid.`)
+      }
+    })
+    server.decorateReply("fingerprint", null)
+    // https://fastify.dev/docs/latest/Reference/Reply/#type-of-the-final-payload
+    // https://fastify.dev/docs/latest/Reference/Reply/#senddata
+
+    server.addHook('onSend', async (request, reply, payload) => {
+      
+      if (helpers.isPurgeRequest(opts, request, purgeUrlPrefix)) return
+      if (request.raw.url.startsWith(path.join(opts.prefix,opts.oauth2.prefix))) return
+
+      let urlTracked = false
+      for (const urlPattern of trakedUrlPatterns) {
+        if (urlPattern.test(request.raw.url)) {
+          urlTracked = true
+          break
+        }
+      }
+
+      if (urlTracked) {
+        if (payload) {
+          let content = payload
+          if (typeof payload === 'string' && 
+            reply.getHeader('content-type')?.toLowerCase().includes('application/json')) {
+            content = JSON.parse(payload)
+          }
+          content = JSON.stringify(helpers._normalizeSimpleObject(content))
+          reply.fingerprint =
+            crypto.createHash("md5").update(JSON.stringify(content)).digest("hex")
+          reply.header("etag", 'W/"' + reply.fingerprint + '"')
+        } else {
+          server.log.warn(`Origin: ${opts.id}. Tracket URL ${request.raw.url} without payload.`)
+        }
+      }
+
+    })
+  
+    // The onResponse hook is executed when a response has been sent, 
+    // so you will not be able to send more data to the client. 
+    // It can however be useful for sending data to external services, 
+    // for example, to gather statistics.
+    server.addHook('onResponse', async (request, reply) => {
+      if (reply.fingerprint) {
+        const counters = 'vary:' + request.urlKey
+        try {
+          tokens = server.redisBreaker
+            ? await server.redisBreaker.fire('zIncrBy', [counters, 1, reply.fingerprint])
+            : await server.redis.zIncrBy(counters, 1, reply.fingerprint)
+        } catch (error) {
+          const msg = `Origin: ${opts.id}. An error occurred while counting the variants ${counters} - ${reply.fingerprint}.`
+          server.log.warn(msg, { cause: error })
+        }
+      }
+    })
+  }
+
+  server.all('/*', async (request, reply) => {
 
     // Métricas
     /*
@@ -547,10 +652,12 @@ export default async function (server, opts) {
 
     try {
 
-      if (request.method === "DELETE"
-        && opts.cache 
-        && request.raw.url.startsWith(purgeUrlPrefix)
-      ) {
+      // Lógica de los BFF al Hook
+      //       if (opts.bff) _transform(CLIENT_REQUEST, request)
+
+      request.urlKey = generateUrlKey(request)
+
+      if (helpers.isPurgeRequest(opts, request, purgeUrlPrefix)) {
         return purge(request, reply)
       }
 
@@ -569,73 +676,57 @@ export default async function (server, opts) {
           ? originBreaker.fire(options, request.rawBody)
           : _fetch(options, request.rawBody)
 
-        // The current value of the clock at the host at the time the
-        // request resulting in the stored response was made.
-        let requestTime = Date.now() / 1000 | 0
-
         // Fecth
         response = await fetch
 
-        // The current value of the clock at the host at the time the
-        // response was received.
-        let responseTime = Date.now()
-
         // Unsure that we have a valid Date Header
-        utils.ensureValidDateHeader(response, responseTime)
         response.headers['x-speedis-cache-status'] = 'CACHE_NOT_ENABLED from ' + os.hostname()
-        // We reduce precision once it’s no longer needed to ensure the Date header.
-        responseTime = responseTime / 1000 | 0
-
-        // We set the attributes involved in calculating the
-        // age of the content.
-        response.requestTime = requestTime
-        response.responseTime = responseTime
 
       } else {
+
         response = await _getCacheable(request)
+      
+      }
+
+
+      utils.ensureValidDateHeader(response, Date.now())
+      if (!response.headers['x-speedis-cache-status']) {
+        response.headers['x-speedis-cache-status'] = 'CACHE_STATUS_UNDEFINED from ' + os.hostname()
       }
 
       // _transform(CLIENT_RESPONSE, remoteResponse, server)
 
-      if (!response.headers['date']) {
-        response.headers['date'] = new Date().toUTCString()
-      }
-      if (!response.headers['x-speedis-cache-status']) {
-        response.headers['x-speedis-cache-status'] = 'CACHE_UNDEFINED_STATUS from ' + os.hostname()
-      }
       return reply
         .code(response.statusCode)
         .headers(response.headers)
         .send(response.body)
+
     } catch (error) {
-      server.log.error(error,
-        "Error requesting to the origin. " +
-        `Origin: ${opts.id}. RID: ${request.id}. Method: ${request.method}. URL: ${request.raw.url}`
-      )
-      // TODO: En caso de error
+      const msg = `Origin: ${opts.id}. Failed to retrieve the requested resource. ` +
+        `RID: ${request.id}. Method: ${request.method}. URL: ${request.raw.url}`
+      server.log.error(msg, { cause: error })
+      return helpers.errorHandler(reply, 500, msg, opts.exposeErrors, error)
     }
   })
 
-  async function purge (request, reply) {
-    const fieldNames = utils.parseVaryHeader(request)
-    let cacheKey = generateCacheKey(request, fieldNames)
-    let toTrash = opts.cache.purgePath.slice(1) + ':'
-    cacheKey = cacheKey.replace(toTrash,"")
+  const toTrash = opts.cache.purgePath.slice(1) + ':'
+  async function purge (request, reply) {  
+    const cacheEviction = request.urlKey.replace(toTrash,"")
     const now = new Date().toUTCString()
     try {
       let result = 0
       // See: https://antirez.com/news/93
-      if (cacheKey.indexOf('*') > -1) {
+      if (cacheEviction.indexOf('*') > -1) {
         // See: https://github.com/redis/node-redis/blob/master/docs/scan-iterators.md
         // See: https://github.com/redis/node-redis/blob/master/docs/v4-to-v5.md#scan-iterators
-        for await (const toTrash of server.redis.scanIterator({
-          MATCH: cacheKey,
+        for await (const entry of client.scanIterator({
+          MATCH: cacheEviction,
           COUNT: 100
         })) {
-          result += await server.redis.unlink((toTrash))
+          result += await server.redis.unlink((entry))
         }
       } else {
-        result = await server.redis.unlink(cacheKey)
+        result = await server.redis.unlink(cacheEviction)
       }
       if (result) {
         return reply.code(204).headers({ date: now }).send()
@@ -644,21 +735,11 @@ export default async function (server, opts) {
       }
     } catch (error) {
       const msg =
-        "Error purging the cache in Redis. " +
-        `Origin: ${opts.id}. Key: ${cacheKey}. RID: ${request.id}.`
+        `Origin: ${opts.id}. Error purging the cache in Redis. ` +
+        `RID: ${request.id}. URL Key pattern: ${cacheEviction}.`
       server.log.error(msg, { cause: error })
-      if (opts.exposeErrors) { 
-        return reply.code(500).headers({ date: now }).send(msg)
-      } else {
-        return reply.code(500).headers({ date: now }).send()
-      }
+      return helpers.errorHandler(reply, 500, msg, opts.exposeErrors, error)
     }
-  }
-
-  function generatePath(request) {
-    const prefix = request.routeOptions.url.replace("/*", "")
-
-    return request.url.replace(prefix, "")
   }
 
   function _fetch(options, body) {
@@ -696,7 +777,7 @@ export default async function (server, opts) {
 
       request.on('error', (err) => {
         if (signal && signal.aborted) {
-          const error = new Error(`Timed out after ${opts.origin.originTimeout} ms`, { cause: err })
+          const error = new Error(`Origin: ${opts.id}. Timed out after ${opts.origin.originTimeout} ms.`, { cause: err })
           error.code = 'ETIMEDOUT'
           reject(error)
         } else {
@@ -705,9 +786,8 @@ export default async function (server, opts) {
       })
 
       // Enviar body si existe
-      if (body) {
-        request.write(body)
-      }
+      if (body) request.write(body)
+
       request.end()
 
     })
@@ -724,14 +804,15 @@ export default async function (server, opts) {
     if (server.redisBreaker &&
       server.redisBreaker.opened &&
       opts.redis.disableOriginOnRedisOutage) {
+      const msg = `Origin: ${opts.id}. Redis is temporarily unavailable. Please try again later.`  
+      server.log.error(msg)
       response.statusCode = 503
       response.headers = {
         date: new Date().toUTCString(),
+        'content-type': 'application/json',
         'x-speedis-cache-status': 'CACHE_REDIS_OUTAGE from ' + os.hostname()
       }
-      if (opts.exposeErrors) {
-        response.body = 'Redis is temporarily unavailable. Please try again later.'
-      }
+      if (opts.exposeErrors) { response.body = { msg: msg } }
       return response
     }
 
@@ -740,41 +821,43 @@ export default async function (server, opts) {
       let tries = 1
       remoteResponse = await _get(request)
       // If the previous _get execution returned -1, it means
-      // that it couldn't acquire the lock to make a request to the
-      // origin. Therefore, the origin has a lock mechanism enabled,
-      // and the opts.cache.distributedRequestsCoalescingOptions
+      // that distributed Requests Coalescing is enabled and 
+      // it couldn't acquire the lock to make a request to the
+      // origin. Therefore, the opts.cache.distributedRequestsCoalescingOptions
       // should exist, with all its attributes being mandatory.   
       while (remoteResponse === -1
-        && tries < opts.cache.distributedRequestsCoalescingOptions?.retryCount
+        && tries < opts.cache.distributedRequestsCoalescingOptions.retryCount
         && !server.redisBreaker.opened) {
-        let delay = opts.cache.distributedRequestsCoalescingOptions?.retryDelay +
-          Math.round(Math.random() * opts.cache.distributedRequestsCoalescingOptions?.retryJitter)
+        let delay = opts.cache.distributedRequestsCoalescingOptions.retryDelay +
+          Math.round(Math.random() * opts.cache.distributedRequestsCoalescingOptions.retryJitter)
         await new Promise(resolve => setTimeout(resolve, delay))
         remoteResponse = await _get(request)
         tries++
       }
       if (remoteResponse === -1) {
+        const msg = `Origin: ${opts.id}. Cache is temporarily unavailable due to lock acquisition failure. Please try again later.`  
+        server.log.error(msg)
         response.statusCode = 503
         response.headers = {
           date: new Date().toUTCString(),
+          'content-type': 'application/json',
           'x-speedis-cache-status': 'CACHE_NO_LOCK from ' + os.hostname()
         }
-        if (opts.exposeErrors) {
-          response.body = 'Cache is temporarily unavailable due to lock acquisition failure. Please try again later.'
-        }
+        if (opts.exposeErrors) { response.body = { msg: msg } }
         return response
       }
     } catch (error) {
+      const msg = 
+        `Origin: ${opts.id}. Failed to retrieve the requested resource. ` +
+        `RID: ${request.id}. Method: ${request.method}. URL: ${request.raw.url}`
+      server.log.error(msg)
       response.statusCode = 500
       response.headers = {
         date: new Date().toUTCString(),
+        'content-type': 'application/json',
         'x-speedis-cache-status': 'CACHE_ERROR_500 from ' + os.hostname()
       }
-      if (opts.exposeErrors) {
-        response.body =
-          "Error requesting to the origin. " +
-          `Origin: ${opts.id}. Url: ${request.url}. RID: ${request.id}.`
-      }
+      if (opts.exposeErrors) { response.body = { msg: msg } }
       return response
     }
 
@@ -812,23 +895,21 @@ export default async function (server, opts) {
     let ifNoneMatchCondition = true
     if (etags.length > 0) {
       if (etags.length === 1 && etags[0] === '"*"') {
-        if (response && 200 === response.statusCode) {
+        if (response?.statusCode === 200) {
           ifNoneMatchCondition = false
         }
-      } else {
-        if (Object.prototype.hasOwnProperty.call(remoteResponse.headers, 'etag')) {
-          let weakCacheEtag = remoteResponse.headers["etag"].startsWith('W/')
-            ? remoteResponse.headers["etag"].substring(2) : remoteResponse.headers["etag"]
-          for (let index = 0; index < etags.length; index++) {
-            // A recipient MUST use the weak comparison function when
-            // comparing entity tags for If-None-Match
-            // https://www.rfc-editor.org/rfc/rfc9110.html#section-8.8.3.2
-            let weakRequestETag = etags[index].startsWith('W/')
-              ? etags[index].substring(2) : etags[index]
-            if (weakRequestETag === weakCacheEtag) {
-              ifNoneMatchCondition = false
-              break
-            }
+      } else if (remoteResponse.headers?.etag) {
+        let weakCacheEtag = remoteResponse.headers.etag.startsWith('W/')
+          ? remoteResponse.headers.etag.substring(2) : remoteResponse.headers.etag
+        for (let index = 0; index < etags.length; index++) {
+          // A recipient MUST use the weak comparison function when
+          // comparing entity tags for If-None-Match
+          // https://www.rfc-editor.org/rfc/rfc9110.html#section-8.8.3.2
+          let weakRequestETag = etags[index].startsWith('W/')
+            ? etags[index].substring(2) : etags[index]
+          if (weakRequestETag === weakCacheEtag) {
+            ifNoneMatchCondition = false
+            break
           }
         }
       }
@@ -865,47 +946,6 @@ export default async function (server, opts) {
     }
   }
 
-  function generateCacheKey(request, fieldNames = utils.parseVaryHeader(request)) {
-    let path = generatePath(request)
-    const [base, queryString] = path.split("?")
-    if (queryString) {
-      const params = new URLSearchParams(queryString)
-      if (opts.cache.ignoredQueryParams) {
-        opts.cache.ignoredQueryParams.forEach(param => params.delete(param))
-      }
-      if (params.size > 0) {
-        if (opts.cache.sortQueryParams) {
-          const sortedParams = [...params.entries()]
-            .sort(([a], [b]) => a.localeCompare(b))
-            .map(([key, value]) => `${key}=${value}`)
-            .join("&")
-          path = `${base}?${sortedParams.toString()}`
-        } else {
-          path = `${base}?${params.toString()}`
-        }
-      } else {
-        path = base
-      }
-    }
-
-    let cacheKey = opts.cache.includeOriginIdInCacheKey ? opts.id : ''
-    if (request.cacheable_per_user) {
-      cacheKey += (cacheKey.length>0 ? ':' : '') + request.session.sub
-    }
-    cacheKey += path.replaceAll('/', ':')
-    if (cacheKey.startsWith(':')) cacheKey = cacheKey.slice(1)
-
-    // See: https://www.rfc-editor.org/rfc/rfc9111.html#name-calculating-cache-keys-with
-    fieldNames.forEach(fieldName => {
-      if (fieldName === '*') cacheKey += ':*'
-      else if (Object.prototype.hasOwnProperty.call(request.headers, fieldName)) {
-        cacheKey += ':' + fieldName
-          + ':' + ((request.headers[fieldName]) ? request.headers[fieldName] : '')
-      }
-    })
-    return cacheKey
-  }
-
   async function _get(request) {
 
     const path = generatePath(request)
@@ -915,20 +955,20 @@ export default async function (server, opts) {
     const options = { ...opts.origin.httpxOptions }
     if (agent) options.agent = agent
     options.path = path
-
+    
     const clientCacheDirectives = utils.parseCacheControlHeader(request)
     const fieldNames = utils.parseVaryHeader(request)
-    let cacheKey = generateCacheKey(request, fieldNames)
 
     let cachedResponse = null
     try {
       cachedResponse = server.redisBreaker
-        ? await server.redisBreaker.fire('json.get', [cacheKey])
-        : await server.redis.json.get(cacheKey)
+        ? await server.redisBreaker.fire('json.get', [request.urlKey])
+        : await server.redis.json.get(request.urlKey)
     } catch (error) {
-      server.log.warn(error,
-        "Error querying the cache entry in Redis. " +
-        `Origin: ${opts.id}. Key: ${cacheKey}. RID: ${request.id}.`)
+      server.log.warn(
+        `Origin: ${opts.id}. Error querying the cache entry in Redis. ` +
+        `RID: ${request.id}. URL Key: ${request.urlKey}.`,
+        { cause: error })
     }
 
     let cachedCacheDirectives = null
@@ -1005,9 +1045,6 @@ export default async function (server, opts) {
 
     }
 
-    // Apply transformations to the request before sending it to the origin
-    if (opts.bff) _transform(ORIGIN_REQUEST, options)
-
     // If localRequestsCoalescing is enabled, only the first request
     // will contact the origin to prevent overloading it.
     let amITheFetcher = false
@@ -1024,13 +1061,13 @@ export default async function (server, opts) {
       // Verify if there is an ongoing fetch operation
       let fetch = null
       if (opts.cache.localRequestsCoalescing) {
-        fetch = ongoing.get(cacheKey)
+        fetch = ongoing.get(request.urlKey)
       }
 
       if (!fetch) {
         // https://redis.io/docs/latest/develop/use/patterns/distributed-locks/#correct-implementation-with-a-single-instance
         if (opts.cache.distributedRequestsCoalescing) {
-          lockKey = `${cacheKey}.lock`
+          lockKey = `${request.urlKey}.lock`
           lockValue = `${process.pid}:${opts.id}:${request.id}:` + crypto.randomBytes(4).toString("hex")
           locked = await _adquireLock(lockKey, lockValue)
         }
@@ -1046,14 +1083,16 @@ export default async function (server, opts) {
         if (request.session?.access_token) {
           options.headers['authorization'] = `Bearer ${request.session.access_token}`
         }
+        // Apply transformations to the request before sending it to the origin
+        if (opts.bff) _transform(ORIGIN_REQUEST, options)
+
         if (originBreaker) {
           fetch = originBreaker.fire(options, request.body)
         } else {
           fetch = _fetch(options, request.body)
         }
-        if (opts.cache.localRequestsCoalescing) ongoing.set(cacheKey, fetch)
+        if (opts.cache.localRequestsCoalescing) ongoing.set(request.urlKey, fetch)
         amITheFetcher = true
-
       }
 
       // The current value of the clock at the host at the time the
@@ -1066,6 +1105,10 @@ export default async function (server, opts) {
       // The current value of the clock at the host at the time the
       // response was received.
       responseTime = Date.now()
+
+      // Apply transformations to the response received from the origin
+      originResponse.path = path
+      if (opts.bff) _transform(ORIGIN_RESPONSE, originResponse)
 
       // Unsure that we have a valid Date Header
       utils.ensureValidDateHeader(originResponse, responseTime)
@@ -1081,12 +1124,13 @@ export default async function (server, opts) {
     } catch (error) {
 
       if (opts.cache.distributedRequestsCoalescing && locked) await _releaseLock(lockKey, lockValue)
-      if (amITheFetcher && opts.cache.localRequestsCoalescing) ongoing.delete(cacheKey)
+      if (amITheFetcher && opts.cache.localRequestsCoalescing) ongoing.delete(request.urlKey)
       delete options.agent
 
-      server.log.error(error,
-        "Error requesting to the origin. " +
-        `Origin: ${opts.id}. RID: ${request.id}. Method: ${request.method}. URL: ${request.raw.url}`
+      server.log.error(
+        `Origin ${opts.id}. Error requesting to the origin. ` +
+        `RID: ${request.id}. Method: ${request.method}. URL: ${request.raw.url}`,
+        { cause: error }
       )
 
       /*
@@ -1097,9 +1141,10 @@ export default async function (server, opts) {
       if (cachedResponse
         && !Object.prototype.hasOwnProperty.call(cachedCacheDirectives, 'must-revalidate')
         && !Object.prototype.hasOwnProperty.call(cachedCacheDirectives, 'proxy-revalidate')) {
-        server.log.warn(error,
-          "Serving stale content from cache. " +
-          `Origin: ${opts.id}. Key: ${cacheKey}. RID: ${request.id}.`)
+        server.log.warn(
+          `Origin: ${opts.id}. Serving stale content from cache. ` +
+          `RID: ${request.id}. URL Key: ${request.urlKey}.`
+        )
         utils.setCacheStatus('CACHE_HIT_NOT_REVALIDATED_STALE', cachedResponse)
         cachedResponse.headers['age'] = utils.calculateAge(cachedResponse)
         return cachedResponse
@@ -1132,12 +1177,8 @@ export default async function (server, opts) {
     }
 
     if (amITheFetcher && opts.cache.localRequestsCoalescing) {
-      ongoing.delete(cacheKey)
+      ongoing.delete(request.urlKey)
     }
-
-    // Apply transformations to the response received from the origin
-    originResponse.path = path
-    if (opts.bff) _transform(ORIGIN_RESPONSE, originResponse)
 
     // We parse the Cache-Control header to extract cache directives.
     const originCacheDirectives = utils.parseCacheControlHeader(originResponse)
@@ -1181,18 +1222,19 @@ export default async function (server, opts) {
             headers: cachedResponse.headers
           }
           server.redisBreaker
-            ? await server.redisBreaker.fire('json.merge', [cacheKey, '$', payload])
-            : await server.redis.json.merge(cacheKey, '$', payload)
+            ? await server.redisBreaker.fire('json.merge', [request.urlKey, '$', payload])
+            : await server.redis.json.merge(request.urlKey, '$', payload)
           // Set the TTL for the cache entry           
           if (!Number.isNaN(ttl) && ttl > 0) {
             server.redisBreaker
-              ? await server.redisBreaker.fire('expire', [cacheKey, ttl])
-              : await server.redis.expire(cacheKey, ttl)
+              ? await server.redisBreaker.fire('expire', [request.urlKey, ttl])
+              : await server.redis.expire(request.urlKey, ttl)
           }
         } catch (error) {
-          server.log.warn(error,
-            "Error while updating the cache. " +
-            `Origin: ${opts.id}. Key: ${cacheKey}. RID: ${request.id}.`
+          server.log.warn(
+            `Origin: ${opts.id}. Error while updating the cache. ` +
+            `RID: ${request.id}. URL Key: ${request.urlKey}.`,
+            { cause: error }
           )
         }
       }
@@ -1204,18 +1246,19 @@ export default async function (server, opts) {
         const ttl = parseInt(cacheEntry.ttl)
         try {
           server.redisBreaker
-            ? await server.redisBreaker.fire('json.set', [cacheKey, '$', cacheEntry])
-            : await server.redis.json.set(cacheKey, '$', cacheEntry)
+            ? await server.redisBreaker.fire('json.set', [request.urlKey, '$', cacheEntry])
+            : await server.redis.json.set(request.urlKey, '$', cacheEntry)
           // Set the TTL for the cache entry           
           if (!Number.isNaN(ttl) && ttl > 0) {
             server.redisBreaker
-              ? await server.redisBreaker.fire('expire', [cacheKey, ttl])
-              : await server.redis.expire(cacheKey, ttl)
+              ? await server.redisBreaker.fire('expire', [request.urlKey, ttl])
+              : await server.redis.expire(request.urlKey, ttl)
           }
         } catch (error) {
-          server.log.warn(error,
-            "Error while storing in the cache. " +
-            `Origin: ${opts.id}. Key: ${cacheKey}. RID: ${request.id}.`
+          server.log.warn(
+            `Origin: ${opts.id}. Error while storing in the cache. ` +
+            `RID: ${request.id}. URL Key: ${request.urlKey}.`,
+            { cause: error }
           )
         }
       }
@@ -1238,12 +1281,13 @@ export default async function (server, opts) {
         && originCacheDirectives['private'] === null)) {
       try {
         server.redisBreaker
-          ? await server.redisBreaker.fire('unlink', [cacheKey])
-          : await server.redis.unlink(cacheKey)
+          ? await server.redisBreaker.fire('unlink', [request.urlKey])
+          : await server.redis.unlink(request.urlKey)
       } catch (error) {
-        server.log.warn(error,
-          "Error while removing private/no-store entry in the cache. " +
-          `Origin: ${opts.id}. Key: ${cacheKey}. RID: ${request.id}.`
+        server.log.warn(
+          `Origin: ${opts.id}. Error while removing private/no-store entry in the cache. ` +
+          `RID: ${request.id}. URL Key: ${request.urlKey}.`,
+          { cause: error }
         )
       }
     }
@@ -1278,11 +1322,13 @@ export default async function (server, opts) {
 
   async function _adquireLock(lockKey, lockValue) {
     let lockTTL
-    if (opts.origin.lockOptions
-      && opts.cache.distributedRequestsCoalescingOptions?.lockTTL
-      && opts.cache.distributedRequestsCoalescingOptions?.lockTTL > 0) {
+    // In JavaScript, when comparing a number with undefined, 
+    // the engine converts undefined to NaN (Not a Number)
+    // Any comparison involving NaN is always false.
+    // This is a core rule in JavaScript.
+    if (opts.cache.distributedRequestsCoalescingOptions?.lockTTL > 0) {
       lockTTL = opts.cache.distributedRequestsCoalescingOptions?.lockTTL
-    } else if (opts.origin.originTimeout && opts.origin.originTimeout > 0) {
+    } else if (opts.origin.originTimeout > 0) {
       lockTTL = Math.round(opts.origin.originTimeout * 1.2)
     } else {
       lockTTL = Math.round(Math.random() * 10000)
@@ -1295,13 +1341,15 @@ export default async function (server, opts) {
         : await server.redis.set(lockKey, lockValue, { NX: true, PX: lockTTL })
       locked = ('OK' === lockResponse)
     } catch (error) {
-      server.log.warn(error,
-        "Error acquiring the lock. " +
-        `Origin: ${opts.id}. Key: ${lockKey}. Value: ${lockValue}. LockTTL: ${lockTTL}.`
+      server.log.warn(
+        `Origin: ${opts.id}. Error acquiring the lock. ` +
+        `RID: ${request.id}. Lock key: ${lockKey}. Lock value: ${lockValue}. Lock TTL: ${lockTTL}.`,
+        { cause: error }
       )
     } finally {
       return locked
     }
+
   }
 
   // Remove the key only if it exists and the value stored at the  key
@@ -1340,9 +1388,10 @@ export default async function (server, opts) {
           }
         )
     } catch (error) {
-      server.log.warn(error,
-        "Error releasing the lock. " +
-        `Origin: ${opts.id}. Key: ${lockKey}. Value: ${lockValue}.`
+      server.log.warn(
+        `Origin: ${opts.id}. Error releasing the lock. ` +
+        `RID: ${request.id}. Lock key: ${lockKey}. Lock value: ${lockValue}.`,
+        { cause: error}
       )
     }
   }

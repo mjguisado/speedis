@@ -4,7 +4,7 @@ config:
     path: 'uuids.csv'
     fields:
       - 'uuid'
-  target: https://localhost:61283
+  target: https://127.0.0.1:61283
   tls:
     rejectUnauthorized: false
   phases:
@@ -15,22 +15,22 @@ scenarios:
   - name: '304'
     flow:
     - get:
-        url: '/mocks/items/{{ uuid }}?cc=public,max-age={{ $randomNumber(1,60) }}'
+        url: '/mocks/items/public-{{ uuid }}?cc=public,max-age={{ $randomNumber(1,60) }}'
         headers:
-          'Host': 'mocks.local'
+          'Host': 'mocks'
         capture:
           - header: 'last-modified'
             as: 'lastModified'
     - think: '{{ $randomNumber(1,60) }}s'
     - get:
-        url: '/mocks/items/{{ uuid }}?cc=public,max-age={{ $randomNumber(1,60) }}'
+        url: '/mocks/items/public-{{ uuid }}?cc=public,max-age={{ $randomNumber(1,60) }}'
         headers:
-          'Host': 'mocks.local'
+          'Host': 'mocks'
           'If-Modified-Since': '{{ lastModified }}'
         ifTrue: 'lastModified'
   - name: 'overflow'
     flow:
     - get:
-        url: '/mocks/items/overflow?delay=500&cc=public,max-age=5'
+        url: '/mocks/items/public-overflow?delay=500&cc=public,max-age=5'
         headers:
-          'Host': 'mocks.local'
+          'Host': 'mocks'

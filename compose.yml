@@ -43,7 +43,7 @@ services:
     command: start-dev
     environment:
       - KC_BOOTSTRAP_ADMIN_USERNAME=admin
-      - KC_BOOTSTRAP_ADMIN_PASSWORD=keycloak
+      - KC_BOOTSTRAP_ADMIN_PASSWORD=admin
       - KC_HTTPS_CERTIFICATE_FILE=/opt/keycloak/conf/certs/keycloak.crt
       - KC_HTTPS_CERTIFICATE_KEY_FILE=/opt/keycloak/conf/certs/keycloak.key
     volumes:

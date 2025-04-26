@@ -19,10 +19,6 @@ export function setLastModifiedAndDateHeaders(target, params) {
     target.headers["date"] = now
 }
 
-export function setETagHeader(target, params) {
-    target.headers["etag"] = createHash("md5").update(JSON.stringify(target.body)).digest("hex")
-}
-
 /*
  * 
  * The `ttl` attribute is used to define the expiration time of a cache entry in Redis.

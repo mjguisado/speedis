@@ -191,6 +191,18 @@ export async function app(opts = {}, ajv = new Ajv({ useDefaults: true })) {
             },
           }
         },
+        variantTracker: {
+          type: "object",
+          additionalProperties: false,
+          required: ["urlPatterns"],
+          properties: {
+            urlPatterns: {
+              type: "array",
+              minItems: 1,
+              items: { type: "string" }
+            }
+          }
+        },
         cache: {
           type: "object",
           additionalProperties: false,
@@ -224,7 +236,7 @@ export async function app(opts = {}, ajv = new Ajv({ useDefaults: true })) {
                 }
               }
             },
-            includeOriginIdInCacheKey: { type: "boolean", default: true },
+            includeOriginIdInUrlKey: { type: "boolean", default: true },
             ignoredQueryParams: {
               type: "array",
               items: {
