@@ -240,14 +240,16 @@ export default async function (server, opts) {
 
   }
 
-  let ongoing = null
   let purgeUrlPrefix = null
+  let ongoing = null
 
   if (opts.cache) {
+
+    purgeUrlPrefix = path.join(opts.prefix, opts.cache.purgePath)
+
     ongoing = opts.cache.localRequestsCoalescing
       ? new Map()
       : null
-    purgeUrlPrefix = path.join(opts.prefix, opts.cache.purgePath)
 
     opts.cache.cacheables.forEach(cacheable => {
       try {
@@ -359,6 +361,7 @@ export default async function (server, opts) {
   const ORIGIN_REQUEST = "OriginRequest"
   const ORIGIN_RESPONSE = "OriginResponse"
   const CACHE_REQUEST = "CacheRequest"
+  const CACHE_RESPONSE = "CacheResponse"
   const VARIANTS_TRACKER = "VariantsTracker"
 
   function _transform(type, target) {
@@ -657,17 +660,10 @@ export default async function (server, opts) {
 
   server.all('/*', async (request, reply) => {
 
-    // Métricas
-    /*
-    server.httpRequestsTotal
-        .labels({ origin: opts.id, method: 'GET' })
-        .inc()
-    */
-
     try {
 
       // Lógica de los BFF al Hook
-      //       if (opts.bff) _transform(CLIENT_REQUEST, request)
+      if (opts.bff) _transform(CLIENT_REQUEST, request)
 
       request.urlKey = generateUrlKey(request)
 
@@ -708,7 +704,7 @@ export default async function (server, opts) {
         response.headers['x-speedis-cache-status'] = 'CACHE_STATUS_UNDEFINED from ' + os.hostname()
       }
 
-      // _transform(CLIENT_RESPONSE, remoteResponse, server)
+      if (opts.bff) _transform(CLIENT_RESPONSE, remoteResponse)
 
       return reply
         .code(response.statusCode)
@@ -721,6 +717,7 @@ export default async function (server, opts) {
       server.log.error(msg, { cause: error })
       return helpers.errorHandler(reply, 500, msg, opts.exposeErrors, error)
     }
+
   })
 
   const toTrash = opts.cache.purgePath.slice(1) + ':'
