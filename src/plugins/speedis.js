@@ -1,7 +1,7 @@
 
 import os from 'os'
 import { initRedis } from '../modules/redis.js'
-import { _fetch } from '../modules/fetcher.js'
+import { _fetch } from '../modules/origin.js'
 import * as bff from '../modules/bff.js'
 import { initOAuth2 } from '../modules/oauth2.js'
 import sessionPlugin from './session.js'
@@ -59,7 +59,7 @@ export default async function (server, opts) {
             const msg = `Origin: ${opts.id}. Failed to retrieve the requested resource. ` +
                 `RID: ${request.id}. Method: ${request.method}. URL: ${request.raw.url}`
             server.log.error(error, msg)
-            return errorHandler(reply, 500, msg, opts.exposeErrors, error)
+            return errorHandler(reply, "ETIMEDOUT"===error.code?504:500, msg, opts.exposeErrors, error)
         }
 
     })

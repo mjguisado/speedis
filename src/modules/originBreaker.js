@@ -1,5 +1,5 @@
 import CircuitBreaker from 'opossum'
-import { _fetch } from './fetcher.js'
+import { _fetch } from './origin.js'
 
 export function initOriginBreaker(server, opts) {
     // Name of the Circuit Breaker

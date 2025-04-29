@@ -123,6 +123,18 @@ export default async function (server, opts) {
                 throw error
             }
         }
+        if (request.id_session) {
+            const sessionKey = SESSION_PREFIX + request.id_session
+            try {
+                server.redisBreaker
+                    ? await server.redisBreaker.fire('unlink', [sessionKey])
+                    : await server.redis.unlink(sessionKey)            
+            } catch (error) {
+                server.log.error(error,
+                    `Error while unlinking the session ${sessionKey}. Origin: ${opts.id}.`)
+                throw error
+            }
+        }
         return reply
             .header('set-cookie', `${opts.sessionIdCookieName}=; Path=/; Secure; HttpOnly; Max-Age=0`)
             .redirect(postLogoutRedirectUri)
