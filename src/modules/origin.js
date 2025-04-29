@@ -27,6 +27,9 @@ export async function initOrigin(server, opts) {
             .Agent(opts.origin.agentOptions)
     }
     server.decorate('agent', agent)
+    server.addHook('onClose', (server) => {
+        if (server.agent) server.agent.destroy()
+    })
 
     // This plugin will add the request.rawBody.
     // It will get the data using the preParsing hook.

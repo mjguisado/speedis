@@ -29,12 +29,6 @@ export default async function (server, opts) {
   }
   if (opts.variantsTracker) initVariantsTracker(server,opts)
 
-  server.addHook('onClose', (server) => {
-    if (server.agent) server.agent.destroy()
-    if (server.ongoingFetch) server.ongoingFetch.clear()
-    if (server.redis) server.redis.quit()
-  })
-
   server.all('/*', async (request, reply) => {
 
     try {

@@ -169,4 +169,8 @@ export async function initRedis(server, opts) {
         server.decorate('redis', client)
     }
 
+    server.addHook('onClose', (server) => {
+        if (server.redis) server.redis.quit()
+    })
+
 }

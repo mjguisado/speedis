@@ -16,6 +16,9 @@ export function initCache(server, opts) {
         ? new Map()
         : null
     server.decorate('ongoingFetch', ongoingFetch)
+    server.addHook('onClose', (server) => {
+        if (server.ongoingFetch) server.ongoingFetch.clear()
+    })    
 
     opts.cache.cacheables.forEach(cacheable => {
         try {
