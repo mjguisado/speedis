@@ -22,6 +22,7 @@ The following table describes the supported fields.
 |`exposeErrors`|Boolean|`false`|`false`|This parameter determines whether descriptive error messages are included in the response body (`true` or `false`).|
 |`origin`|Object|`true`||This object defines all the details related to the origin server. Its format is detailed below.|
 |`bff`|Object|`false`||This object defines all the details related to the Backend-For-Frontend (BFF). Its format is detailed below.|
+|`variantsTracker`|Object|`false`||This object defines all the details related to the variant tracker. Its format is detailed below.|
 |`cache`|Object|`false`||This object defines all the details related to the cache. Its format is detailed below.|
 |`oauth2`|Object|`false`||This object defines all the details related to the OAuth2-based Access Control. Its format is detailed below.|
 |`redis`|Object|`true` if cache of oauth2 is enabled||This object defines all the details related to the redis database. Its format is detailed below.|
@@ -96,6 +97,12 @@ Speedis includes out of the box two libreries
 |----------|--------|-----------|
 |headers|[./src/actions/headers.js](../src/actions/headers.js)|Actions to manipulate headers|
 |json|[./src/actions/json.js](../src/actions/json.js)|Actions to manipulate the body in JSON format|
+
+## Variant Tracker
+The following table describes the supported fields in the variant tracker configuration object.
+|Field|Type|Mandatory|Default|Description|
+|-----|----|---------|-------|-----------|
+|`urlPatterns`|[String]|`true`||List of URL patterns to track along with their variants.|
 
 ## Cache configuration object
 The following table describes the supported fields in the cache configuration object.

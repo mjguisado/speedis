@@ -92,12 +92,12 @@ if (cluster.isPrimary) {
 
   metricsServer.listen(
     { host: '::', port: config.metricServerPort },
-    (err, address) => {
-      if (err) {
-        metricsServer.log.error('Error starting server:', err)
+    (error, address) => {
+      if (error) {
+        metricsServer.log.error(error, 'Error starting metric server.')
         process.exit(1)
       }
-      metricsServer.log.info(`Master metrics server running at ${address}`)
+      metricsServer.log.info(`Metrics server running at ${address}.`)
     }
   )
 
@@ -118,8 +118,8 @@ if (cluster.isPrimary) {
   // Run the server!
   try {
     await server.listen({ host: '::', port: config.port })
-  } catch (err) {
-    server.log.error(err)
+  } catch (error) {
+    server.log.error(error)
     process.exit(1)
   }
 

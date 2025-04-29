@@ -56,8 +56,8 @@ await mockServer.register(mocksPlugin, {
 
 try {
     await mockServer.listen({ host: '::', port: 3030 })
-} catch (err) {
-    mockServer.log.error(err)
+} catch (error) {
+    mockServer.log.error(error)
     process.exit(1)
 }
 
