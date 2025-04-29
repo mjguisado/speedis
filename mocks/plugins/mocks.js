@@ -99,7 +99,8 @@ export default async function (server, opts) {
     ]
 
     async function common(request, reply) {
-        server.log.debug(`REQUEST: Id: ${request.id} - Method: ${request.method} - Url: ${request.url} - Headers: ${JSON.stringify(request.headers)} - Body: ${request.body}` )
+
+        server.log.debug(`REQUEST: Id: ${request.id} - Method: ${request.method} - Url: ${request.url} - Headers: ${JSON.stringify(request.headers)} - Body: ${request.body}`)
 
         if (request.query['delay']) {
             let delay = parseInt(request.query['delay'])

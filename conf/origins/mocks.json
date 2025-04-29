@@ -50,14 +50,13 @@
                     }
                 ]
             }
-
         ]
     },
     "variantsTracker": {
         "urlPatterns": [
             "/mocks/users/*"
         ]
-    },    
+    },
     "cache": {
         "cacheables": [
             {

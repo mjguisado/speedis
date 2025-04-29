@@ -1,6 +1,6 @@
 import * as openidClient from 'openid-client'
 import * as crypto from 'crypto'
-import * as helpers from './helpers.js'
+import { storeSession } from '../modules/oauth2.js' 
 
 // https://medium.com/google-cloud/understanding-oauth2-and-building-a-basic-authorization-server-of-your-own-a-beginners-guide-cf7451a16f66
 // https://skycloak.io/blog/keycloak-how-to-create-a-pkce-authorization-flow-client/
@@ -9,6 +9,9 @@ import * as helpers from './helpers.js'
 // https://www.rfc-editor.org/rfc/rfc8414
 // https://www.rfc-editor.org/rfc/rfc6749
 // https://www.iana.org/assignments/oauth-parameters/oauth-parameters.xhtml#authorization-server-metadata
+
+export const SESSION_INDEX_NAME = 'idx:sessions'
+export const SESSION_PREFIX = 'sessions:'
 
 export default async function (server, opts) {
 
@@ -37,9 +40,8 @@ export default async function (server, opts) {
           ? await server.redisBreaker.fire('set', [parameters.state, codeVerifier, { EX: opts.authorizationCodeTtl } ])
           : await server.redis.set(parameters.state, codeVerifier, { EX: opts.authorizationCodeTtl })
       } catch (error) {
-        server.log.error(
-          `Error while storing the code verifier. Origin: ${opts.id}.`, { cause: error }
-        )
+        server.log.error(error
+          `Error while storing the code verifier. Origin: ${opts.id}.`)
         throw error
       }
     }
@@ -48,9 +50,8 @@ export default async function (server, opts) {
       const url = openidClient.buildAuthorizationUrl(server.authServerConfiguration, parameters)
       return reply.redirect(url)
     } catch (error) {
-      server.log.error(
-        `Error while building authorization url. Origin: ${opts.id}.`, { cause: error }
-      )
+      server.log.error(error
+        `Error while building authorization url. Origin: ${opts.id}.`)
       throw error
     }
 
@@ -67,9 +68,8 @@ export default async function (server, opts) {
           ? await server.redisBreaker.fire('get', [request.query['state']])
           : await server.redis.get(request.query['state'])
       } catch (error) {
-        server.log.error(
-          `Error while retrieving the code verifier. Origin: ${opts.id}.`, { cause: error }
-        )
+        server.log.error(error,
+          `Error while retrieving the code verifier. Origin: ${opts.id}.`)
         code_verifier = 'it will fail'
       }
       checks.expectedState = request.query['state']
@@ -87,13 +87,12 @@ export default async function (server, opts) {
         checks
       )
     } catch (error) {
-      server.log.error(
-        `Error while executing the authorization code grant. Origin: ${opts.id}.`, { cause: error }
-      )
+      server.log.error(error,
+        `Error while executing the authorization code grant. Origin: ${opts.id}.`)
       throw error
     }
 
-    const id_session = await helpers.storeSession(server, tokens)
+    const id_session = await storeSession(server, tokens)
     if (opts.pkceEnabled) {
       server.redisBreaker
           ? await server.redisBreaker.fire('unlink', [request.query['state']])
@@ -119,9 +118,8 @@ export default async function (server, opts) {
           parameters
         )
       } catch (error) {
-        server.log.error(
-          `Error while building end session url. Origin: ${opts.id}.`, { cause: error }
-        )
+        server.log.error(error,
+          `Error while building end session url. Origin: ${opts.id}.`)
         throw error
       }
     }
@@ -155,7 +153,7 @@ export default async function (server, opts) {
 
   server.post('/sessions/:id_session/invalidate', async (request, reply) => {
     const { id_session } = request.params
-    const sessionKey = helpers.SESSION_PREFIX + id_session
+    const sessionKey = SESSION_PREFIX + id_session
     const now = new Date().toUTCString()
     try {
       if (await invalidateSession(sessionKey)) {
@@ -166,7 +164,7 @@ export default async function (server, opts) {
     } catch (error) {
       const msg = "Error invalidating the session. " +
         `Origin: ${opts.id}. Session ID: ${id_session}. RID: ${request.id}.`
-      server.log.error(msg, { cause: error })
+      server.log.error(error, msg)
       if (opts.exposeErrors) { 
         return reply.code(500).headers({ date: now }).send(msg)
       } else {
@@ -181,7 +179,7 @@ export default async function (server, opts) {
     try {
       const sessions = server.redisBreaker
         ? await server.redisBreaker.fire('ft.search', [
-            helpers.SESSION_INDEX_NAME, 
+            SESSION_INDEX_NAME, 
             `@sub:{${sub}}`,
             {
               SORTBY: {
@@ -191,7 +189,7 @@ export default async function (server, opts) {
             }
           ])
         : await server.redis.ft.search(
-          helpers.SESSION_INDEX_NAME, 
+          SESSION_INDEX_NAME, 
           `@sub:{\"${sub}\"}`,
             {
               SORTBY: {
@@ -211,7 +209,7 @@ export default async function (server, opts) {
         const invalidations = await Promise.allSettled(sessionsToInvalidate)
         invalidations.forEach((invalidation, i) => {
           if (invalidation.status === 'rejected') {
-            server.log.warn(`Failed to invalidate session ${sessions.documents[i].id.replace(helpers.SESSION_PREFIX,'')}:`, invalidation.reason)
+            server.log.warn(`Failed to invalidate session ${sessions.documents[i].id.replace(SESSION_PREFIX,'')}:`, invalidation.reason)
           }
         })
         reply.code(204).headers({ date: now }).send()
@@ -221,7 +219,7 @@ export default async function (server, opts) {
     } catch (error) {
       const msg = "Error invalidating the user’s sessions. " +
         `Origin: ${opts.id}. User ID: ${sub}. RID: ${request.id}.`
-      server.log.error(msg, { cause: error })
+      server.log.error(error, msg)
       if (opts.exposeErrors) { 
         return reply.code(500).headers({ date: now }).send(msg)
       } else {
@@ -229,44 +227,5 @@ export default async function (server, opts) {
       }
     }
   })
-
-  /*
-  server.post(opts.logoutPath, async (request, reply) => {
-    let id_session = null
-    try {
-       const { payload } = await jwtVerify(
-        request.body, 
-        server.jwks,
-        {
-          issuer: server.authServerConfiguration.serverMetadata().issuer,
-        }
-      )
-      id_session = payload.sid
-    } catch (error) {
-      const msg = `Invalid logout token: ${request.body}. Origin: ${opts.id}.`
-      server.log.error(msg, { cause: error })
-      return reply
-        .code(400)
-        .headers({date: new Date().toUTCString()})
-        .send(server.exposeErrors?msg:"")
-    }
-    try {
-      server.redisBreaker
-          ? await server.redisBreaker.fire('unlink', [id_session])
-          : await server.redis.unlink(id_session)
-    } catch (error) {
-      const msg = `Error while deleting the session ${id_session}. Origin: ${opts.id}.`
-      server.log.error(msg,{ cause: error })
-      return reply
-        .code(500)
-        .headers({date: new Date().toUTCString()})
-        .send(server.exposeErrors?msg:"")
-    } 
-    return reply
-      .code(204)
-      .headers({date: new Date().toUTCString()})
-      .send()
-  })
-  */
 
 }

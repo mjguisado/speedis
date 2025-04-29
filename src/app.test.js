@@ -5,14 +5,14 @@ import crypto from 'crypto'
 
 suite('Speedis', async () => {
 
-    let fastifyServer
+    let server
 
     function sleep(ms) {
         return new Promise((resolve) => setTimeout(resolve, ms));
     }
 
     before(async () => {
-        fastifyServer = await app({
+        server = await app({
             logger: { level: 'warn' }
         })
     })
@@ -22,7 +22,7 @@ suite('Speedis', async () => {
         test('DELETE 404', async (t) => {
             t.plan(1)
             let url = '/mocks/mocks/items/public-' + crypto.randomUUID()
-            let response = await fastifyServer.inject({
+            let response = await server.inject({
                 method: 'DELETE',
                 url: url.replace('/mocks/mocks/','/mocks/purge/mocks/')
             })
@@ -34,12 +34,12 @@ suite('Speedis', async () => {
             let url = '/mocks/mocks/items/public-' + crypto.randomUUID()
 
             url += '?cc=' + encodeURIComponent('public,max-age=60')
-            let response = await fastifyServer.inject({
+            let response = await server.inject({
                 method: 'GET',
                 url: url
             })
             t.assert.strictEqual(response.statusCode, 200)
-            response = await fastifyServer.inject({
+            response = await server.inject({
                 method: 'DELETE',
                 url: url.replace('/mocks/mocks/','/mocks/purge/mocks/')
             })
@@ -54,7 +54,7 @@ suite('Speedis', async () => {
 
             let url = '/mocks/mocks/items/public-' + crypto.randomUUID()
             url += '?cc=' + encodeURIComponent(`public,max-age=${originmaxage}`)
-            let response = await fastifyServer.inject({
+            let response = await server.inject({
                 method: 'GET',
                 url: url,
                 headers: {
@@ -66,7 +66,7 @@ suite('Speedis', async () => {
             t.assert.match(response.headers['x-speedis-cache-status'], /^CACHE_MISS/)     
             t.assert.ok(!Object.prototype.hasOwnProperty.call(response.headers, 'age'))
 
-            response = await fastifyServer.inject({
+            response = await server.inject({
                 method: 'GET',
                 url: url,
                 headers: {
@@ -81,7 +81,7 @@ suite('Speedis', async () => {
 
             await sleep((clientmaxage + 1)  * 1000)
 
-            response = await fastifyServer.inject({
+            response = await server.inject({
                 method: 'GET',
                 url: url,
                 headers: {
@@ -93,7 +93,7 @@ suite('Speedis', async () => {
             t.assert.match(response.headers['x-speedis-cache-status'], /^CACHE_HIT_REVALIDATED/)
             t.assert.ok(!Object.prototype.hasOwnProperty.call(response.headers, 'age'))
 
-            response = await fastifyServer.inject({
+            response = await server.inject({
                 method: 'GET',
                 url: url,
                 headers: {
@@ -116,7 +116,7 @@ suite('Speedis', async () => {
 
             let url = '/mocks/mocks/items/public-' + crypto.randomUUID()
             url += '?cc=' + encodeURIComponent(`public,max-age=${originmaxage}`)
-            let response = await fastifyServer.inject({
+            let response = await server.inject({
                 method: 'GET',
                 url: url,
                 headers: {
@@ -128,7 +128,7 @@ suite('Speedis', async () => {
             t.assert.match(response.headers['x-speedis-cache-status'], /^CACHE_MISS/)     
             t.assert.ok(!Object.prototype.hasOwnProperty.call(response.headers, 'age'))
 
-            response = await fastifyServer.inject({
+            response = await server.inject({
                 method: 'GET',
                 url: url,
                 headers: {
@@ -143,7 +143,7 @@ suite('Speedis', async () => {
 
             await sleep((clientminfresh + 1)  * 1000)
 
-            response = await fastifyServer.inject({
+            response = await server.inject({
                 method: 'GET',
                 url: url,
                 headers: {
@@ -155,7 +155,7 @@ suite('Speedis', async () => {
             t.assert.match(response.headers['x-speedis-cache-status'], /^CACHE_HIT_REVALIDATED/)
             t.assert.ok(!Object.prototype.hasOwnProperty.call(response.headers, 'age'))
 
-            response = await fastifyServer.inject({
+            response = await server.inject({
                 method: 'GET',
                 url: url,
                 headers: {
@@ -178,7 +178,7 @@ suite('Speedis', async () => {
 
             let url = '/mocks/mocks/items/public-' + crypto.randomUUID()
             url += '?cc=' + encodeURIComponent(`public,max-age=${originmaxage}`)
-            let response = await fastifyServer.inject({
+            let response = await server.inject({
                 method: 'GET',
                 url: url,
                 headers: {
@@ -190,7 +190,7 @@ suite('Speedis', async () => {
             t.assert.match(response.headers['x-speedis-cache-status'], /^CACHE_MISS/)     
             t.assert.ok(!Object.prototype.hasOwnProperty.call(response.headers, 'age'))
 
-            response = await fastifyServer.inject({
+            response = await server.inject({
                 method: 'GET',
                 url: url,
                 headers: {
@@ -205,7 +205,7 @@ suite('Speedis', async () => {
             
             await sleep((originmaxage + 1)  * 1000)
 
-            response = await fastifyServer.inject({
+            response = await server.inject({
                 method: 'GET',
                 url: url,
                 headers: {
@@ -221,7 +221,7 @@ suite('Speedis', async () => {
 
             await sleep((originmaxage + 1)  * 1000)
 
-            response = await fastifyServer.inject({
+            response = await server.inject({
                 method: 'GET',
                 url: url,
                 headers: {
@@ -233,7 +233,7 @@ suite('Speedis', async () => {
             t.assert.match(response.headers['x-speedis-cache-status'], /^CACHE_HIT_REVALIDATED/)
             t.assert.ok(!Object.prototype.hasOwnProperty.call(response.headers, 'age'))
 
-            response = await fastifyServer.inject({
+            response = await server.inject({
                 method: 'GET',
                 url: url,
                 headers: {
@@ -255,7 +255,7 @@ suite('Speedis', async () => {
 
             let url = '/mocks/mocks/items/public-' + crypto.randomUUID()
             url += '?cc=' + encodeURIComponent(`public,max-age=${originmaxage}`)
-            let response = await fastifyServer.inject({
+            let response = await server.inject({
                 method: 'GET',
                 url: url,
             })
@@ -264,7 +264,7 @@ suite('Speedis', async () => {
             t.assert.match(response.headers['x-speedis-cache-status'], /^CACHE_MISS/)     
             t.assert.ok(!Object.prototype.hasOwnProperty.call(response.headers, 'age'))
 
-            response = await fastifyServer.inject({
+            response = await server.inject({
                 method: 'GET',
                 url: url,
                 headers: {
@@ -276,7 +276,7 @@ suite('Speedis', async () => {
             t.assert.match(response.headers['x-speedis-cache-status'], /^CACHE_HIT_REVALIDATED/)
             t.assert.ok(!Object.prototype.hasOwnProperty.call(response.headers, 'age'))
 
-            response = await fastifyServer.inject({
+            response = await server.inject({
                 method: 'GET',
                 url: url,
                 headers: {}
@@ -296,7 +296,7 @@ suite('Speedis', async () => {
 
             let url = '/mocks/mocks/items/public-' + crypto.randomUUID()
             url += '?cc=' + encodeURIComponent(`public,max-age=${originmaxage}`)
-            let response = await fastifyServer.inject({
+            let response = await server.inject({
                 method: 'GET',
                 url: url,
             })
@@ -307,7 +307,7 @@ suite('Speedis', async () => {
 
             await sleep((originmaxage + 1)  * 1000)
 
-            response = await fastifyServer.inject({
+            response = await server.inject({
                 method: 'GET',
                 url: url
             })
@@ -325,7 +325,7 @@ suite('Speedis', async () => {
 
             let url = '/mocks/mocks/items/public-' + crypto.randomUUID()
             url += '?cc=' + encodeURIComponent(`public,max-age=${originmaxage},no-cache`)
-            let response = await fastifyServer.inject({
+            let response = await server.inject({
                 method: 'GET',
                 url: url,
             })
@@ -334,7 +334,7 @@ suite('Speedis', async () => {
             t.assert.match(response.headers['x-speedis-cache-status'], /^CACHE_MISS/)     
             t.assert.ok(!Object.prototype.hasOwnProperty.call(response.headers, 'age'))
 
-            response = await fastifyServer.inject({
+            response = await server.inject({
                 method: 'GET',
                 url: url
             })
@@ -352,7 +352,7 @@ suite('Speedis', async () => {
 
             let url = '/mocks/mocks/items/public-' + crypto.randomUUID()
             url += '?cc=' + encodeURIComponent(`public,max-age=${originmaxage},private`)
-            let response = await fastifyServer.inject({
+            let response = await server.inject({
                 method: 'GET',
                 url: url,
             })
@@ -361,7 +361,7 @@ suite('Speedis', async () => {
             t.assert.match(response.headers['x-speedis-cache-status'], /^CACHE_MISS/)     
             t.assert.ok(!Object.prototype.hasOwnProperty.call(response.headers, 'age'))
 
-            response = await fastifyServer.inject({
+            response = await server.inject({
                 method: 'GET',
                 url: url
             })
@@ -379,7 +379,7 @@ suite('Speedis', async () => {
 
             let url = '/mocks/mocks/items/public-' + crypto.randomUUID()
             url += '?cc=' + encodeURIComponent(`public,max-age=${originmaxage},private="x-mocks-custom-header-1,x-mocks-custom-header-2"`)
-            let response = await fastifyServer.inject({
+            let response = await server.inject({
                 method: 'GET',
                 url: url,
             })
@@ -391,7 +391,7 @@ suite('Speedis', async () => {
             t.assert.ok(Object.prototype.hasOwnProperty.call(response.headers, 'x-mocks-custom-header-2'))
             t.assert.ok(Object.prototype.hasOwnProperty.call(response.headers, 'x-mocks-custom-header-3'))
 
-            response = await fastifyServer.inject({
+            response = await server.inject({
                 method: 'GET',
                 url: url
             })
@@ -413,7 +413,7 @@ suite('Speedis', async () => {
 
             let url = '/mocks/mocks/items/public-' + crypto.randomUUID()
             url += '?cc=' + encodeURIComponent(`public,max-age=${originmaxage},no-cache="x-mocks-custom-header-1,x-mocks-custom-header-2"`)
-            let response = await fastifyServer.inject({
+            let response = await server.inject({
                 method: 'GET',
                 url: url,
             })
@@ -425,7 +425,7 @@ suite('Speedis', async () => {
             t.assert.ok(Object.prototype.hasOwnProperty.call(response.headers, 'x-mocks-custom-header-2'))
             t.assert.ok(Object.prototype.hasOwnProperty.call(response.headers, 'x-mocks-custom-header-3'))
 
-            response = await fastifyServer.inject({
+            response = await server.inject({
                 method: 'GET',
                 url: url
             })
@@ -446,7 +446,7 @@ suite('Speedis', async () => {
             const uuid = crypto.randomUUID()
             let url = '/mocks/mocks/items/public-' + uuid 
             url += '?cc=' + encodeURIComponent(`public,max-age=${originmaxage}`)
-            let response = await fastifyServer.inject({
+            let response = await server.inject({
                 method: 'GET',
                 url: url,
                 headers: {
@@ -509,7 +509,7 @@ suite('Speedis', async () => {
     })
 
     after(async () => {
-        await fastifyServer.close()
+        await server.close()
     })
 
 })
