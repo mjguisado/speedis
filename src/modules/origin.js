@@ -75,8 +75,8 @@ export function generateUrlKey(opts, request, fieldNames = utils.parseVaryHeader
         }
     }
 
-    let urlKey = opts.cache?.includeOriginIdInUrlKey 
-        ? opts.id 
+    let urlKey = opts.cache?.includeOriginIdInUrlKey
+        ? opts.id
         : ''
     if (request.cacheable_per_user) {
         urlKey += (urlKey.length > 0 ? ':' : '') + request.session.sub
