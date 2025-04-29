@@ -73,9 +73,9 @@ export async function initOAuth2(server, opts) {
 
     }
 
+    server.decorateRequest("id_session", null)
     server.addHook('onRequest', async (request, reply) => {
         let tokens = {}
-        let id_session = null
         if (request.headers?.cookie) {
             // Parse the Cookie header
             const cookies = request.headers?.cookie
@@ -87,14 +87,14 @@ export async function initOAuth2(server, opts) {
                 }, {})
             if (cookies[opts.oauth2.sessionIdCookieName]) {
                 // Retrieve session information from Redis
-                id_session = cookies[opts.oauth2.sessionIdCookieName]
-                const sessionKey = SESSION_PREFIX + id_session
+                request.id_session = cookies[opts.oauth2.sessionIdCookieName]
+                const sessionKey = SESSION_PREFIX + request.id_session
                 try {
                     tokens = server.redisBreaker
                         ? await server.redisBreaker.fire('hGetAll', [sessionKey])
                         : await server.redis.hGetAll(sessionKey)
                 } catch (error) {
-                    const msg = `Origin: ${opts.id}. An error occurred while retrieving the stored session ${id_session}.`
+                    const msg = `Origin: ${opts.id}. An error occurred while retrieving the stored session ${request.id_session}.`
                     server.log.error(error, msg)
                     return errorHandler(reply, 500, msg, opts.exposeErrors, error)
                 }
@@ -125,7 +125,7 @@ export async function initOAuth2(server, opts) {
                         return errorHandler(reply, 500, msg, opts.exposeErrors, error)
                     }
                 } else {
-                    const msg = `Origin: ${opts.id}. Invalid stored session ${id_session}.`
+                    const msg = `Origin: ${opts.id}. Invalid stored session ${request.id_session}.`
                     server.log.error(error, msg)
                     return errorHandler(reply, 500, msg, opts.exposeErrors, error)
                 }

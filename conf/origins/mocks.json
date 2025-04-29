@@ -8,77 +8,12 @@
             "port": 3030,
             "timeout": 2000
         },
-        "agentOptions": {
-            "keepAlive": true
-        },
         "originTimeout": 2000,
         "originBreaker": true,
         "originBreakerOptions": {
             "errorThresholdPercentage": 25,
             "resetTimeout": 10000
-        }
-    },
-    "bff": {
-        "transformations": [
-            {
-                "urlPattern": "/mocks/users/1",
-                "actions": [
-                    {
-                        "phase": "OriginResponse",
-                        "uses": "json:deleteJsonPaths",
-                        "with": {
-                            "jsonpaths": [
-                                "$[*].user.phones[*].type",
-                                "$[*].metadata"
-                            ]
-                        }
-                    }
-                ]
-            },
-            {
-                "urlPattern": "/mocks/users/2",
-                "actions": [
-                    {
-                        "phase": "VariantsTracker",
-                        "uses": "json:keepJsonPaths",
-                        "with": {
-                            "jsonpaths": [
-                                "$[*].user.phones[*].type",
-                                "$[*].metadata"
-                            ]
-                        }
-                    }
-                ]
-            }
-        ]
-    },
-    "variantsTracker": {
-        "urlPatterns": [
-            "/mocks/users/*"
-        ]
-    },
-    "cache": {
-        "cacheables": [
-            {
-                "urlPattern": "/mocks/items/public-.*"
-            },
-            {
-                "urlPattern": "/mocks/items/.*",
-                "perUser": true
-            }
-        ],
-        "ignoredQueryParams": [
-            "cc",
-            "delay"
-        ],
-        "localRequestsCoalescing": true,
-        "distributedRequestsCoalescing": true,
-        "distributedRequestsCoalescingOptions": {
-            "lockTTL": 750,
-            "retryCount": 3,
-            "retryDelay": 500,
-            "retryJitter": 250
-        }
+        }        
     },
     "oauth2": {
         "id": "mocks.oauth2",
@@ -106,13 +41,6 @@
     "redis": {
         "redisOptions": {
             "url": "redis://redis:6379"
-        },
-        "redisTimeout": 500,
-        "redisBreaker": true,
-        "redisBreakerOptions": {
-            "errorThresholdPercentage": 25,
-            "resetTimeout": 5000
-        },
-        "disableOriginOnRedisOutage": true
-    }
+        }
+    }    
 }
