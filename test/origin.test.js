@@ -7,9 +7,11 @@ suite('Speedis - Origin', () => {
     let server
 
     before(async () => {
-        server = await fastify({
+
+        server = fastify({
             logger: { level: 'info' }
         })
+
         server.register(
             speedisPlugin,
             {
@@ -102,7 +104,9 @@ suite('Speedis - Origin', () => {
                 }
             }
         )
+
         await server.ready()
+        
     })
 
     test('Proxy', async (t) => {

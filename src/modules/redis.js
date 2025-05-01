@@ -18,7 +18,6 @@ export async function initRedis(server, opts) {
     } catch (error) {
         throw new Error(`Origin: ${opts.id}. Unable to connect to Redis during startup.`, { cause: error })
     }
-    server.decorate("redisClient", client)
 
     if (opts.oauth2) {
         // The index creation process can take a considerable amount of time, 
@@ -159,16 +158,14 @@ export async function initRedis(server, opts) {
         redisBreaker.on('close', () => {
             server.log.info(`Origin ${opts.id}. Redis Breaker CLOSED: Commands are being executed normally.`)
         })
-
-        server.decorate('redis', client)
         server.decorate('redisBreaker', redisBreaker)
-
-    } else if (opts.redis.redisTimeout) {
+    
+    }
+    if (opts.redis.redisTimeout) {
         server.decorate('redis', wrapRedisWithTimeout(client, opts.redis.redisTimeout))
     } else {
         server.decorate('redis', client)
     }
-
     server.addHook('onClose', (server) => {
         if (server.redis) server.redis.quit()
     })

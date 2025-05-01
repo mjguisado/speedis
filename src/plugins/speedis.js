@@ -20,7 +20,7 @@ export default async function (server, opts) {
 
     // Module init
     initOrigin(server, opts)
-    if (opts.redis) initRedis(server, opts)
+    if (opts.redis) await initRedis(server, opts)
     if (opts.cache) cache.initCache(server, opts)
     if (opts.bff) await bff.initBff(server, opts)
     if (opts.oauth2) {

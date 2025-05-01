@@ -198,7 +198,7 @@ export function initOriginConfigValidator(ajv) {
                 cache: {
                     type: "object",
                     additionalProperties: false,
-                    required: ["purgePath", "cacheables"],
+                    required: ["cacheables"],
                     allOf: [
                         {
                             if: {
