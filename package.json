@@ -5,9 +5,9 @@
     "main": "An HTTP cache based on Redis",
     "type": "module",
     "scripts": {
-        "dev": "nodemon src/index.js",
-        "debug": "node --inspect src/index.js",
-        "test": "node --test",
+        "dev": "NODE_TLS_REJECT_UNAUTHORIZED=0 nodemon src/index.js",
+        "debug": "NODE_TLS_REJECT_UNAUTHORIZED=0 node --inspect src/index.js",
+        "test": "NODE_TLS_REJECT_UNAUTHORIZED=0 node --test ./test/*",
         "start": "node src/index.js"
     },
     "repository": {

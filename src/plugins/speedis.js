@@ -19,7 +19,7 @@ export default async function (server, opts) {
     const remoteBaseUrl = `${opts.origin.httpxOptions.protocol}//${opts.origin.httpxOptions.host}:${opts.origin.httpxOptions.port}`
 
     // Module init
-    initOrigin(server, opts)
+    await initOrigin(server, opts)
     if (opts.redis) await initRedis(server, opts)
     if (opts.cache) cache.initCache(server, opts)
     if (opts.bff) await bff.initBff(server, opts)
