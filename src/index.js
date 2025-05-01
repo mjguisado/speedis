@@ -29,6 +29,7 @@ const config = await
         })
 
 const ajv = new Ajv({ useDefaults: true })
+
 const validateSpeedis = ajv.compile(
     {
         type: "object",
@@ -48,6 +49,7 @@ const validateSpeedis = ajv.compile(
         }
     }
 )
+
 if (!validateSpeedis(config)) {
     console.error("Invalid configuration file:", configurationFilename)
     console.error(validateSpeedis.errors)
