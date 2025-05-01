@@ -699,7 +699,7 @@ export async function purge(server, opts, request, reply) {
         if (cacheEviction.indexOf('*') > -1) {
             // See: https://github.com/redis/node-redis/blob/master/docs/scan-iterators.md
             // See: https://github.com/redis/node-redis/blob/master/docs/v4-to-v5.md#scan-iterators
-            for await (const entry of server.redisClient.scanIterator({
+            for await (const entry of server.redis.scanIterator({
                 MATCH: cacheEviction,
                 COUNT: 100
             })) {

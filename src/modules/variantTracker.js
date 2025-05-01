@@ -4,7 +4,7 @@ import { isPurgeRequest } from './cache.js'
 import { generatePath } from './origin.js'
 import { transform, VARIANTS_TRACKER } from './bff.js'
 
-export async function initVariantsTracker(server, opts) {
+export function initVariantsTracker(server, opts) {
 
     const trakedUrlPatterns = []
     opts.variantsTracker.urlPatterns.forEach(trakedUrlPattern => {

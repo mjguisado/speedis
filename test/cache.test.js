@@ -1,8 +1,11 @@
 import { suite, test, before, after } from 'node:test'
-import { app } from '../src/app.js'
+import fastify from 'fastify'
+import speedisPlugin from '../src/plugins/speedis.js'
 import crypto from 'crypto'
+import Ajv from "ajv"
+import { initOriginConfigValidator } from '../src/modules/originConfigValidator.js'
 
-suite('Speedis', () => {
+suite('Speedis - Origin', () => {
 
     let server
 
@@ -11,9 +14,49 @@ suite('Speedis', () => {
     }
 
     before(async () => {
-        server = await app({
+
+        server = fastify({
             logger: { level: 'info' }
         })
+
+        const ajv = new Ajv({ useDefaults: true })
+        const originConfigValidator = initOriginConfigValidator(ajv)
+        const origin = {
+            "id": "mocks",
+            "prefix": "/mocks",
+            "origin": {
+                "httpxOptions": {
+                    "host": "mocks",
+                    "port": 3030,
+                    "timeout": 2000
+                }
+            },
+            "cache": {
+                "cacheables": [
+                    {
+                        "urlPattern": "/mocks/items/public-.*"
+                    },
+                    {
+                        "urlPattern": "/mocks/items/.*",
+                        "perUser": true
+                    }
+                ],
+                "ignoredQueryParams": [
+                    "cc",
+                    "delay"
+                ]
+            },
+            "redis": {
+                "redisOptions": {
+                    "url": "redis://redis:6379"
+                }
+            }
+        }
+        originConfigValidator(origin, ajv)
+        server.register(speedisPlugin, origin)
+
+        await server.ready()
+
     })
 
     test('DELETE 404', async (t) => {
