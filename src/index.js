@@ -4,7 +4,7 @@ import fs from 'fs/promises'
 import cluster from "node:cluster"
 import fastify from 'fastify'
 import { app } from './app.js'
-import { AggregatorRegistry, } from 'prom-client'
+import { register, collectDefaultMetrics, AggregatorRegistry } from 'prom-client'
 import Ajv from "ajv"
 import { open } from 'inspector';
 
@@ -57,6 +57,7 @@ if (!validateSpeedis(config)) {
 }
 
 const aggregatorRegistry = new AggregatorRegistry()
+collectDefaultMetrics()
 
 // https://medium.com/@mjdrehman/implementing-node-js-cluster-for-improved-performance-f800146e58e1
 // https://medium.com/deno-the-complete-reference/the-benefits-of-clustering-fastify-app-in-node-js-hello-world-case-8a99127b9951
@@ -76,8 +77,7 @@ if (cluster.isPrimary) {
     const metricsServer = fastify({
         logger: { level: config.metricServerLogLevel }
     })
-
-    // FIXME: Las llamadas a las métricas no se contabilizan en el servidor de métricas.
+    
     metricsServer.get('/metrics', async (req, res) => {
         try {
             res.type(aggregatorRegistry.contentType)

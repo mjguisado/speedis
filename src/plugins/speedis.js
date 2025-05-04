@@ -1,15 +1,16 @@
 
 import os from 'os'
-import { initRedis } from '../modules/redis.js'
-import { _fetch } from '../modules/origin.js'
 import * as bff from '../modules/bff.js'
-import { initOAuth2 } from '../modules/oauth2.js'
-import sessionPlugin from './session.js'
-import { initVariantsTracker } from '../modules/variantTracker.js'
-import { initOrigin, generateUrlKey, proxy } from '../modules/origin.js'
 import * as cache from '../modules/cache.js'
 import * as utils from '../utils/utils.js'
+import sessionPlugin from './session.js'
+import { initOrigin, generateUrlKey, proxy } from '../modules/origin.js'
+import { initRedis } from '../modules/redis.js'
+import { initOAuth2 } from '../modules/oauth2.js'
+import { initVariantsTracker } from '../modules/variantTracker.js'
+import { initMetrics } from '../modules/metrics.js'
 import { errorHandler } from '../modules/error.js'
+import { _fetch } from '../modules/origin.js'
 
 export default async function (server, opts) {
 
@@ -19,7 +20,7 @@ export default async function (server, opts) {
     const remoteBaseUrl = `${opts.origin.httpxOptions.protocol}//${opts.origin.httpxOptions.host}:${opts.origin.httpxOptions.port}`
 
     // Module init
-    initOrigin(server, opts)
+    await initOrigin(server, opts)
     if (opts.redis) await initRedis(server, opts)
     if (opts.cache) cache.initCache(server, opts)
     if (opts.bff) await bff.initBff(server, opts)
@@ -28,6 +29,14 @@ export default async function (server, opts) {
         await server.register(sessionPlugin, opts.oauth2)
     }
     if (opts.variantsTracker) initVariantsTracker(server, opts)
+
+    // In Fastify, you can’t explicitly define the execution order of hooks of 
+    // the same type (such as onRequest, preHandler, etc.), because all hooks 
+    // registered for the same event are executed in the order they were added.
+    // For this reason, the metrics are initialized at the last moment so that 
+    // their hooks are executed last for each event.
+    server.decorateRequest('target', null)
+    initMetrics(server, opts)
 
     server.all('/*', async (request, reply) => {
 

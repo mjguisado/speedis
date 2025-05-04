@@ -1,7 +1,7 @@
 {
   "maxNumberOfWorkers": 1,
   "port": 3001,
-  "logLevel": "info",
+  "logLevel": "warn",
   "metricServerPort": 3003,
-  "metricServerLogLevel": "info"
+  "metricServerLogLevel": "warn"
 }

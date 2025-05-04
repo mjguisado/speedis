@@ -690,9 +690,11 @@ function isCacheable(originResponse, originCacheDirectives) {
 }
 
 export async function purge(server, opts, request, reply) {
+
     const toTrash = opts.cache.purgePath.slice(1) + ':'
     const cacheEviction = request.urlKey.replace(toTrash, "")
     const now = new Date().toUTCString()
+
     try {
         let result = 0
         // See: https://antirez.com/news/93

@@ -1,6 +1,7 @@
 {
     "id": "mocks",
     "prefix": "/mocks",
+    "logLevel": "warn",
     "exposeErrors": true,
     "origin": {
         "httpxOptions": {
@@ -82,6 +83,7 @@
     },
     "oauth2": {
         "id": "mocks.oauth2",
+        "logLevel": "warn",
         "baseUrl": "https://mocks",
         "clientId": "speedis-client",
         "clientSecret": "3sBLsgSHC8guhDIWExsMed4zu9TlkMfC",

@@ -16,6 +16,7 @@ export const SESSION_PREFIX = 'sessions:'
 export default async function (server, opts) {
 
     server.get('/login', async (request, reply) => {
+
         /*
         The client initiates the flow by directing the resource owner's
         user-agent to the authorization endpoint.  The client includes
@@ -140,33 +141,12 @@ export default async function (server, opts) {
             .redirect(postLogoutRedirectUri)
     })
 
-    async function invalidateSession(sessionKey, tokens) {
-        if (!tokens) {
-            tokens = server.redisBreaker
-                ? await server.redisBreaker.fire('hGetAll', [sessionKey])
-                : await server.redis.hGetAll(sessionKey)
-        }
-        if (Object.keys(tokens).length > 0) {
-            await openidClient.tokenRevocation(
-                server.authServerConfiguration,
-                tokens.access_token,
-                { token_type_hint: 'access_token' }
-            )
-            await openidClient.tokenRevocation(
-                server.authServerConfiguration,
-                tokens.refresh_token,
-                { token_type_hint: 'refresh_token' }
-            )
-        }
-        return server.redisBreaker
-            ? await server.redisBreaker.fire('unlink', [sessionKey])
-            : await server.redis.unlink(sessionKey)
-    }
-
     server.post('/sessions/:id_session/invalidate', async (request, reply) => {
+
         const { id_session } = request.params
         const sessionKey = SESSION_PREFIX + id_session
         const now = new Date().toUTCString()
+
         try {
             if (await invalidateSession(sessionKey)) {
                 return reply.code(204).headers({ date: now }).send()
@@ -239,5 +219,29 @@ export default async function (server, opts) {
             }
         }
     })
+
+    async function invalidateSession(sessionKey, tokens) {
+
+        if (!tokens) {
+            tokens = server.redisBreaker
+                ? await server.redisBreaker.fire('hGetAll', [sessionKey])
+                : await server.redis.hGetAll(sessionKey)
+        }
+        if (Object.keys(tokens).length > 0) {
+            await openidClient.tokenRevocation(
+                server.authServerConfiguration,
+                tokens.access_token,
+                { token_type_hint: 'access_token' }
+            )
+            await openidClient.tokenRevocation(
+                server.authServerConfiguration,
+                tokens.refresh_token,
+                { token_type_hint: 'refresh_token' }
+            )
+        }
+        return server.redisBreaker
+            ? await server.redisBreaker.fire('unlink', [sessionKey])
+            : await server.redis.unlink(sessionKey)
+    }
 
 }
