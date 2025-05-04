@@ -226,56 +226,6 @@ export function cleanUpHeader(entry, cacheDirectives) {
 
 }
 
-// See: https://techdocs.akamai.com/edge-diagnostics/docs/pragma-headers
-export function setCacheStatus(trigger, outResponse) {
-    switch (trigger) {
-        case 'CACHE_HIT':
-            // The response stored in the cache is valid.
-            outResponse.headers['x-speedis-cache-status'] = 'CACHE_HIT from ' + os.hostname()
-            break
-        case 'CACHE_MISS':
-            // There is no response stored in the cache.
-            outResponse.headers['x-speedis-cache-status'] = 'CACHE_MISS from ' + os.hostname()
-            break
-        case 'CACHE_FAILED_MISS':
-            // There is no response stored in the cache, and we tried to request it  
-            // to the origin, which failed.  
-            outResponse.headers['x-speedis-cache-status'] = 'CACHE_FAILED_MISS from ' + os.hostname()
-            break
-        case 'CACHE_NO_LOCK':
-            // it couldn't acquire the lock to make a request to the origin
-            outResponse.headers['x-speedis-cache-status'] = 'CACHE_NO_LOCK from ' + os.hostname()
-            break
-        case 'CACHE_HIT_REVALIDATED_304':
-            // There is a response stored in the cache, and it has been refreshed 
-            // using a conditional request to the origin, which replied with a 304.
-            outResponse.headers['x-speedis-cache-status'] = 'CACHE_HIT_REVALIDATED_304 from ' + os.hostname()
-            break
-        case 'CACHE_HIT_REVALIDATED':
-            // There is a response stored in the cache, and it has been refreshed 
-            // using a conditional request to the origin, which replied with a 200.
-            outResponse.headers['x-speedis-cache-status'] = 'CACHE_HIT_REVALIDATED from ' + os.hostname()
-            break
-        case 'CACHE_HIT_NOT_REVALIDATED_STALE':
-            // There is a response stored in the cache, and we tried to refresh it  
-            // using a conditional request to the origin, which failed.  
-            // The stale response IS being reused.
-            outResponse.headers['x-speedis-cache-status'] = 'CACHE_HIT_NOT_REVALIDATED_STALE from ' + os.hostname()
-            break
-        case 'CACHE_HIT_NOT_REVALIDATED':
-            // There is a response stored in the cache, and we tried to refresh it  
-            // using a conditional request to the origin, which failed.  
-            // The stale response IS NOT being reused.
-            outResponse.headers['x-speedis-cache-status'] = 'CACHE_HIT_NOT_REVALIDATED from ' + os.hostname()
-            break
-        case 'CACHE_REDIS_OUTAGE':
-            // Redis is not available.
-            outResponse.headers['x-speedis-cache-status'] = 'CACHE_REDIS_OUTAGE from ' + os.hostname()
-            break
-    }
-
-}
-
 const originRE = /^\/([^/]+)/
 export function getOrigin(server, request) {
     const matches = request.originalUrl.match(originRE)
