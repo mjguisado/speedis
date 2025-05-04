@@ -209,7 +209,32 @@
             ]
           }
         },
-        "overrides": []
+        "overrides": [
+          {
+            "__systemRef": "hideSeriesFrom",
+            "matcher": {
+              "id": "byNames",
+              "options": {
+                "mode": "exclude",
+                "names": [
+                  "Total"
+                ],
+                "prefix": "All except:",
+                "readOnly": true
+              }
+            },
+            "properties": [
+              {
+                "id": "custom.hideFrom",
+                "value": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": true
+                }
+              }
+            ]
+          }
+        ]
       },
       "gridPos": {
         "h": 8,
@@ -217,7 +242,7 @@
         "x": 9,
         "y": 0
       },
-      "id": 11,
+      "id": 16,
       "options": {
         "legend": {
           "calcs": [],
@@ -234,29 +259,33 @@
       "pluginVersion": "11.6.1",
       "targets": [
         {
-          "editorMode": "code",
-          "expr": "sum(rate(speedis_http_requests_total[$__rate_interval]))",
-          "legendFormat": "Total",
+          "disableTextWrap": false,
+          "editorMode": "builder",
+          "expr": "sum(rate(http_requests_total{job=\"mocks\"}[$__rate_interval]))",
+          "fullMetaSearch": false,
+          "includeNullMetadata": true,
+          "legendFormat": "Mocks",
           "range": true,
-          "refId": "A"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "PBFA97CFB590B2093"
-          },
-          "editorMode": "code",
-          "expr": "sum(rate(speedis_http_requests_total[$__rate_interval])) by (target)",
-          "hide": false,
-          "instant": false,
-          "legendFormat": "{{target}}",
-          "range": true,
-          "refId": "B"
+          "refId": "A",
+          "useBackend": false
         }
       ],
-      "title": "Number of requests by target",
+      "title": "Number of requests by origin",
       "transparent": true,
       "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 8
+      },
+      "id": 15,
+      "panels": [],
+      "title": "Row title",
+      "type": "row"
     },
     {
       "datasource": {
@@ -321,9 +350,9 @@
         "h": 8,
         "w": 9,
         "x": 0,
-        "y": 8
+        "y": 9
       },
-      "id": 5,
+      "id": 11,
       "options": {
         "legend": {
           "calcs": [],
@@ -340,14 +369,20 @@
       "pluginVersion": "11.6.1",
       "targets": [
         {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
           "editorMode": "code",
-          "expr": "sum(rate(speedis_http_responses_total{job=\"speedis\",origin=\"mocks\"}[$__rate_interval])) by (cacheStatus)",
-          "legendFormat": "{{cacheStatus}}",
+          "expr": "sum(rate(speedis_http_requests_total[$__rate_interval])) by (target)",
+          "hide": false,
+          "instant": false,
+          "legendFormat": "{{target}}",
           "range": true,
           "refId": "A"
         }
       ],
-      "title": "Number of responses by Cache Status",
+      "title": "Number of requests by target",
       "transparent": true,
       "type": "timeseries"
     },
@@ -439,9 +474,9 @@
         "h": 8,
         "w": 9,
         "x": 9,
-        "y": 8
+        "y": 9
       },
-      "id": 1,
+      "id": 12,
       "options": {
         "legend": {
           "calcs": [],
@@ -464,16 +499,16 @@
           },
           "disableTextWrap": false,
           "editorMode": "code",
-          "expr": "sum(rate(speedis_http_responses_duration_sum{job=\"speedis\",origin=\"mocks\"}[$__rate_interval])) by (cacheStatus) / sum(rate(speedis_http_responses_duration_count{job=\"speedis\",origin=\"mocks\"}[$__rate_interval])) by (cacheStatus) ",
+          "expr": "sum(rate(speedis_http_responses_duration_sum[$__rate_interval])) by (target) / sum(rate(speedis_http_responses_duration_count[$__rate_interval])) by (target)",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
-          "legendFormat": "{{cacheStatus}}",
+          "legendFormat": "{{target}}",
           "range": true,
           "refId": "CACHE_HITS",
           "useBackend": false
         }
       ],
-      "title": "Responses duration by Cache Status",
+      "title": "Responses duration by target",
       "transparent": true,
       "type": "timeseries"
     },
@@ -540,7 +575,113 @@
         "h": 8,
         "w": 9,
         "x": 0,
-        "y": 16
+        "y": 17
+      },
+      "id": 13,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.6.1",
+      "targets": [
+        {
+          "editorMode": "code",
+          "expr": "sum(rate(speedis_http_responses_total{job=\"speedis\"}[$__rate_interval])) by (target)",
+          "legendFormat": "{{target}}",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Number of responses by target",
+      "transparent": true,
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 25
+      },
+      "id": 14,
+      "panels": [],
+      "title": "Cache Overview",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 9,
+        "x": 0,
+        "y": 26
       },
       "id": 6,
       "options": {
@@ -560,7 +701,7 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "sum(rate(speedis_http_responses_total{job=\"speedis\",origin=\"mocks\"}[$__rate_interval])) by (statusCode) ",
+          "expr": "sum(rate(speedis_http_responses_total{job=\"speedis\",target=\"cache\"}[$__rate_interval])) by (statusCode) ",
           "legendFormat": "{{statusCode}}",
           "range": true,
           "refId": "A"
@@ -658,7 +799,7 @@
         "h": 8,
         "w": 9,
         "x": 9,
-        "y": 16
+        "y": 26
       },
       "id": 9,
       "options": {
@@ -683,7 +824,7 @@
           },
           "disableTextWrap": false,
           "editorMode": "code",
-          "expr": "sum(rate(speedis_http_responses_duration_sum{job=\"speedis\",origin=\"mocks\"}[$__rate_interval])) by (statusCode) / sum(rate(speedis_http_responses_duration_count{job=\"speedis\",origin=\"mocks\"}[$__rate_interval])) by (statusCode)",
+          "expr": "sum(rate(speedis_http_responses_duration_sum{job=\"speedis\",target=\"cache\"}[$__rate_interval])) by (statusCode) / sum(rate(speedis_http_responses_duration_count{job=\"speedis\",target=\"cache\"}[$__rate_interval])) by (statusCode)",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "legendFormat": "{{cacheStatus}}",
@@ -693,6 +834,225 @@
         }
       ],
       "title": "Responses duration by Status Code",
+      "transparent": true,
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 9,
+        "x": 0,
+        "y": 34
+      },
+      "id": 5,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.6.1",
+      "targets": [
+        {
+          "editorMode": "code",
+          "expr": "sum(rate(speedis_http_responses_total{job=\"speedis\",target=\"cache\"}[$__rate_interval])) by (cacheStatus)",
+          "legendFormat": "{{cacheStatus}}",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Number of responses by Cache Status",
+      "transparent": true,
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "__systemRef": "hideSeriesFrom",
+            "matcher": {
+              "id": "byNames",
+              "options": {
+                "mode": "exclude",
+                "names": [
+                  "Value"
+                ],
+                "prefix": "All except:",
+                "readOnly": true
+              }
+            },
+            "properties": [
+              {
+                "id": "custom.hideFrom",
+                "value": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": true
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 9,
+        "x": 9,
+        "y": 34
+      },
+      "id": 1,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.6.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "disableTextWrap": false,
+          "editorMode": "code",
+          "expr": "sum(rate(speedis_http_responses_duration_sum{job=\"speedis\",target=\"cache\"}[$__rate_interval])) by (cacheStatus) / sum(rate(speedis_http_responses_duration_count{job=\"speedis\",target=\"cache\"}[$__rate_interval])) by (cacheStatus) ",
+          "fullMetaSearch": false,
+          "includeNullMetadata": true,
+          "legendFormat": "{{cacheStatus}}",
+          "range": true,
+          "refId": "CACHE_HITS",
+          "useBackend": false
+        }
+      ],
+      "title": "Responses duration by Cache Status",
       "transparent": true,
       "type": "timeseries"
     }
@@ -712,5 +1072,5 @@
   "timezone": "browser",
   "title": "Speedis",
   "uid": "feamyf5ocs45ca",
-  "version": 3
+  "version": 5
 }

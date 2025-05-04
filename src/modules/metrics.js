@@ -13,13 +13,13 @@ export function initMetrics(server, opts) {
     const speedisHttpResponsesTotal = new Counter({
         name: 'speedis_http_responses_total',
         help: 'Total number of HTTP responses from Speedis',
-        labelNames: ['origin', 'statusCode', 'cacheStatus']
+        labelNames: ['origin', 'statusCode', 'cacheStatus', 'target']
     })
 
     const speedisHttpResponsesDuration = new Histogram({
         name: 'speedis_http_responses_duration',
         help: 'Duration of HTTP responses  from Speedis',
-        labelNames: ['origin', 'statusCode', 'cacheStatus']
+        labelNames: ['origin', 'statusCode', 'cacheStatus', 'target']
     })
 
     const oauth2UrlPrefix = opts.oauth2
@@ -49,19 +49,19 @@ export function initMetrics(server, opts) {
     const xSpeedisCacheStatusHeaderRE = /^(CACHE_.+) from/
     server.addHook('onResponse', async (request, reply) => {
 
-        let origin = ''
+        let origin = 'Unknown'
         server.plugins.forEach((prefix, id) => {
             if (request.url.startsWith(prefix)) {
                 origin = id
             }
         })
 
-        let statusCode = ''
+        let statusCode = 'Unknown'
         if (typeof reply.statusCode === 'number' && !Number.isNaN(reply.statusCode)) {
             statusCode = reply.statusCode
         }
 
-        let cacheStatus = ''
+        let cacheStatus = 'Unknown'
         if ('cache' === request.target &&
             reply.hasHeader('x-speedis-cache-status')) {
             const matches = reply.getHeader('x-speedis-cache-status')
@@ -73,14 +73,16 @@ export function initMetrics(server, opts) {
             .labels({
                 origin: origin,
                 statusCode: statusCode,
-                cacheStatus: cacheStatus
+                cacheStatus: cacheStatus,
+                target: request.target
             }).inc()
 
         if (typeof reply.elapsedTime === 'number' && !Number.isNaN(reply.elapsedTime)) {
             speedisHttpResponsesDuration.labels({
                 origin: origin,
                 statusCode: statusCode,
-                cacheStatus: cacheStatus
+                cacheStatus: cacheStatus,
+                target: request.target
             }).observe(reply.elapsedTime)
         } else {
             server.log.warn(`The duration value ${reply.elapsedTime} is not valid.`)

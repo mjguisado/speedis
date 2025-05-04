@@ -11,7 +11,9 @@
             "file:///Users/manuel.guisado/redis/speedis/3rparties/artillery/load-test-k8s.yml",
             "git:/Users/manuel.guisado/redis/speedis/3rparties/artillery/load-test.yml?%7B%22path%22%3A%22%2FUsers%2Fmanuel.guisado%2Fredis%2Fspeedis%2F3rparties%2Fartillery%2Fload-test.yml%22%2C%22ref%22%3A%22~%22%7D",
             "git:/Users/manuel.guisado/redis/speedis/3rparties/artillery/load-test-k8s.yml?%7B%22path%22%3A%22%2FUsers%2Fmanuel.guisado%2Fredis%2Fspeedis%2F3rparties%2Fartillery%2Fload-test-k8s.yml%22%2C%22ref%22%3A%22~%22%7D",
-            "file:///Users/manuel.guisado/redis/speedis/3rparties/artillery/load-test%20copy.yml"
+            "file:///Users/manuel.guisado/redis/speedis/3rparties/artillery/load-test%20copy.yml",
+            "git:/Users/manuel.guisado/redis/speedis/3rparties/artillery/load-test.yml?%7B%22path%22%3A%22%2FUsers%2Fmanuel.guisado%2Fredis%2Fspeedis%2F3rparties%2Fartillery%2Fload-test.yml%22%2C%22ref%22%3A%22c4e076666fe780cfd9c96a7c263776436f3cd782%22%7D",
+            "git:/Users/manuel.guisado/redis/speedis/3rparties/artillery/load-test.yml?%7B%22path%22%3A%22%2FUsers%2Fmanuel.guisado%2Fredis%2Fspeedis%2F3rparties%2Fartillery%2Fload-test.yml%22%2C%22ref%22%3A%22a05eb59042c0830b8ffe3a62086f670bd68e4031%22%7D"
         ]
     }
 }
