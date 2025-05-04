@@ -35,7 +35,6 @@ export default async function (server, opts) {
     // registered for the same event are executed in the order they were added.
     // For this reason, the metrics are initialized at the last moment so that 
     // their hooks are executed last for each event.
-    server.decorateRequest('target', null)
     initMetrics(server, opts)
 
     server.all('/*', async (request, reply) => {

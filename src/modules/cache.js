@@ -295,7 +295,8 @@ export async function _get(server, opts, request) {
             // https://www.rfc-editor.org/rfc/rfc9111.html#name-calculating-cache-keys-with
             // A stored response with a Vary header field value containing a member "*" always fails to match
             && !fieldNames.includes('*')) {
-            utils.setCacheStatus('CACHE_HIT', cachedResponse)
+            // The response stored in the cache is valid.
+            cachedResponse.headers['x-speedis-cache-status'] = 'CACHE_HIT from ' + os.hostname()                
             cachedResponse.headers['age'] = utils.calculateAge(cachedResponse)
             return cachedResponse
         } else {
@@ -409,7 +410,10 @@ export async function _get(server, opts, request) {
                 `Origin: ${opts.id}. Serving stale content from cache. ` +
                 `RID: ${request.id}. URL Key: ${request.urlKey}.`
             )
-            utils.setCacheStatus('CACHE_HIT_NOT_REVALIDATED_STALE', cachedResponse)
+            // There is a response stored in the cache, and we tried to refresh it  
+            // using a conditional request to the origin, which failed.  
+            // The stale response IS being reused.
+            cachedResponse.headers['x-speedis-cache-status'] = 'CACHE_HIT_NOT_REVALIDATED_STALE from ' + os.hostname()
             cachedResponse.headers['age'] = utils.calculateAge(cachedResponse)
             return cachedResponse
         } else {
@@ -418,10 +422,16 @@ export async function _get(server, opts, request) {
                     date: new Date().toUTCString()
                 }
             }
-            utils.setCacheStatus(
-                cachedResponse ? 'CACHE_HIT_NOT_REVALIDATED' : 'CACHE_FAILED_MISS',
-                generatedResponse
-            )
+            if (cachedResponse) {
+                // There is a response stored in the cache, and we tried to refresh it  
+                // using a conditional request to the origin, which failed.  
+                // The stale response IS NOT being reused.                
+                generatedResponse.headers['x-speedis-cache-status'] = 'CACHE_HIT_NOT_REVALIDATED from ' + os.hostname()
+            } else {
+                // There is no response stored in the cache, and we tried to request it  
+                // to the origin, which failed.  
+                generatedResponse.headers['x-speedis-cache-status'] = 'CACHE_FAILED_MISS from ' + os.hostname()
+            }
             switch (error.code) {
                 case 'ETIMEDOUT':
                     generatedResponse.statusCode = 504
@@ -563,17 +573,25 @@ export async function _get(server, opts, request) {
                 'date': new Date().toUTCString()
             }
         }
-        utils.setCacheStatus('CACHE_MISS', generatedResponse)
+        // There is no response stored in the cache.
+        generatedResponse.headers['x-speedis-cache-status'] = 'CACHE_MISS from ' + os.hostname()
         return generatedResponse
     }
 
     if (originResponse.statusCode === 304) {
-        utils.setCacheStatus('CACHE_HIT_REVALIDATED_304', cachedResponse)
+        // There is a response stored in the cache, and it has been refreshed 
+        // using a conditional request to the origin, which replied with a 304.
+        cachedResponse.headers['x-speedis-cache-status'] = 'CACHE_HIT_REVALIDATED_304 from ' + os.hostname()
         return utils.cloneAndTrimResponse(cachedResponse)
     } else {
-        utils.setCacheStatus(
-            cachedResponse ? 'CACHE_HIT_REVALIDATED' : 'CACHE_MISS', originResponse
-        )
+        if (cachedResponse) {
+            // There is a response stored in the cache, and it has been refreshed 
+            // using a conditional request to the origin, which replied with a 200.
+            originResponse.headers['x-speedis-cache-status'] = 'CACHE_HIT_REVALIDATED from ' + os.hostname()
+        } else {
+            // There is no response stored in the cache.
+            originResponse.headers['x-speedis-cache-status'] = 'CACHE_MISS from ' + os.hostname()
+        }
         return utils.cloneAndTrimResponse(originResponse)
     }
 
