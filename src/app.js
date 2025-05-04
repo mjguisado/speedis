@@ -4,7 +4,6 @@ import fs from 'fs/promises'
 import speedisPlugin from './plugins/speedis.js'
 import Ajv from "ajv"
 import { initOriginConfigValidator } from './modules/originConfigValidator.js'
-import { initMetrics } from './modules/metrics.js'
 
 export async function app(opts = {}, ajv = new Ajv({ useDefaults: true })) {
 
@@ -42,8 +41,7 @@ export async function app(opts = {}, ajv = new Ajv({ useDefaults: true })) {
         }
     })
 
-    initMetrics(server, plugins)
-
+    server.decorate('plugins', plugins)
     server.ready(err => { if (err) console.log(err) })
 
     return server

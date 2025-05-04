@@ -28,6 +28,26 @@ scenarios:
           'Host': 'mocks'
           'If-Modified-Since': '{{ lastModified }}'
         ifTrue: 'lastModified'
+    - get:
+        url: '/mocks/users/1?cc=public,max-age={{ $randomNumber(1,60) }}'
+        headers:
+          'Host': 'mocks'
+    - get:
+        url: '/oauth2/login'
+        headers:
+          'Host': 'mocks'
+    - think: '{{ $randomNumber(1,60) }}s'
+    - get:
+        url: '/mocks/items/public-{{ uuid }}?cc=public,max-age={{ $randomNumber(1,60) }}'
+        headers:
+          'Host': 'mocks'
+        capture:
+          - header: 'last-modified'
+            as: 'lastModified'
+    - get:
+        url: '/mocks/users/2?cc=public,max-age={{ $randomNumber(1,60) }}'
+        headers:
+          'Host': 'mocks'
   - name: 'overflow'
     flow:
     - get:

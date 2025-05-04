@@ -3,7 +3,7 @@ import mocksPlugin from './plugins/mocks.js'
 import { collectDefaultMetrics, register, Counter, Histogram } from 'prom-client'
 
 const mockServer = fastify({
-    logger: { level: 'debug' }
+    logger: { level: 'warn' }
 })
 
 const httpRequestsTotal = new Counter({
@@ -11,12 +11,12 @@ const httpRequestsTotal = new Counter({
     help: 'Total number of HTTP requests to Speedis',
 })
 
-const httpResponsesTotal = new Counter({
+const speedisHttpResponsesTotal = new Counter({
     name: 'http_responses_total',
     help: 'Total number of HTTP responses',
 })
 
-const httpResponsesDuration = new Histogram({
+const speedisHttpResponsesDuration = new Histogram({
     name: 'http_responses_duration',
     help: 'Duration of HTTP responses',
     labelNames: ['statusCode']
@@ -32,9 +32,9 @@ mockServer.addHook('onRequest', async (request, reply) => {
 
 mockServer.addHook('onResponse', async (request, reply) => {
     if (request.originalUrl.startsWith('/mocks')) {
-        httpResponsesTotal.inc()
+        speedisHttpResponsesTotal.inc()
         if (reply.elapsedTime && !Number.isNaN(reply.elapsedTime)) {
-            httpResponsesDuration.labels({
+            speedisHttpResponsesDuration.labels({
                 statusCode: reply.statusCode,
             }).observe(reply.elapsedTime)
         } else {
@@ -51,7 +51,7 @@ mockServer.get('/metrics', async (request, reply) => {
 await mockServer.register(mocksPlugin, {
     id: "mocks",
     prefix: "/mocks",
-    logLevel: "info"
+    logLevel: "warn"
 })
 
 try {

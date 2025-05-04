@@ -101,6 +101,7 @@ export async function proxy(server, opts, request) {
     requestOptions.method = request.method
     requestOptions.path = generatePath(request)
     requestOptions.headers = request.headers
+
     if (server.agent) requestOptions.agent = server.agent
     if (request.session?.access_token) {
         requestOptions.headers['authorization'] = `Bearer ${request.session.access_token}`
