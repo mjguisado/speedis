@@ -26,73 +26,66 @@ export function initMetrics(server, opts) {
         ? path.join(opts.prefix, opts.oauth2.prefix)
         : false
 
+    server.decorateRequest('target', null)
     server.addHook('onRequest', async (request, reply) => {
-        let target
         if (oauth2UrlPrefix && request.raw.url.startsWith(oauth2UrlPrefix)) {
-            target = 'oauth2'
+            request.target = 'oauth2'
         } else if (isPurgeRequest(opts, request)) {
-            target = 'purge'
+            request.target = 'purge'
         } else if (request.cacheable) {
-            target = 'cache'
+            request.target = 'cache'
         } else {
-            target = 'proxy'
+            request.target = 'proxy'
         }
+
         speedisHttpRequestsTotal
             .labels({
                 origin: opts.id,
                 method: request.method,
-                target: target
-            }).inc() 
+                target: request.target
+            }).inc()
     })
 
-    /*
     const xSpeedisCacheStatusHeaderRE = /^(CACHE_.+) from/
     server.addHook('onResponse', async (request, reply) => {
-        if (request.originalUrl !== '/metrics') {
 
-            let origin = 'unknown'
-            server.plugins.forEach((prefix, id) => {
-                if (request.url.startsWith(prefix)) {
-                    origin = id
-                }
-            })
-
-            let statusCode = 'unknown'
-            if (typeof reply.statusCode === 'number' && !Number.isNaN(reply.statusCode)) {
-                statusCode = reply.statusCode
+        let origin = ''
+        server.plugins.forEach((prefix, id) => {
+            if (request.url.startsWith(prefix)) {
+                origin = id
             }
+        })
 
-            let cacheStatus = 'unknown'
-            if (reply.hasHeader('x-speedis-cache-status')) {
-                const matches = reply.getHeader('x-speedis-cache-status')
-                    .match(xSpeedisCacheStatusHeaderRE)
-                if (matches) cacheStatus = matches[1]
-            }
+        let statusCode = ''
+        if (typeof reply.statusCode === 'number' && !Number.isNaN(reply.statusCode)) {
+            statusCode = reply.statusCode
+        }
 
-            if ('unknown' === origin || 'unknown' === cacheStatus || 'unknown' === statusCode) {
-                server.log.warn(`The origin ${origin}, cache status ${cacheStatus}  or status code ${statusCode} is not valid for ${request.raw.url}.`)
-            }
+        let cacheStatus = ''
+        if ('cache' === request.target &&
+            reply.hasHeader('x-speedis-cache-status')) {
+            const matches = reply.getHeader('x-speedis-cache-status')
+                .match(xSpeedisCacheStatusHeaderRE)
+            if (matches) cacheStatus = matches[1]
+        }
 
-            speedisHttpResponsesTotal
-                .labels({
-                    origin: origin,
-                    statusCode: statusCode,
-                    cacheStatus: cacheStatus
-                }).inc()
+        speedisHttpResponsesTotal
+            .labels({
+                origin: origin,
+                statusCode: statusCode,
+                cacheStatus: cacheStatus
+            }).inc()
 
-            if (typeof reply.elapsedTime === 'number' && !Number.isNaN(reply.elapsedTime)) {
-                speedisHttpResponsesDuration.labels({
-                    origin: origin,
-                    statusCode: statusCode,
-                    cacheStatus: cacheStatus
-                }).observe(reply.elapsedTime)
-            } else {
-                server.log.warn(`The duration value ${reply.elapsedTime} is not valid.`)
-            }
-
+        if (typeof reply.elapsedTime === 'number' && !Number.isNaN(reply.elapsedTime)) {
+            speedisHttpResponsesDuration.labels({
+                origin: origin,
+                statusCode: statusCode,
+                cacheStatus: cacheStatus
+            }).observe(reply.elapsedTime)
+        } else {
+            server.log.warn(`The duration value ${reply.elapsedTime} is not valid.`)
         }
 
     })
-    */
 
 }

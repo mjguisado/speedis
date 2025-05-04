@@ -69,8 +69,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -79,106 +78,37 @@
             ]
           }
         },
-        "overrides": []
+        "overrides": [
+          {
+            "__systemRef": "hideSeriesFrom",
+            "matcher": {
+              "id": "byNames",
+              "options": {
+                "mode": "exclude",
+                "names": [
+                  "Total"
+                ],
+                "prefix": "All except:",
+                "readOnly": true
+              }
+            },
+            "properties": [
+              {
+                "id": "custom.hideFrom",
+                "value": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": true
+                }
+              }
+            ]
+          }
+        ]
       },
       "gridPos": {
         "h": 8,
         "w": 9,
         "x": 0,
-        "y": 0
-      },
-      "id": 7,
-      "options": {
-        "legend": {
-          "calcs": [],
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": {
-          "hideZeros": false,
-          "mode": "single",
-          "sort": "none"
-        }
-      },
-      "pluginVersion": "11.5.2",
-      "targets": [
-        {
-          "editorMode": "code",
-          "expr": "sum(rate(http_responses_total{job=\"speedis\"}[$__rate_interval])) by (job) ",
-          "legendFormat": "{{job}}",
-          "range": true,
-          "refId": "A"
-        }
-      ],
-      "title": " Number of requests to Speedis",
-      "transparent": true,
-      "type": "timeseries"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "PBFA97CFB590B2093"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisBorderShow": false,
-            "axisCenteredZero": false,
-            "axisColorMode": "text",
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "barWidthFactor": 0.6,
-            "drawStyle": "line",
-            "fillOpacity": 0,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "insertNulls": false,
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "pointSize": 5,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "showPoints": "auto",
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 9,
-        "x": 9,
         "y": 0
       },
       "id": 10,
@@ -195,14 +125,27 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "11.5.2",
+      "pluginVersion": "11.6.1",
       "targets": [
         {
           "editorMode": "code",
-          "expr": "sum(rate(http_responses_total{job=\"mocks\"}[$__rate_interval])) by (job)",
-          "legendFormat": "{{job}}",
+          "expr": "sum(rate(speedis_http_requests_total[$__rate_interval]))",
+          "legendFormat": "Total",
           "range": true,
           "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "expr": "sum(rate(speedis_http_requests_total[$__rate_interval])) by (origin)",
+          "hide": false,
+          "instant": false,
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "B"
         }
       ],
       "title": "Number of requests by origin",
@@ -257,8 +200,113 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 9,
+        "x": 9,
+        "y": 0
+      },
+      "id": 11,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.6.1",
+      "targets": [
+        {
+          "editorMode": "code",
+          "expr": "sum(rate(speedis_http_requests_total[$__rate_interval]))",
+          "legendFormat": "Total",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "expr": "sum(rate(speedis_http_requests_total[$__rate_interval])) by (target)",
+          "hide": false,
+          "instant": false,
+          "legendFormat": "{{target}}",
+          "range": true,
+          "refId": "B"
+        }
+      ],
+      "title": "Number of requests by target",
+      "transparent": true,
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
               },
               {
                 "color": "red",
@@ -289,11 +337,11 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "11.5.2",
+      "pluginVersion": "11.6.1",
       "targets": [
         {
           "editorMode": "code",
-          "expr": "sum(rate(http_responses_total{job=\"speedis\",origin=\"mocks\"}[$__rate_interval])) by (cacheStatus)",
+          "expr": "sum(rate(speedis_http_responses_total{job=\"speedis\",origin=\"mocks\"}[$__rate_interval])) by (cacheStatus)",
           "legendFormat": "{{cacheStatus}}",
           "range": true,
           "refId": "A"
@@ -351,8 +399,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -408,7 +455,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "11.5.2",
+      "pluginVersion": "11.6.1",
       "targets": [
         {
           "datasource": {
@@ -417,7 +464,7 @@
           },
           "disableTextWrap": false,
           "editorMode": "code",
-          "expr": "sum(rate(http_responses_duration_sum{job=\"speedis\",origin=\"mocks\"}[$__rate_interval])) by (cacheStatus) / sum(rate(http_responses_duration_count{job=\"speedis\",origin=\"mocks\"}[$__rate_interval])) by (cacheStatus) ",
+          "expr": "sum(rate(speedis_http_responses_duration_sum{job=\"speedis\",origin=\"mocks\"}[$__rate_interval])) by (cacheStatus) / sum(rate(speedis_http_responses_duration_count{job=\"speedis\",origin=\"mocks\"}[$__rate_interval])) by (cacheStatus) ",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "legendFormat": "{{cacheStatus}}",
@@ -478,8 +525,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -510,11 +556,11 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "11.5.2",
+      "pluginVersion": "11.6.1",
       "targets": [
         {
           "editorMode": "code",
-          "expr": "sum(rate(http_responses_total{job=\"speedis\",origin=\"mocks\"}[$__rate_interval])) by (statusCode) ",
+          "expr": "sum(rate(speedis_http_responses_total{job=\"speedis\",origin=\"mocks\"}[$__rate_interval])) by (statusCode) ",
           "legendFormat": "{{statusCode}}",
           "range": true,
           "refId": "A"
@@ -572,8 +618,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -629,7 +674,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "11.5.2",
+      "pluginVersion": "11.6.1",
       "targets": [
         {
           "datasource": {
@@ -638,7 +683,7 @@
           },
           "disableTextWrap": false,
           "editorMode": "code",
-          "expr": "sum(rate(http_responses_duration_sum{job=\"speedis\",origin=\"mocks\"}[$__rate_interval])) by (statusCode) / sum(rate(http_responses_duration_count{job=\"speedis\",origin=\"mocks\"}[$__rate_interval])) by (statusCode)",
+          "expr": "sum(rate(speedis_http_responses_duration_sum{job=\"speedis\",origin=\"mocks\"}[$__rate_interval])) by (statusCode) / sum(rate(speedis_http_responses_duration_count{job=\"speedis\",origin=\"mocks\"}[$__rate_interval])) by (statusCode)",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "legendFormat": "{{cacheStatus}}",
@@ -654,7 +699,7 @@
   ],
   "preload": false,
   "refresh": "30s",
-  "schemaVersion": 40,
+  "schemaVersion": 41,
   "tags": [],
   "templating": {
     "list": []
@@ -667,6 +712,5 @@
   "timezone": "browser",
   "title": "Speedis",
   "uid": "feamyf5ocs45ca",
-  "version": 2,
-  "weekStart": ""
+  "version": 3
 }
