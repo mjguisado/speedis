@@ -7,19 +7,19 @@ export function initMetrics(server, opts) {
     const speedisHttpRequestsTotal = new Counter({
         name: 'speedis_http_requests_total',
         help: 'Total number of HTTP requests to Speedis',
-        labelNames: ['origin', 'method', 'target']
+        labelNames: ['origin', 'target', 'method']
     })
 
     const speedisHttpResponsesTotal = new Counter({
         name: 'speedis_http_responses_total',
         help: 'Total number of HTTP responses from Speedis',
-        labelNames: ['origin', 'statusCode', 'cacheStatus', 'target']
+        labelNames: ['origin', 'target', 'statusCode', 'cacheStatus']
     })
 
     const speedisHttpResponsesDuration = new Histogram({
         name: 'speedis_http_responses_duration',
         help: 'Duration of HTTP responses  from Speedis',
-        labelNames: ['origin', 'statusCode', 'cacheStatus', 'target']
+        labelNames: ['origin', 'target', 'statusCode', 'cacheStatus']
     })
 
     const oauth2UrlPrefix = opts.oauth2
@@ -37,12 +37,11 @@ export function initMetrics(server, opts) {
         } else {
             request.target = 'proxy'
         }
-
         speedisHttpRequestsTotal
             .labels({
                 origin: opts.id,
-                method: request.method,
-                target: request.target
+                target: request.target,
+                method: request.method
             }).inc()
     })
 
@@ -72,17 +71,17 @@ export function initMetrics(server, opts) {
         speedisHttpResponsesTotal
             .labels({
                 origin: origin,
+                target: request.target,
                 statusCode: statusCode,
-                cacheStatus: cacheStatus,
-                target: request.target
+                cacheStatus: cacheStatus
             }).inc()
 
         if (typeof reply.elapsedTime === 'number' && !Number.isNaN(reply.elapsedTime)) {
             speedisHttpResponsesDuration.labels({
                 origin: origin,
+                target: request.target,
                 statusCode: statusCode,
-                cacheStatus: cacheStatus,
-                target: request.target
+                cacheStatus: cacheStatus
             }).observe(reply.elapsedTime)
         } else {
             server.log.warn(`The duration value ${reply.elapsedTime} is not valid.`)
