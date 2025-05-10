@@ -55,11 +55,15 @@ suite('Speedis - Origin', () => {
         originConfigValidator(origin, ajv)
         server.register(speedisPlugin, origin)
 
+        const plugins = new Map()
+        plugins.set(origin.id, origin.prefix)
+        server.decorate('plugins', plugins)
+
         await server.ready()
 
     })
 
-    test('DELETE 404', async (t) => {
+    test('PURGE - 404', async (t) => {
         t.plan(1)
         let url = '/mocks/mocks/items/public-' + crypto.randomUUID()
         let response = await server.inject({
@@ -69,7 +73,7 @@ suite('Speedis - Origin', () => {
         t.assert.strictEqual(response.statusCode, 404)
     })
 
-    test('DELETE 204', async (t) => {
+    test('PURGE - 204', async (t) => {
         t.plan(2)
         let url = '/mocks/mocks/items/public-' + crypto.randomUUID()
 
@@ -89,7 +93,7 @@ suite('Speedis - Origin', () => {
     test('GET - REQUEST max-age', async (t) => {
         t.plan(18)
 
-        let clientmaxage = 2
+        let clientmaxage = 1
         let originmaxage = clientmaxage * 2
 
         let url = '/mocks/mocks/items/public-' + crypto.randomUUID()
@@ -151,7 +155,7 @@ suite('Speedis - Origin', () => {
     test('GET - REQUEST min-fresh', async (t) => {
         t.plan(18)
 
-        let clientminfresh = 2
+        let clientminfresh = 1
         let originmaxage = clientminfresh * 2
 
         let url = '/mocks/mocks/items/public-' + crypto.randomUUID()
@@ -213,7 +217,7 @@ suite('Speedis - Origin', () => {
     test('GET - REQUEST max-stale', async (t) => {
         t.plan(24)
 
-        let clientmaxstale = 2
+        let clientmaxstale = 1
         let originmaxage = clientmaxstale
 
         let url = '/mocks/mocks/items/public-' + crypto.randomUUID()
@@ -291,7 +295,7 @@ suite('Speedis - Origin', () => {
     test('GET - REQUEST no-cache', async (t) => {
         t.plan(13)
 
-        let originmaxage = 4
+        let originmaxage = 2
 
         let url = '/mocks/mocks/items/public-' + crypto.randomUUID()
         url += '?cc=' + encodeURIComponent(`public,max-age=${originmaxage}`)
@@ -361,7 +365,7 @@ suite('Speedis - Origin', () => {
     test('GET - RESPONSE unqualified no-cache', async (t) => {
         t.plan(8)
 
-        let originmaxage = 4
+        let originmaxage = 2
 
         let url = '/mocks/mocks/items/public-' + crypto.randomUUID()
         url += '?cc=' + encodeURIComponent(`public,max-age=${originmaxage},no-cache`)
@@ -388,7 +392,7 @@ suite('Speedis - Origin', () => {
     test('GET - RESPONSE unqualified private', async (t) => {
         t.plan(8)
 
-        let originmaxage = 4
+        let originmaxage = 2
 
         let url = '/mocks/mocks/items/public-' + crypto.randomUUID()
         url += '?cc=' + encodeURIComponent(`public,max-age=${originmaxage},private`)
@@ -415,7 +419,7 @@ suite('Speedis - Origin', () => {
     test('GET - RESPONSE qualified private', async (t) => {
         t.plan(15)
 
-        let originmaxage = 4
+        let originmaxage = 2
 
         let url = '/mocks/mocks/items/public-' + crypto.randomUUID()
         url += '?cc=' + encodeURIComponent(`public,max-age=${originmaxage},private="x-mocks-custom-header-1,x-mocks-custom-header-2"`)
@@ -449,7 +453,7 @@ suite('Speedis - Origin', () => {
     test('GET - RESPONSE qualified no-cache', async (t) => {
         t.plan(15)
 
-        let originmaxage = 4
+        let originmaxage = 2
 
         let url = '/mocks/mocks/items/public-' + crypto.randomUUID()
         url += '?cc=' + encodeURIComponent(`public,max-age=${originmaxage},no-cache="x-mocks-custom-header-1,x-mocks-custom-header-2"`)
@@ -480,7 +484,63 @@ suite('Speedis - Origin', () => {
 
     })
 
-    test('GET - RESPONSE Not Modified', async (t) => {
+    test('GET - if-none-match - wildcard duplicate', async (t) => {
+        t.plan(1)
+        let originmaxage = 10
+        const uuid = crypto.randomUUID()
+        let url = '/mocks/mocks/items/public-' + uuid
+        url += '?cc=' + encodeURIComponent(`public,max-age=${originmaxage}`)
+        let response = await server.inject({
+            method: 'GET',
+            url: url,
+            headers: {
+                'if-none-match': '"*", W/"' + crypto.randomUUID() + `", "*", W/"public-${uuid}"`
+            }
+        })
+        t.assert.strictEqual(response.statusCode, 400)
+    })
+
+    test('GET - if-none-match - wildcard - 200', async (t) => {
+        t.plan(1)
+        let originmaxage = 10
+        const uuid = crypto.randomUUID()
+        let url = '/mocks/mocks/items/public-' + uuid
+        url += '?cc=' + encodeURIComponent(`public,max-age=${originmaxage}`)
+        let response = await server.inject({
+            method: 'GET',
+            url: url,
+            headers: {
+                'if-none-match': '"*"'
+            }
+        })
+        t.assert.strictEqual(response.statusCode, 200)
+    })
+
+    test('GET - if-none-match - wildcard - 304', async (t) => {
+        t.plan(2)
+        let originmaxage = 10
+        const uuid = crypto.randomUUID()
+        let url = '/mocks/mocks/items/public-' + uuid
+        url += '?cc=' + encodeURIComponent(`public,max-age=${originmaxage}`)
+        let response = await server.inject({
+            method: 'GET',
+            url: url,
+            headers: {
+                'if-none-match': '"*"'
+            }
+        })
+        t.assert.strictEqual(response.statusCode, 200)
+        response = await server.inject({
+            method: 'HEAD',
+            url: url,
+            headers: {
+                'if-none-match': '"*"'
+            }
+        })
+        t.assert.strictEqual(response.statusCode, 304)
+    })
+
+    test('GET - if-none-match - 304', async (t) => {
         t.plan(1)
         let originmaxage = 4
         const uuid = crypto.randomUUID()
@@ -491,6 +551,44 @@ suite('Speedis - Origin', () => {
             url: url,
             headers: {
                 'if-none-match': 'W/"' + crypto.randomUUID() + `", W/"public-${uuid}"`
+            }
+        })
+        t.assert.strictEqual(response.statusCode, 304)
+    })
+
+    test('GET - if-modified-since - invalid date', async (t) => {
+        t.plan(1)
+        let originmaxage = 10
+        const uuid = crypto.randomUUID()
+        let url = '/mocks/mocks/items/public-' + uuid
+        url += '?cc=' + encodeURIComponent(`public,max-age=${originmaxage}`)
+        let response = await server.inject({
+            method: 'GET',
+            url: url,
+            headers: {
+                'if-modified-since': 'INVALID DATE'
+            }
+        })
+        t.assert.strictEqual(response.statusCode, 200)
+    })
+
+    test('GET - if-modified-since - 304', async (t) => {
+        t.plan(2)
+        let originmaxage = 10
+        const uuid = crypto.randomUUID()
+        let url = '/mocks/mocks/items/public-' + uuid
+        url += '?cc=' + encodeURIComponent(`public,max-age=${originmaxage}`)
+        let response = await server.inject({
+            method: 'GET',
+            url: url,
+            headers: {}
+        })
+        t.assert.strictEqual(response.statusCode, 200)
+        response = await server.inject({
+            method: 'HEAD',
+            url: url,
+            headers: {
+                'if-modified-since': response.headers['last-modified']
             }
         })
         t.assert.strictEqual(response.statusCode, 304)

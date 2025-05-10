@@ -12,14 +12,18 @@ export function initCache(server, opts) {
 
     purgeUrlPrefix = path.join(opts.prefix, opts.cache.purgePath)
 
+    // When Local Requests Coalescing is enabled, this variable 
+    // stores the promises associated with ongoing origin server requests.
     const ongoingFetch = opts.cache.localRequestsCoalescing
         ? new Map()
         : null
     server.decorate('ongoingFetch', ongoingFetch)
     server.addHook('onClose', (server) => {
         if (server.ongoingFetch) server.ongoingFetch.clear()
-    })    
+    })
 
+    // To improve performance, we compile the regular 
+    // expressions used to determine whether a URL is cacheable.
     opts.cache.cacheables.forEach(cacheable => {
         try {
             cacheable.re = new RegExp(cacheable.urlPattern)
@@ -30,12 +34,17 @@ export function initCache(server, opts) {
         }
     })
 
+    // Each time a request is received, this hook checks whether it 
+    // is cacheable and, if so, whether the response should be cached 
+    // separately for each user.
     server.decorateRequest('cacheable')
     server.decorateRequest('cacheable_per_user')
     server.addHook('onRequest', async (request, reply) => {
         request.cacheable = false
         request.cacheable_per_user = false
-        if ('GET' === request.method) {
+        // Only the safe methods are cacheables
+        // https://developer.mozilla.org/en-US/docs/Glossary/Safe/HTTP
+        if (['GET', 'HEAD'].includes(request.method)) {
             for (const cacheable of opts.cache.cacheables) {
                 if (cacheable.re.test(request.raw.url)) {
                     request.cacheable = true
@@ -46,6 +55,8 @@ export function initCache(server, opts) {
         }
     })
 
+    // This hook verifies that cacheable per-user requests include the user’s ID.
+    // This ID is set by a hook in the OAuth2 module.
     server.addHook('preValidation', async (request, reply) => {
         if (request.cacheable_per_user && !request.session?.sub) {
             const msg = `Origin: ${opts.id}. This resource ${request.raw.url} is cacheable per user, but the user could not be determined.`
@@ -56,6 +67,7 @@ export function initCache(server, opts) {
 
 }
 
+// This function checks whether the request corresponds to a cache purge operation.
 export function isPurgeRequest(opts, request) {
     return opts.cache
         && request.method === "DELETE"
@@ -67,8 +79,8 @@ export async function getCacheable(server, opts, request) {
 
     let response = {}
 
-    // If Redis is unavailable and we can’t reach the origin when the 
-    // cache is down, we return a 503.
+    // If Redis is unavailable and we shouldn't reach the origin 
+    // when the cache is down, we return a 503.
     if (server.redisBreaker &&
         server.redisBreaker.opened &&
         opts.redis.disableOriginOnRedisOutage) {
@@ -131,6 +143,12 @@ export async function getCacheable(server, opts, request) {
 
     // We have a response from the cache or the origin.
     // Check if we have received a conditional request.
+
+    // https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Conditional_requests
+    // https://www.rfc-editor.org/rfc/rfc9111.html#name-handling-a-received-validat
+    // https://www.rfc-editor.org/rfc/rfc9110.html#section-13.1.2
+
+    // Extract the validators
     /*
     https://www.rfc-editor.org/rfc/rfc9110#name-etag
     ETag       = entity-tag
@@ -146,35 +164,63 @@ export async function getCacheable(server, opts, request) {
     */
     const eTagRE = /(?:W\/)*\x22(?:[\x21\x23-\x7E\x80-\xFF])*\x22/g
     let etags = []
-    let lastModified = null
-    for (let header in request.headers) {
-        switch (header) {
-            case 'if-none-match':
-                etags = request.headers[header].match(eTagRE)
-                etags = etags !== null ? etags : []
-                break
-            case 'if-modified-since':
-                lastModified = request.headers[header]
-                break
-        }
+    let ifModifiedSince = null
+    if (request.headers['if-none-match']) {
+        etags = request.headers['if-none-match'].match(eTagRE)
+        etags = etags !== null ? etags : []
+    } else if (request.headers['if-modified-since']) {
+        ifModifiedSince = request.headers['if-modified-since']
     }
 
-    // See: https://www.rfc-editor.org/rfc/rfc9110.html#section-13.1.2
+    // Note that an If-None-Match header field with a list value containing "*" 
+    // and other values (including other instances of "*") is syntactically 
+    // invalid (therefore not allowed to be generated) and furthermore 
+    // is unlikely to be interoperable.
+    if (etags.includes('"*"') && etags.length > 1) {
+        const msg =
+            `Origin: ${opts.id}. The If-None-Match header field with a list value containing "*" and other values is syntactically invalid and not allowed. ` +
+            `RID: ${request.id}. Method: ${request.method}. URL: ${request.raw.url}`
+        server.log.error(msg)
+        response.statusCode = 400
+        response.headers = {
+            date: new Date().toUTCString(),
+            'content-type': 'application/json',
+            'x-speedis-cache-status': 'CACHE_ERROR_400 from ' + os.hostname()
+        }
+        if (opts.exposeErrors) { response.body = { msg: msg } }
+        return response
+    }
+
+    // A request containing an If-None-Match header field indicates that 
+    // the client wants to validate one or more of its own stored 
+    // responses in comparison to the stored response chosen 
+    // by the cache.
     let ifNoneMatchCondition = true
     if (etags.length > 0) {
-        if (etags.length === 1 && etags[0] === '"*"') {
-            if (response?.statusCode === 200) {
-                ifNoneMatchCondition = false
-            }
-        } else if (remoteResponse.headers?.etag) {
+        // To evaluate a received If-None-Match header field:
+        if (etags[0] === '"*"') {
+            // If the field value is "*", the condition is false if the 
+            // origin server has a current representation for the target resource.
+            if (remoteResponse.headers['x-speedis-cache-status'] &&
+                (
+                    remoteResponse.headers['x-speedis-cache-status'].startsWith('CACHE_HIT from') ||
+                    remoteResponse.headers['x-speedis-cache-status'].startsWith('CACHE_HIT_REVALIDATED_304 from')
+                )
+            ) { ifNoneMatchCondition = false }
+        } else if (remoteResponse.headers.etag) {
+            // If the field value is a list of entity tags, the condition is false
+            // if one of the listed tags matches the entity tag of the selected 
+            // representation.
             let weakCacheEtag = remoteResponse.headers.etag.startsWith('W/')
-                ? remoteResponse.headers.etag.substring(2) : remoteResponse.headers.etag
+                ? remoteResponse.headers.etag.substring(2)
+                : remoteResponse.headers.etag
             for (let index = 0; index < etags.length; index++) {
                 // A recipient MUST use the weak comparison function when
                 // comparing entity tags for If-None-Match
                 // https://www.rfc-editor.org/rfc/rfc9110.html#section-8.8.3.2
                 let weakRequestETag = etags[index].startsWith('W/')
-                    ? etags[index].substring(2) : etags[index]
+                    ? etags[index].substring(2)
+                    : etags[index]
                 if (weakRequestETag === weakCacheEtag) {
                     ifNoneMatchCondition = false
                     break
@@ -187,31 +233,46 @@ export async function getCacheable(server, opts, request) {
         date: new Date().toUTCString(),
         'x-speedis-cache-status': remoteResponse.headers['x-speedis-cache-status']
     }
+
     if (!ifNoneMatchCondition) {
         response.statusCode = 304
         return response
-    } else {
-        // See: https://www.rfc-editor.org/rfc/rfc9110.html#section-13.1.3
-        let ifModifiedSinceCondition = true
-        if (!Object.prototype.hasOwnProperty.call(request.headers, 'if-none-match')) {
-            let requestlmd = lastModified
-                ? Date.parse(lastModified)
-                : NaN
-            let cachelmd = remoteResponse.headers['last-modified']
-                ? Date.parse(remoteResponse.headers['last-modified'])
-                : NaN
-            if (!Number.isNaN(requestlmd) && !Number.isNaN(cachelmd) && cachelmd <= requestlmd) {
-                ifModifiedSinceCondition = false
-            }
+    }
+
+    // See: https://www.rfc-editor.org/rfc/rfc9110.html#section-13.1.3   
+    // A recipient MUST ignore the If-Modified-Since header if the request includes
+    // an If-None-Match header. Note: ifModifiedSince is only set when the request 
+    // does not include an If-None-Match header.
+    // ... or the request method is neither GET nor HEAD. ( checked before )
+    if (ifModifiedSince) {
+        // ...or its value is not a valid single HTTP-date (requestLMD will be set to null)
+        // Note: it this last case requestlmd will be set to NaN
+        const requestlmd = Date.parse(ifModifiedSince)
+
+        // https://www.rfc-editor.org/rfc/rfc9111.html#section-4.3.2
+        // If a request contains an If-Modified-Since header field and the Last-Modified 
+        // header field is not present in a stored response, a cache SHOULD use the 
+        // stored response's Date field value (or, if no Date field is present, 
+        // the time that the stored response was received) to evaluate the conditional.
+        let cachelmd = NaN
+        if (remoteResponse.headers['last-modified']) {
+            cachelmd = Date.parse(remoteResponse.headers['last-modified'])
+        } else if (remoteResponse.headers['date']) {
+            cachelmd = Date.parse(remoteResponse.headers['date'])
+        } else if (remoteResponse.responseTime) {
+            cachelmd = remoteResponse.responseTime * 1000
         }
-        if (!ifModifiedSinceCondition) {
+
+        if (!Number.isNaN(requestlmd) && !Number.isNaN(cachelmd) && cachelmd <= requestlmd) {
             response.statusCode = 304
             return response
-        } else {
-            remoteResponse.headers['date'] = response.headers['date']
-            return remoteResponse
         }
+
     }
+
+    remoteResponse.headers['date'] = response.headers['date']
+    return remoteResponse
+
 }
 
 export async function _get(server, opts, request) {
@@ -296,7 +357,7 @@ export async function _get(server, opts, request) {
             // A stored response with a Vary header field value containing a member "*" always fails to match
             && !fieldNames.includes('*')) {
             // The response stored in the cache is valid.
-            cachedResponse.headers['x-speedis-cache-status'] = 'CACHE_HIT from ' + os.hostname()                
+            cachedResponse.headers['x-speedis-cache-status'] = 'CACHE_HIT from ' + os.hostname()
             cachedResponse.headers['age'] = utils.calculateAge(cachedResponse)
             return cachedResponse
         } else {
@@ -389,7 +450,7 @@ export async function _get(server, opts, request) {
 
     } catch (error) {
 
-        if (opts.cache.distributedRequestsCoalescing && locked) 
+        if (opts.cache.distributedRequestsCoalescing && locked)
             await _releaseLock(server, opts, lockKey, lockValue)
         if (amITheFetcher && opts.cache.localRequestsCoalescing) server.ongoingFetch.delete(request.urlKey)
         delete requestOptions.agent
@@ -561,7 +622,7 @@ export async function _get(server, opts, request) {
     }
 
     // In this point the Cache Entry has been updated or deleted in Redis.
-    if (opts.cache.distributedRequestsCoalescing && locked) 
+    if (opts.cache.distributedRequestsCoalescing && locked)
         await _releaseLock(server, opts, lockKey, lockValue)
 
     // See: https://www.rfc-editor.org/rfc/rfc9111.html#cache-request-directive.only-if-cached

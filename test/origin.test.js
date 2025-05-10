@@ -11,6 +11,8 @@ suite('Speedis - Origin', () => {
         server = fastify({
             logger: { level: 'info' }
         })
+        
+        const plugins = new Map()
 
         server.register(
             speedisPlugin,
@@ -27,6 +29,8 @@ suite('Speedis - Origin', () => {
                 }
             }
         )
+        plugins.set("proxy","/proxy")
+
         server.register(
             speedisPlugin,
             {
@@ -43,6 +47,8 @@ suite('Speedis - Origin', () => {
                 }
             }
         )
+        plugins.set("proxy-timeout","/proxy-timeout")
+
         server.register(
             speedisPlugin,
             {
@@ -61,6 +67,8 @@ suite('Speedis - Origin', () => {
                 }
             }
         )
+        plugins.set("proxy-agent","/proxy-agent")
+
         server.register(
             speedisPlugin,
             {
@@ -80,6 +88,8 @@ suite('Speedis - Origin', () => {
                 }
             }
         )
+        plugins.set("proxy-agent-timeout","/proxy-agent-timeout")
+
         server.register(
             speedisPlugin,
             {
@@ -104,7 +114,10 @@ suite('Speedis - Origin', () => {
                 }
             }
         )
+        plugins.set("proxy-agent-timeout-circuit-breaker","/proxy-agent-timeout-circuit-breaker")
 
+        server.decorate('plugins', plugins)
+        
         await server.ready()
         
     })
