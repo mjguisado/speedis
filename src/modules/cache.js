@@ -149,6 +149,7 @@ export async function getCacheable(server, opts, request) {
     // https://www.rfc-editor.org/rfc/rfc9110.html#section-13.1.2
 
     // Extract the validators
+    // https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Conditional_requests#validators
     /*
     https://www.rfc-editor.org/rfc/rfc9110#name-etag
     ETag       = entity-tag
@@ -163,6 +164,7 @@ export async function getCacheable(server, opts, request) {
     etag       = [\x21\x23-\x7E\x80-\xFF]
     */
     const eTagRE = /(?:W\/)*\x22(?:[\x21\x23-\x7E\x80-\xFF])*\x22/g
+
     let etags = []
     let ifModifiedSince = null
     if (request.headers['if-none-match']) {
@@ -280,12 +282,14 @@ export async function _get(server, opts, request) {
     // We create options for an HTTP/S request to the required path
     // based on the default ones that must not be modified.
     const requestOptions = { ...opts.origin.httpxOptions }
-    requestOptions.path = generatePath(request)
     if (server.agent) requestOptions.agent = server.agent
 
-    const clientCacheDirectives = utils.parseCacheControlHeader(request)
-    const fieldNames = utils.parseVaryHeader(request)
+    // To make the request to the origin server, we remove from 
+    // the received URL the prefix that was used to route the request
+    // to this instance of the plugin
+    requestOptions.path = generatePath(request)
 
+    // Check if there is an entry stored in the cache.
     let cachedResponse = null
     try {
         cachedResponse = server.redisBreaker
@@ -297,12 +301,15 @@ export async function _get(server, opts, request) {
             `RID: ${request.id}. URL Key: ${request.urlKey}.`)
     }
 
+    const clientCacheDirectives = utils.parseCacheControlHeader(request)
+    const fieldNames = utils.parseVaryHeader(request)
     let cachedCacheDirectives = null
 
     if (cachedResponse) {
 
-        // Apply transformations to the entry fetched from the cache
         cachedResponse.path = requestOptions.path
+
+        // Apply transformations to the entry fetched from the cache
         if (opts.bff) bff.transform(opts, bff.CACHE_RESPONSE, cachedResponse)
 
         // See: https://www.rfc-editor.org/rfc/rfc9111.html#name-calculating-freshness-lifet
@@ -311,31 +318,25 @@ export async function _get(server, opts, request) {
         // See: https://www.rfc-editor.org/rfc/rfc9111.html#name-calculating-age
         const currentAge = utils.calculateAge(cachedResponse)
 
+        const fresh = freshnessLifetime - currentAge
+
         // We calculate whether the cache entry is fresh or stale.
-        let responseIsFresh = (currentAge <= freshnessLifetime)
+        let responseIsFresh = fresh >= 0
 
         // See: https://www.rfc-editor.org/rfc/rfc9111.html#cache-request-directive.max-age
-        if (Object.prototype.hasOwnProperty.call(clientCacheDirectives, 'max-age')) {
-            const maxAge = parseInt(clientCacheDirectives['max-age'])
-            if (!Number.isNaN(maxAge) && currentAge > maxAge) {
-                responseIsFresh = false
-            }
+        const maxAge = parseInt(clientCacheDirectives['max-age'])
+        if (!Number.isNaN(maxAge) && currentAge > maxAge) {
+            responseIsFresh = false
         }
         // See: https://www.rfc-editor.org/rfc/rfc9111.html#cache-request-directive.min-fresh
-        if (Object.prototype.hasOwnProperty.call(clientCacheDirectives, 'min-fresh')) {
-            const minFresh = parseInt(clientCacheDirectives['min-fresh'])
-            const fresh = freshnessLifetime - currentAge
-            if (!Number.isNaN(minFresh) && fresh < minFresh) {
-                responseIsFresh = false
-            }
+        const minFresh = parseInt(clientCacheDirectives['min-fresh'])
+        if (!Number.isNaN(minFresh) && fresh < minFresh) {
+            responseIsFresh = false
         }
         // See: https://www.rfc-editor.org/rfc/rfc9111.html#cache-request-directive.max-stale
-        if (Object.prototype.hasOwnProperty.call(clientCacheDirectives, 'max-stale')) {
-            const maxStale = parseInt(clientCacheDirectives['max-stale'])
-            const fresh = freshnessLifetime - currentAge
-            if (!Number.isNaN(maxStale) && -maxStale <= fresh) {
-                responseIsFresh = true
-            }
+        const maxStale = parseInt(clientCacheDirectives['max-stale'])
+        if (!Number.isNaN(maxStale) && -maxStale <= fresh) {
+            responseIsFresh = true
         }
 
         /*
@@ -364,8 +365,7 @@ export async function _get(server, opts, request) {
             // We need to revalidate the response.
             if (Object.prototype.hasOwnProperty.call(cachedResponse.headers, 'etag')) {
                 requestOptions.headers['if-none-match'] = cachedResponse.headers['etag']
-            }
-            if (Object.prototype.hasOwnProperty.call(cachedResponse.headers, 'last-modified')) {
+            } else if (Object.prototype.hasOwnProperty.call(cachedResponse.headers, 'last-modified')) {
                 requestOptions.headers['if-modified-since'] = cachedResponse.headers['last-modified']
             }
         }
