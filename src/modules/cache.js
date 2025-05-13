@@ -42,6 +42,7 @@ export function initCache(server, opts) {
     server.addHook('onRequest', async (request, reply) => {
         request.cacheable = false
         request.cacheable_per_user = false
+
         // Only the safe methods are cacheables
         // https://developer.mozilla.org/en-US/docs/Glossary/Safe/HTTP
         if (['GET', 'HEAD'].includes(request.method)) {
@@ -301,7 +302,7 @@ export async function _get(server, opts, request) {
             `RID: ${request.id}. URL Key: ${request.urlKey}.`)
     }
 
-    const clientCacheDirectives = utils.parseCacheControlHeader(request)
+    const requestCacheDirectives = utils.parseCacheControlHeader(request)
     const fieldNames = utils.parseVaryHeader(request)
     let cachedCacheDirectives = null
 
@@ -324,17 +325,17 @@ export async function _get(server, opts, request) {
         let responseIsFresh = fresh >= 0
 
         // See: https://www.rfc-editor.org/rfc/rfc9111.html#cache-request-directive.max-age
-        const maxAge = parseInt(clientCacheDirectives['max-age'])
+        const maxAge = parseInt(requestCacheDirectives['max-age'])
         if (!Number.isNaN(maxAge) && currentAge > maxAge) {
             responseIsFresh = false
         }
         // See: https://www.rfc-editor.org/rfc/rfc9111.html#cache-request-directive.min-fresh
-        const minFresh = parseInt(clientCacheDirectives['min-fresh'])
+        const minFresh = parseInt(requestCacheDirectives['min-fresh'])
         if (!Number.isNaN(minFresh) && fresh < minFresh) {
             responseIsFresh = false
         }
         // See: https://www.rfc-editor.org/rfc/rfc9111.html#cache-request-directive.max-stale
-        const maxStale = parseInt(clientCacheDirectives['max-stale'])
+        const maxStale = parseInt(requestCacheDirectives['max-stale'])
         if (!Number.isNaN(maxStale) && -maxStale <= fresh) {
             responseIsFresh = true
         }
@@ -343,14 +344,14 @@ export async function _get(server, opts, request) {
         * See: https://www.rfc-editor.org/rfc/rfc9111.html#name-no-cache
         * See: https://www.rfc-editor.org/rfc/rfc9111.html#name-no-cache-2
         * See: https://www.rfc-editor.org/rfc/rfc9111.html#cache-request-directive.no-store
-        * Note that if a request containing the no-store directive is
-        * satisfied from a cache, the no-store request directive does
-        * not apply to the already stored response.
+        * 
+        * Note that if a request containing the no-store directive is satisfied
+        * from a cache, the no-store request directive does not apply to the 
+        * already stored response.
         */
         cachedCacheDirectives = utils.parseCacheControlHeader(cachedResponse)
-
         if (responseIsFresh
-            && !Object.prototype.hasOwnProperty.call(clientCacheDirectives, 'no-cache')
+            && !Object.prototype.hasOwnProperty.call(requestCacheDirectives, 'no-cache')
             && (!Object.prototype.hasOwnProperty.call(cachedCacheDirectives, 'no-cache')
                 // The qualified form of the no-cache response directive
                 || cachedCacheDirectives['no-cache'] !== null)
@@ -359,7 +360,9 @@ export async function _get(server, opts, request) {
             && !fieldNames.includes('*')) {
             // The response stored in the cache is valid.
             cachedResponse.headers['x-speedis-cache-status'] = 'CACHE_HIT from ' + os.hostname()
-            cachedResponse.headers['age'] = utils.calculateAge(cachedResponse)
+            // The presence of an Age header field implies that the response was not generated 
+            // or validated by the origin server for this request.
+            cachedResponse.headers['age'] = currentAge
             return cachedResponse
         } else {
             // We need to revalidate the response.
@@ -380,7 +383,8 @@ export async function _get(server, opts, request) {
     let originResponse = null
     let requestTime = null
     let responseTime = null
-    let lockKey, lockValue
+    let lockKey = null
+    let lockValue = null
     let locked = false
 
     try {
@@ -392,6 +396,7 @@ export async function _get(server, opts, request) {
         }
 
         if (!fetch) {
+
             // https://redis.io/docs/latest/develop/use/patterns/distributed-locks/#correct-implementation-with-a-single-instance
             if (opts.cache.distributedRequestsCoalescing) {
                 lockKey = `${request.urlKey}.lock`
@@ -452,7 +457,10 @@ export async function _get(server, opts, request) {
 
         if (opts.cache.distributedRequestsCoalescing && locked)
             await _releaseLock(server, opts, lockKey, lockValue)
-        if (amITheFetcher && opts.cache.localRequestsCoalescing) server.ongoingFetch.delete(request.urlKey)
+
+        if (amITheFetcher && opts.cache.localRequestsCoalescing) 
+            server.ongoingFetch.delete(request.urlKey)
+
         delete requestOptions.agent
 
         server.log.error(error,
@@ -519,10 +527,10 @@ export async function _get(server, opts, request) {
     const originCacheDirectives = utils.parseCacheControlHeader(originResponse)
 
     let writeCache = amITheFetcher
-        && !Object.prototype.hasOwnProperty.call(clientCacheDirectives, 'no-store')
-        && isCacheable(originResponse, originCacheDirectives)
-    // See: https://www.rfc-editor.org/rfc/rfc9111.html#name-no-store
-    // See: https://www.rfc-editor.org/rfc/rfc9111.html#name-storing-responses-in-caches
+        // See: https://www.rfc-editor.org/rfc/rfc9111.html#name-no-store
+        && !Object.prototype.hasOwnProperty.call(requestCacheDirectives, 'no-store')
+        // See: https://www.rfc-editor.org/rfc/rfc9111.html#name-storing-responses-in-caches
+        && isStorableResponse(originResponse, originCacheDirectives)
 
     // We generate a cache entry from the response.
     const cacheEntry = utils.cloneAndTrimResponse(originResponse)
@@ -571,6 +579,7 @@ export async function _get(server, opts, request) {
                     `RID: ${request.id}. URL Key: ${request.urlKey}.`)
             }
         }
+
     } else {
 
         if (writeCache) {
@@ -626,17 +635,15 @@ export async function _get(server, opts, request) {
         await _releaseLock(server, opts, lockKey, lockValue)
 
     // See: https://www.rfc-editor.org/rfc/rfc9111.html#cache-request-directive.only-if-cached
-    if (Object.prototype.hasOwnProperty.call(clientCacheDirectives, 'only-if-cached')
+    if (Object.prototype.hasOwnProperty.call(requestCacheDirectives, 'only-if-cached')
         && cachedResponse == null) {
-        const generatedResponse = {
+        return generatedResponse = {
             statusCode: 504,
             headers: {
-                'date': new Date().toUTCString()
+                'date': new Date().toUTCString(),
+                'x-speedis-cache-status': 'CACHE_MISS from ' + os.hostname()
             }
         }
-        // There is no response stored in the cache.
-        generatedResponse.headers['x-speedis-cache-status'] = 'CACHE_MISS from ' + os.hostname()
-        return generatedResponse
     }
 
     if (originResponse.statusCode === 304) {
@@ -658,6 +665,9 @@ export async function _get(server, opts, request) {
 
 }
 
+/**
+ * Acquire a lock to make a request to the origin server.
+ */
 async function _adquireLock(server, opts, lockKey, lockValue) {
     let lockTTL
     // In JavaScript, when comparing a number with undefined, 
@@ -697,6 +707,9 @@ const releaseLockScript = `
     end
   `
 const releaseLockScriptSHA1 = crypto.createHash('sha1').update(releaseLockScript).digest('hex')
+/**
+ * Releases the lock acquired to make a request to the origin server.
+ */
 async function _releaseLock(server, opts, lockKey, lockValue) {
     try {
         const exists = server.redisBreaker
@@ -729,10 +742,18 @@ async function _releaseLock(server, opts, lockKey, lockValue) {
     }
 }
 
-// See: https://www.rfc-editor.org/rfc/rfc9111.html#name-storing-responses-in-caches
-function isCacheable(originResponse, originCacheDirectives) {
+/**
+ * This function checks whether the response received from the origin is 
+ * can be stored in the cache according to the HTTP/1.1 specification, 
+ * specifically RFC 9111.
+ * https://www.rfc-editor.org/rfc/rfc9111.html#name-storing-responses-in-caches
+ * @param {*} originResponse 
+ * @param {*} originCacheDirectives 
+ * @returns 
+ */
+function isStorableResponse(originResponse, originCacheDirectives) {
     let isTheResponseCacheable =
-        // The request method is always GET
+        // The request method is always GET & HEAD
         // The response status code is final
         originResponse.statusCode >= 200
         // This cache doesn't understands Partial Content
@@ -750,7 +771,7 @@ function isCacheable(originResponse, originCacheDirectives) {
         && !Object.prototype.hasOwnProperty.call(originCacheDirectives, 'no-store')
         // See: https://www.rfc-editor.org/rfc/rfc9111.html#name-private
         && (!Object.prototype.hasOwnProperty.call(originCacheDirectives, 'private')
-            // // The qualified form of the private response directive
+            // The qualified form of the private response directive
             || originCacheDirectives['private'] !== null
         )
         && (!Object.prototype.hasOwnProperty.call(originResponse.headers, 'authorization')
