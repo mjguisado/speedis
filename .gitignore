@@ -1,5 +1,6 @@
 .DS_Store
 node_modules/
+mocks/certs/*
 3rparties/haproxy/*.crt
 3rparties/haproxy/*.key
 3rparties/haproxy/certs/*.pem
