@@ -1,7 +1,7 @@
 {
     "id": "mocks",
     "prefix": "/mocks",
-    "logLevel": "info",
+    "logLevel": "warn",
     "exposeErrors": true,
     "origin": {
         "http2Options": {
