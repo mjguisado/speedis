@@ -10,9 +10,10 @@ RUN --mount=type=bind,source=package.json,target=package.json \
     --mount=type=bind,source=package-lock.json,target=package-lock.json \
     --mount=type=cache,target=/root/.npm \
     npm ci --include=dev
+COPY . .
+RUN chown -R node:node .
 USER node
 EXPOSE 3001 3003 9229-9249
-COPY . .
 CMD ["nodemon", "src/index.js"]
 
 FROM base AS production
@@ -21,7 +22,8 @@ RUN --mount=type=bind,source=package.json,target=package.json \
     --mount=type=bind,source=package-lock.json,target=package-lock.json \
     --mount=type=cache,target=/root/.npm \
     npm ci
+COPY . .
+RUN chown -R node:node .
 USER node
 EXPOSE 3001 3003
-COPY . .
 CMD  ["node", "src/index.js"]

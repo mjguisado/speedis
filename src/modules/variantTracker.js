@@ -23,7 +23,8 @@ export function initVariantsTracker(server, opts) {
     server.addHook('onSend', async (request, reply, payload) => {
 
         if (isPurgeRequest(opts, request)
-            || request.raw.url.startsWith(path.join(opts.prefix, opts.oauth2.prefix))
+            || (opts.oauth2 &&
+                request.raw.url.startsWith(path.join(opts.prefix, opts.oauth2.prefix)))
         ) return
 
         let urlTracked = false
@@ -84,6 +85,7 @@ export function initVariantsTracker(server, opts) {
             }
         }
     })
+
 }
 
 export function _normalizeComplexObject(obj) {
@@ -100,13 +102,13 @@ export function _normalizeComplexObject(obj) {
 
 export function _normalizeSimpleObject(obj) {
     if (Array.isArray(obj)) {
-      return obj.map(_normalizeSimpleObject)
+        return obj.map(_normalizeSimpleObject)
     } else if (obj !== null && typeof obj === 'object') {
-      const normalized = {}
-      for (const key of Object.keys(obj).sort()) {
-        normalized[key] = _normalizeSimpleObject(obj[key])
-      }
-      return normalized
+        const normalized = {}
+        for (const key of Object.keys(obj).sort()) {
+            normalized[key] = _normalizeSimpleObject(obj[key])
+        }
+        return normalized
     }
     return obj
 }

@@ -1,10 +1,24 @@
+import fs from 'fs'
 import fastify from 'fastify'
 import mocksPlugin from './plugins/mocks.js'
 import { collectDefaultMetrics, register, Counter, Histogram } from 'prom-client'
 
-const mockServer = fastify({
-    logger: { level: 'warn' }
-})
+// Build Fastify options depending on env var
+let fastifyOptions = { logger: { level: 'warn' } }
+
+if (process.env.MOCKS_HTTP2 === 'true') {
+    fastifyOptions = {
+        logger: { level: 'warn' },
+        http2: true,
+        https: {
+            key: fs.readFileSync('./certs/mocks.key'),
+            cert: fs.readFileSync('./certs/mocks.crt'),
+        },
+        allowHTTP1: true
+    }
+}
+
+const mockServer = fastify(fastifyOptions)
 
 const httpRequestsTotal = new Counter({
     name: 'http_requests_total',

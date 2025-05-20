@@ -20,6 +20,7 @@ The following table describes the supported fields.
 |`prefix`|String|`true`||URL path prefix used to route incoming requests to this origin.|
 |`logLevel`|String|`false`|`info`|Logging level for this origin (`trace`, `debug`, `info`, `warn`, `error`, `fatal`).|
 |`exposeErrors`|Boolean|`false`|`false`|This parameter determines whether descriptive error messages are included in the response body (`true` or `false`).|
+|`metrics`|Boolean|`false`|`true`|This parameter determines whether the metrics for this plugin are enabled. (`true` or `false`).|
 |`origin`|Object|`true`||This object defines all the details related to the origin server. Its format is detailed below.|
 |`bff`|Object|`false`||This object defines all the details related to the Backend-For-Frontend (BFF). Its format is detailed below.|
 |`variantsTracker`|Object|`false`||This object defines all the details related to the variant tracker. Its format is detailed below.|
@@ -29,9 +30,12 @@ The following table describes the supported fields.
 
 ## Origin configuration object
 The following table describes the supported fields in the origin configuration object.
+In the origin configuration, you must set either the http1xOptions or http2Options parameter.
+The agentOptions parameter is only valid when http1xOptions is used.
 |Field|Type|Mandatory|Default|Description|
 |-----|----|---------|-------|-----------|
-|`httpxOptions`|Object|`true`||Speedis leverages Node’s native [http](https://nodejs.org/api/http.html)/[https](https://nodejs.org/api/https.html) libraries to make requests to the origin server. This field is used to define the request options. Its format is almost identical to the original [options](https://nodejs.org/api/http.html#httprequestoptions-callback). The main difference is that, since the configuration is in JSON format, parameters defined as JavaScript entities in the original options are not supported. Options in socket.connect() are not supported.|
+|`http1xOptions`|Object|`false`||Speedis leverages Node’s native [http](https://nodejs.org/api/http.html)/[https](https://nodejs.org/api/https.html) libraries to make HTTP/1.x requests to the origin server. This field is used to define the request options. Its format is almost identical to the original [options](https://nodejs.org/api/http.html#httprequestoptions-callback). The main difference is that, since the configuration is in JSON format, parameters defined as JavaScript entities in the original options are not supported. Options in socket.connect() are not supported.|
+|`http2Options`|Object|`false`||Speedis leverages Node’s native [http2](https://nodejs.org/api/http2.html) library to make HTTP/2 requests to the origin server. This field is used to define the connection options. Its format is identical to the original [options](https://nodejs.org/api/http2.html#http2connectauthority-options-listener).
 |`agentOptions`|Object|`false`||Speedis allows to use an [Agent](https://nodejs.org/api/https.html#class-httpsagent) to manage connection persistence and reuse for HTTP clients. This field is used to configure the agent. Its format is identical to the original [https options](https://nodejs.org/api/https.html#class-httpsagent) or [http options](https://nodejs.org/api/http.html#new-agentoptions).|
 |`originTimeout`|Number|`false`||Specifies the maximum time allowed for retrieving the resource from the origin server before the request is considered a failure.|
 |`originBreaker`|Boolean|`false`|`false`|Enables (`true`) or disables (`false`) the origin's circuit breaker mechanism.|
