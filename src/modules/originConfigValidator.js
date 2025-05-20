@@ -109,11 +109,28 @@ export function initOriginConfigValidator(ajv) {
                     default: "info"
                 },
                 exposeErrors: { type: "boolean", default: false },
+                metrics: { type: "boolean", default: true },
                 origin: {
                     type: "object",
                     additionalProperties: false,
-                    required: ["httpxOptions"],
+                    oneOf: [
+                        { required: ["http2Options"] },
+                        { required: ["http1xOptions"] }
+                    ],
                     allOf: [
+                        {
+                            if: {
+                                required: ["http2Options"]
+                            },
+                            then: {
+                                not: {
+                                    anyOf: [
+                                        { required: ["http1xOptions"] },
+                                        { required: ["agentOptions"] }
+                                    ]
+                                }
+                            }
+                        },
                         {
                             if: {
                                 properties: {
@@ -127,7 +144,16 @@ export function initOriginConfigValidator(ajv) {
                         }
                     ],
                     properties: {
-                        httpxOptions: { $ref: "#/definitions/requestOptions" },
+                        http2Options: {
+                            type: "object",
+                            additionalProperties: false,
+                            required: ["authority"],
+                            properties: {
+                                authority: { type: "string" },
+                                options: { type: "object" },
+                            }
+                        },
+                        http1xOptions: { $ref: "#/definitions/requestOptions" },
                         agentOptions: { $ref: "#/definitions/agentOptions" },
                         originTimeout: { type: "integer" },
                         originBreaker: { type: "boolean", default: false },

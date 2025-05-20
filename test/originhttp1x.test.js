@@ -20,8 +20,9 @@ suite('Speedis - Origin', () => {
                 "id": "proxy",
                 "prefix": "/proxy",
                 "exposeErrors": true,
+                "metrics": false,
                 "origin": {
-                    "httpxOptions": {
+                    "http1xOptions": {
                         "host": "mocks",
                         "port": 3030,
                         "timeout": 1000
@@ -37,8 +38,9 @@ suite('Speedis - Origin', () => {
                 "id": "proxy-timeout",
                 "prefix": "/proxy-timeout",
                 "exposeErrors": true,
+                "metrics": false,
                 "origin": {
-                    "httpxOptions": {
+                    "http1xOptions": {
                         "host": "mocks",
                         "port": 3030,
                         "timeout": 1000
@@ -55,8 +57,9 @@ suite('Speedis - Origin', () => {
                 "id": "proxy-agent",
                 "prefix": "/proxy-agent",
                 "exposeErrors": true,
+                "metrics": false,
                 "origin": {
-                    "httpxOptions": {
+                    "http1xOptions": {
                         "host": "mocks",
                         "port": 3030,
                         "timeout": 1000
@@ -75,8 +78,9 @@ suite('Speedis - Origin', () => {
                 "id": "proxy-agent-timeout",
                 "prefix": "/proxy-agent-timeout",
                 "exposeErrors": true,
+                "metrics": false,
                 "origin": {
-                    "httpxOptions": {
+                    "http1xOptions": {
                         "host": "mocks",
                         "port": 3030,
                         "timeout": 1000
@@ -96,8 +100,9 @@ suite('Speedis - Origin', () => {
                 "id": "proxy-agent-timeout-circuit-breaker",
                 "prefix": "/proxy-agent-timeout-circuit-breaker",
                 "exposeErrors": true,
+                "metrics": false,
                 "origin": {
-                    "httpxOptions": {
+                    "http1xOptions": {
                         "host": "mocks",
                         "port": 3030,
                         "timeout": 1000
@@ -122,7 +127,7 @@ suite('Speedis - Origin', () => {
         
     })
 
-    test('Proxy', async (t) => {
+     test('Proxy', async (t) => {
         t.plan(1)
         let url = '/proxy/mocks/items/public-' + crypto.randomUUID()
         let response = await server.inject({

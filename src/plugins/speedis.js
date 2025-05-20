@@ -10,15 +10,18 @@ import { initOAuth2 } from '../modules/oauth2.js'
 import { initVariantsTracker } from '../modules/variantTracker.js'
 import { initMetrics } from '../modules/metrics.js'
 import { errorHandler } from '../modules/error.js'
-import { _fetch } from '../modules/origin.js'
 
 export default async function (server, opts) {
 
     // This parameter determines whether descriptive error 
     // messages are included in the response body
     server.decorate('exposeErrors', opts.exposeErrors)
-    const remoteBaseUrl = `${opts.origin.httpxOptions.protocol}//${opts.origin.httpxOptions.host}:${opts.origin.httpxOptions.port}`
-
+    /*
+    const remoteBaseUrl = opts.origin.http2Options
+        ? opts.origin.http2Options.authority
+        : `${opts.origin.http1xOptions.protocol}//${opts.origin.http1xOptions.host}:${opts.origin.http1xOptions.port}`
+    */
+   
     // Module init
     await initOrigin(server, opts)
     if (opts.redis) await initRedis(server, opts)
@@ -35,7 +38,7 @@ export default async function (server, opts) {
     // registered for the same event are executed in the order they were added.
     // For this reason, the metrics are initialized at the last moment so that 
     // their hooks are executed last for each event.
-    initMetrics(server, opts)
+    if (opts.metrics) initMetrics(server, opts)
 
     server.all('/*', async (request, reply) => {
 

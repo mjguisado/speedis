@@ -76,6 +76,25 @@ services:
           target: /usr/src/app/mocks
     ports:
       - 3030:3030
+  mocks2:
+    image: mjguisado/mocks:latest
+    pull_policy: build
+    build:
+      context: .
+      dockerfile: Dockerfile.mocks
+    container_name: mocks2
+    environment:
+      - MOCKS_HTTP2=true
+    restart: unless-stopped
+    develop:
+      watch:
+        - action: rebuild
+          path: package*.json
+        - action: sync
+          path: ./mocks
+          target: /usr/src/app/mocks
+    ports:
+      - 3032:3030
   speedis:
     image: mjguisado/speedis:latest
     pull_policy: build
@@ -105,6 +124,8 @@ services:
       - "9229-9249:9229-9249"
     depends_on:
       mocks:
+        condition: service_started
+      mocks2:
         condition: service_started
       redis:
         condition: service_healthy

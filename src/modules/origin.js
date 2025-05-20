@@ -1,5 +1,7 @@
 import http from 'http'
 import https from 'https'
+import http2 from 'node:http2'
+
 import os from 'os'
 import { initOriginBreaker } from '../modules/originBreaker.js'
 import { transform, ORIGIN_REQUEST, ORIGIN_RESPONSE } from './bff.js'
@@ -7,29 +9,46 @@ import * as utils from '../utils/utils.js'
 
 export async function initOrigin(server, opts) {
 
-    /*
-     * We ensure that header names are in lowercase for the following
-     * comparisons, which are case-sensitive.
-     * Node HTTP library sets all headers to lower case automatically.
-     */
-    let aux = null
-    for (const header in opts.origin.httpxOptions.headers) {
-        aux = opts.origin.httpxOptions.headers[header]
-        delete opts.origin.httpxOptions.headers[header]
-        opts.origin.httpxOptions.headers[header.toLowerCase()] = aux
-    }
+    if (opts.origin.http2Options) {
 
-    // Agents are responsible for managing connections.
-    let agent = null
-    if (opts.origin.agentOptions) {
-        // The default protocol is 'http:'
-        agent = ('https:' === opts.origin.httpxOptions.protocol ? https : http)
-            .Agent(opts.origin.agentOptions)
+        const http2Session = setupHttp2Session(server, opts)
+        if (!server.http2Session) {
+            // We register the hook only the first time
+            server.addHook('onClose', (server) => {
+                if (server.http2Session) server.http2Session.close()
+            })
+            server.decorate('http2Session', http2Session)
+        } else {
+            server.http2Session = http2Session
+        }
+
+    } else {
+
+        /*
+        * We ensure that header names are in lowercase for the following
+        * comparisons, which are case-sensitive.
+        * Node HTTP library sets all headers to lower case automatically.
+        */
+        let aux = null
+        for (const header in opts.origin.http1xOptions.headers) {
+            aux = opts.origin.http1xOptions.headers[header]
+            delete opts.origin.http1xOptions.headers[header]
+            opts.origin.http1xOptions.headers[header.toLowerCase()] = aux
+        }
+
+        // Agents are responsible for managing connections.
+        let agent = null
+        if (opts.origin.agentOptions) {
+            // The default protocol is 'http:'
+            agent = ('https:' === opts.origin.http1xOptions.protocol ? https : http)
+                .Agent(opts.origin.agentOptions)
+        }
+        server.decorate('agent', agent)
+        server.addHook('onClose', (server) => {
+            if (server.agent) server.agent.destroy()
+        })
+
     }
-    server.decorate('agent', agent)
-    server.addHook('onClose', (server) => {
-        if (server.agent) server.agent.destroy()
-    })
 
     // This plugin will add the request.rawBody.
     // It will get the data using the preParsing hook.
@@ -43,6 +62,28 @@ export async function initOrigin(server, opts) {
     server.decorate('originBreaker', originBreaker)
 
     server.decorateRequest("urlKey", null)
+
+}
+
+function setupHttp2Session(server, opts) {
+
+    const http2Session = http2.connect(opts.origin.http2Options.authority)
+
+    http2Session.on('error', (error) => {
+        server.log.error(error, `Origin: ${opts.id}. HTTP2 session lost.`)
+    })
+
+    http2Session.on('close', async () => {
+        server.log.info(`Origin: ${opts.id}. HTTP2 session closed.`)
+    })
+
+    http2Session.on('goaway', () => {
+        server.log.info(`Origin: ${opts.id}. HTTP2 server go away.`)
+        // The server does not want to accept any more streams.
+        // http2Session.close()
+    })
+
+    return http2Session
 
 }
 
@@ -97,12 +138,15 @@ export function generateUrlKey(opts, request, fieldNames = utils.parseVaryHeader
 
 export async function proxy(server, opts, request) {
 
-    const requestOptions = { ...opts.origin.httpxOptions }
-    requestOptions.method = request.method
+    let requestOptions = {}
+    if (!opts.origin.http2Options) {
+        requestOptions = { ...opts.origin.http1xOptions }
+        if (server.agent) requestOptions.agent = server.agent
+    }
+
     requestOptions.path = generatePath(request)
     requestOptions.headers = request.headers
 
-    if (server.agent) requestOptions.agent = server.agent
     if (request.session?.access_token) {
         requestOptions.headers['authorization'] = `Bearer ${request.session.access_token}`
     }
@@ -110,8 +154,8 @@ export async function proxy(server, opts, request) {
     if (opts.bff) transform(opts, ORIGIN_REQUEST, requestOptions)
 
     const fetch = server.originBreaker
-        ? server.originBreaker.fire(opts, requestOptions, request.rawBody)
-        : _fetch(opts, requestOptions, request.rawBody)
+        ? server.originBreaker.fire(server, opts, requestOptions, request.rawBody)
+        : _fetch(server, opts, requestOptions, request.rawBody)
 
     // Fecth
     const response = await fetch
@@ -127,27 +171,37 @@ export async function proxy(server, opts, request) {
 
 }
 
-export function _fetch(originOptions, requestOptions, body) {
+export function _fetch(server, originOptions, requestOptions, body) {
+
+    // We set the content-length header just for interoperability.
+    // It's not required by the HTTP/2
+    if (body && !requestOptions.headers['content-length']) {
+        const bodyLength = Buffer.isBuffer(body)
+            ? body.length
+            : Buffer.byteLength(body)
+        requestOptions.headers['content-length'] = bodyLength
+    }
+
+    return originOptions.origin.http2Options
+        ? _fetchHttp2(server, originOptions, requestOptions, body)
+        : _fetchHttp1x(originOptions, requestOptions, body)
+}
+
+function _fetchHttp1x(originOptions, requestOptions, body) {
 
     return new Promise((resolve, reject) => {
 
         // If we are using the Circuit Breaker the timeout is managed by it.
         // In other cases, we has to manage the timeout in the request.
         let signal, timeoutId = null
-        if (originOptions.origin.originTimeout && !requestOptions.signal) {
+        // if (originOptions.origin.originTimeout && !requestOptions.signal) {
+        if (originOptions.origin.originTimeout && !originOptions.origin.originBreaker){
             const abortController = new AbortController()
             timeoutId = setTimeout(() => {
                 abortController.abort()
             }, originOptions.origin.originTimeout)
             signal = abortController.signal
             requestOptions.signal = signal
-        }
-
-        if (body && !requestOptions.headers['Content-Length']) {
-            const bodyLength = Buffer.isBuffer(body)
-                ? body.length
-                : Buffer.byteLength(body)
-            requestOptions.headers['Content-Length'] = bodyLength
         }
 
         const request = (requestOptions.protocol === 'https:' ? https : http)
@@ -178,3 +232,102 @@ export function _fetch(originOptions, requestOptions, body) {
     })
 
 }
+
+export function transformHeadersForHttp2(headers, options = {}) {
+
+    const forbidden = [
+        'connection',
+        'upgrade',
+        'http2-settings',
+        'keep-alive',
+        'proxy-connection',
+        'transfer-encoding'
+    ];
+    const result = {};
+
+    for (const [key, value] of Object.entries(headers)) {
+        const lowerKey = key.toLowerCase();
+        if (forbidden.includes(lowerKey)) continue;
+        if (lowerKey === 'te' && value.trim().toLowerCase() !== 'trailers') continue;
+        if (lowerKey === 'host') {
+            result[':authority'] = value;
+            continue;
+        }
+        // Optional: Split cookies into serveral headers
+        if (lowerKey === 'cookie' && value.includes(';')) {
+            value.split(';').map(c => c.trim()).forEach(cookie => {
+                if (!result['cookie']) result['cookie'] = [];
+                result['cookie'].push(cookie);
+            });
+            continue;
+        }
+        result[lowerKey] = value;
+    }
+
+    // Add pseudo-headers if ther included in options
+    if (options.method) result[http2.constants.HTTP2_HEADER_METHOD] = options.method;
+    if (options.path) result[http2.constants.HTTP2_HEADER_PATH] = options.path;
+    if (options.scheme) result[http2.constants.HTTP2_HEADER_SCHEME] = options.scheme;
+    if (options.authority && !result[http2.constants.HTTP2_HEADER_AUTHORITY]) 
+        result[http2.constants.HTTP2_HEADER_AUTHORITY] = options.authority;
+
+    return result;
+}
+
+function _fetchHttp2(server, originOptions, requestOptions, body) {
+
+    return new Promise((resolve, reject) => {
+
+        const headers = transformHeadersForHttp2(requestOptions.headers, {
+            method: requestOptions.method,
+            path: requestOptions.path
+        })
+
+        // https://nodejs.org/api/http2.html#sensitive-headers
+        if (headers[http2.constants.HTTP2_HEADER_AUTHORIZATION]) {
+            headers[http2.sensitiveHeaders] = [http2.constants.HTTP2_HEADER_AUTHORIZATION]
+        }
+
+        const clientHttp2Stream = server.http2Session.request(headers)
+        clientHttp2Stream.setEncoding('utf8')
+
+        const response = { body: '' }
+
+        clientHttp2Stream.on('response', (headers) => {
+            response.statusCode = headers[':status']
+            response.headers = headers
+            delete response.headers[':status']
+        })
+
+        clientHttp2Stream.on('data', (chunk) => {
+            response.body += chunk
+        })
+
+        clientHttp2Stream.on('end', () => {
+            if (timeoutId) clearTimeout(timeoutId)
+            resolve(response)
+        })
+
+        clientHttp2Stream.on('error', (err) => {
+            if (timeoutId) clearTimeout(timeoutId)
+            reject(err)
+        })
+
+        if (body) clientHttp2Stream.write(body)
+        clientHttp2Stream.end()
+
+        let timeoutId = null
+        if (originOptions.origin.originTimeout && !originOptions.origin.originBreaker) {
+            timeoutId = setTimeout(() => {
+                clientHttp2Stream.close(http2.constants.NGHTTP2_CANCEL)
+                const error = new Error(`Origin: ${originOptions.id}. Timed out after ${originOptions.origin.originTimeout} ms.`)
+                error.code = 'ETIMEDOUT'
+                reject(error)
+            }, originOptions.origin.originTimeout)
+        }
+
+    })
+}
+
+
+

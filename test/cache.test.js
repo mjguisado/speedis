@@ -25,7 +25,7 @@ suite('Speedis - Origin', () => {
             "id": "mocks",
             "prefix": "/mocks",
             "origin": {
-                "httpxOptions": {
+                "http1xOptions": {
                     "host": "mocks",
                     "port": 3030,
                     "timeout": 2000

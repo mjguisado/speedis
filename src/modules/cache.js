@@ -282,7 +282,12 @@ export async function _get(server, opts, request) {
 
     // We create options for an HTTP/S request to the required path
     // based on the default ones that must not be modified.
-    const requestOptions = { ...opts.origin.httpxOptions }
+    const requestOptions = opts.origin.http2Options 
+        ? { headers: {} }
+        : { ...opts.origin.http1xOptions }
+        
+    requestOptions.method = request.method
+
     if (server.agent) requestOptions.agent = server.agent
 
     // To make the request to the origin server, we remove from 
@@ -421,7 +426,7 @@ export async function _get(server, opts, request) {
             if (server.originBreaker) {
                 fetch = server.originBreaker.fire(opts, requestOptions, request.body)
             } else {
-                fetch = _fetch(opts, requestOptions, request.body)
+                fetch = _fetch(server, opts, requestOptions, request.body)
             }
             if (opts.cache.localRequestsCoalescing) server.ongoingFetch.set(request.urlKey, fetch)
             amITheFetcher = true
