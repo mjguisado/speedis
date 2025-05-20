@@ -424,7 +424,7 @@ export async function _get(server, opts, request) {
             if (opts.bff) bff.transform(opts, bff.ORIGIN_REQUEST, requestOptions)
 
             if (server.originBreaker) {
-                fetch = server.originBreaker.fire(opts, requestOptions, request.body)
+                fetch = server.originBreaker.fire(server, opts, requestOptions, request.body)
             } else {
                 fetch = _fetch(server, opts, requestOptions, request.body)
             }
