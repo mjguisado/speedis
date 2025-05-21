@@ -25,7 +25,7 @@ The core of Speedis is developed as a Fastify plugin.
 Speedis creates an instance of the plugin for each origin configuration file.
 Requests are routed to the corresponding plugin instance using a prefix in the URL path.
 
-### Backend-For-Fronend (BFF)
+### Backend-For-Frontend (BFF)
 Speedis can apply various transformations to incoming requests and outgoing responses throughout their lifecycle.
 These transformations are designed to adapt the data and behavior of the origin server to meet the specific needs of different clients.
 The architecture follows a Backend For Frontend (BFF) pattern, allowing for client-specific optimizations.

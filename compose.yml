@@ -104,8 +104,6 @@ services:
       target: development
     container_name: speedis
     restart: unless-stopped
-    profiles:
-      - develop
     develop:
       watch:
         - action: rebuild
