@@ -10,18 +10,10 @@ import * as utils from '../utils/utils.js'
 export async function initOrigin(server, opts) {
 
     if (opts.origin.http2Options) {
-
-        const http2Session = setupHttp2Session(server, opts)
-        if (!server.http2Session) {
-            // We register the hook only the first time
-            server.addHook('onClose', (server) => {
-                if (server.http2Session) server.http2Session.close()
-            })
-            server.decorate('http2Session', http2Session)
-        } else {
-            server.http2Session = http2Session
-        }
-
+        server.decorate('http2Session', null)
+        server.addHook('onClose', (server) => {
+            if (server.http2Session) server.http2Session.close()
+        })
     } else {
 
         /*
@@ -65,9 +57,38 @@ export async function initOrigin(server, opts) {
 
 }
 
+
+function getValidHttp2Session(server, opts) {
+    if (!server.http2Session ||
+        server.http2Session.destroyed ||
+        server.http2Session.closed
+    ) {
+        if (server.http2Session) {
+            try { server.http2Session.close(); } catch {}
+        }
+        server.http2Session = http2.connect(opts.origin.http2Options.authority)
+
+        server.http2Session.on('error', (error) => {
+            server.log.error(error, `Origin: ${opts.id}. HTTP2 session lost.`)
+        })
+
+        server.http2Session.on('close', async () => {
+            server.log.info(`Origin: ${opts.id}. HTTP2 session closed.`)
+        })
+
+        server.http2Session.on('goaway', () => {
+            server.log.info(`Origin: ${opts.id}. HTTP2 server go away.`)
+        })
+    }
+
+    return server.http2Session
+
+}
+
+
 function setupHttp2Session(server, opts) {
 
-    const http2Session = http2.connect(opts.origin.http2Options.authority)
+    const http2Session = 
 
     http2Session.on('error', (error) => {
         server.log.error(error, `Origin: ${opts.id}. HTTP2 session lost.`)
@@ -288,7 +309,7 @@ function _fetchHttp2(server, originOptions, requestOptions, body) {
             headers[http2.sensitiveHeaders] = [http2.constants.HTTP2_HEADER_AUTHORIZATION]
         }
 
-        const clientHttp2Stream = server.http2Session.request(headers)
+        const clientHttp2Stream = getValidHttp2Session(server, originOptions).request(headers)
         clientHttp2Stream.setEncoding('utf8')
 
         const response = { body: '' }
