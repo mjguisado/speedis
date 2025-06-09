@@ -4,6 +4,11 @@ config:
     path: 'uuids.csv'
     fields:
       - 'uuid'
+  http:
+    # pool: 10240
+    # timeout: 30
+    keepAlive: true
+    cacheDns: true      
   target: https://127.0.0.1:61283
   tls:
     rejectUnauthorized: false

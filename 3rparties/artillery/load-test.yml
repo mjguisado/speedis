@@ -4,13 +4,24 @@ config:
     path: 'uuids.csv'
     fields:
       - 'uuid'
+  http:
+    # pool: 10240
+    # timeout: 30
+    keepAlive: true
+    cacheDns: true      
   target: https://127.0.0.1
   tls:
     rejectUnauthorized: false
   phases:
-    - name: 'loadtest'
-      duration: 1h
-      arrivalRate: 500
+    - name: 'warmup'
+      duration: 1m
+      arrivalRate: 1024
+    - name: 'rampup'
+      duration: 1m
+      arrivalRate: 2048
+    - name: 'load'
+      duration: 1m
+      arrivalRate: 4096
 scenarios:
   - name: '304'
     flow:
@@ -28,26 +39,6 @@ scenarios:
           'Host': 'mocks'
           'If-Modified-Since': '{{ lastModified }}'
         ifTrue: 'lastModified'
-    - get:
-        url: '/mocks/users/1?cc=public,max-age={{ $randomNumber(1,60) }}'
-        headers:
-          'Host': 'mocks'
-    - get:
-        url: '/oauth2/login'
-        headers:
-          'Host': 'mocks'
-    - think: '{{ $randomNumber(1,60) }}s'
-    - get:
-        url: '/mocks/items/public-{{ uuid }}?cc=public,max-age={{ $randomNumber(1,60) }}'
-        headers:
-          'Host': 'mocks'
-        capture:
-          - header: 'last-modified'
-            as: 'lastModified'
-    - get:
-        url: '/mocks/users/2?cc=public,max-age={{ $randomNumber(1,60) }}'
-        headers:
-          'Host': 'mocks'
   - name: 'overflow'
     flow:
     - get:
