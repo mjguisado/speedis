@@ -3,24 +3,36 @@ import { register, Counter, Histogram } from 'prom-client'
 import { isPurgeRequest } from './cache.js'
 
 export function initMetrics(server, opts) {
+   
+    let speedisHttpRequestsTotal = 
+        register.getSingleMetric('speedis_http_requests_total')
+    if (!speedisHttpRequestsTotal) {
+        speedisHttpRequestsTotal = new Counter({
+            name: 'speedis_http_requests_total',
+            help: 'Total number of HTTP requests to Speedis',
+            labelNames: ['origin', 'target', 'method']
+        })
+    }
 
-    const speedisHttpRequestsTotal = new Counter({
-        name: 'speedis_http_requests_total',
-        help: 'Total number of HTTP requests to Speedis',
-        labelNames: ['origin', 'target', 'method']
-    })
+    let speedisHttpResponsesTotal =
+        register.getSingleMetric('speedis_http_responses_total')
+    if (!speedisHttpResponsesTotal) {
+        speedisHttpResponsesTotal = new Counter({
+            name: 'speedis_http_responses_total',
+            help: 'Total number of HTTP responses from Speedis',
+            labelNames: ['origin', 'target', 'statusCode', 'cacheStatus']
+        })
+    }
 
-    const speedisHttpResponsesTotal = new Counter({
-        name: 'speedis_http_responses_total',
-        help: 'Total number of HTTP responses from Speedis',
-        labelNames: ['origin', 'target', 'statusCode', 'cacheStatus']
-    })
-
-    const speedisHttpResponsesDuration = new Histogram({
-        name: 'speedis_http_responses_duration',
-        help: 'Duration of HTTP responses  from Speedis',
-        labelNames: ['origin', 'target', 'statusCode', 'cacheStatus']
-    })
+    let speedisHttpResponsesDuration = 
+        register.getSingleMetric('speedis_http_responses_duration')
+    if (!speedisHttpResponsesDuration) {
+        speedisHttpResponsesDuration = new Histogram({
+            name: 'speedis_http_responses_duration',
+            help: 'Duration of HTTP responses  from Speedis',
+            labelNames: ['origin', 'target', 'statusCode', 'cacheStatus']
+        })
+    }
 
     const oauth2UrlPrefix = opts.oauth2
         ? path.join(opts.prefix, opts.oauth2.prefix)
