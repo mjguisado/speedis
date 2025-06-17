@@ -64,7 +64,7 @@ function getValidHttp2Session(server, opts) {
         server.http2Session.closed
     ) {
         if (server.http2Session) {
-            try { server.http2Session.close(); } catch {}
+            try { server.http2Session.close() } catch {}
         }
         server.http2Session = http2.connect(opts.origin.http2Options.authority)
 
@@ -157,16 +157,62 @@ export function generateUrlKey(opts, request, fieldNames = utils.parseVaryHeader
     request.urlKey = urlKey
 }
 
+/**
+ * Filters client headers based on forward and exclude lists.
+ *
+ * @param {object} headers - The incoming request headers (from Fastify).
+ * @param {string[]} headersToForward - List of headers to allow forwarding. ['*'] means all.
+ * @param {string[]} headersToExclude - List of headers to exclude. ['*'] means none.
+ * @returns {object} The filtered headers to be sent to the origin server.
+ */
+export function getForwardedHeaders(headers, headersToForward, headersToExclude) {
+
+  const lowerCaseHeaders = Object.fromEntries(
+    Object.entries(headers).map(([k, v]) => [k.toLowerCase(), v])
+  )
+
+  if (headersToExclude.includes('*')) return {}
+  const forwarded = new Set(
+    headersToForward.includes('*')
+      ? Object.keys(lowerCaseHeaders)
+      : headersToForward.map(h => h.toLowerCase())
+  )
+
+  const excluded = new Set(headersToExclude.map(h => h.toLowerCase()))
+
+  const result = {}
+  for (const [key, value] of Object.entries(lowerCaseHeaders)) {
+    if (forwarded.has(key) && !excluded.has(key)) {
+      result[key] = value
+    }
+  }
+  return result
+
+}
+
 export async function proxy(server, opts, request) {
 
     let requestOptions = {}
     if (!opts.origin.http2Options) {
         requestOptions = { ...opts.origin.http1xOptions }
         if (server.agent) requestOptions.agent = server.agent
+    } else {
+        requestOptions.headers = {}
     }
 
+    const forwardedHeaders = getForwardedHeaders(
+        request.headers,
+        opts.origin.headersToForward,
+        opts.origin.headersToExclude
+    )
+
+    const finalHeaders = { ...forwardedHeaders, ...requestOptions.headers }
+    requestOptions.headers = finalHeaders
+    
+    // To make the request to the origin server, we remove from 
+    // the received URL the prefix that was used to route the request
+    // to this instance of the plugin
     requestOptions.path = generatePath(request)
-    requestOptions.headers = request.headers
 
     if (request.session?.access_token) {
         requestOptions.headers['authorization'] = `Bearer ${request.session.access_token}`
@@ -263,36 +309,36 @@ export function transformHeadersForHttp2(headers, options = {}) {
         'keep-alive',
         'proxy-connection',
         'transfer-encoding'
-    ];
-    const result = {};
+    ]
+    const result = {}
 
     for (const [key, value] of Object.entries(headers)) {
-        const lowerKey = key.toLowerCase();
-        if (forbidden.includes(lowerKey)) continue;
-        if (lowerKey === 'te' && value.trim().toLowerCase() !== 'trailers') continue;
+        const lowerKey = key.toLowerCase()
+        if (forbidden.includes(lowerKey)) continue
+        if (lowerKey === 'te' && value.trim().toLowerCase() !== 'trailers') continue
         if (lowerKey === 'host') {
-            result[':authority'] = value;
-            continue;
+            result[':authority'] = value
+            continue
         }
         // Optional: Split cookies into serveral headers
         if (lowerKey === 'cookie' && value.includes(';')) {
             value.split(';').map(c => c.trim()).forEach(cookie => {
-                if (!result['cookie']) result['cookie'] = [];
-                result['cookie'].push(cookie);
-            });
-            continue;
+                if (!result['cookie']) result['cookie'] = []
+                result['cookie'].push(cookie)
+            })
+            continue
         }
-        result[lowerKey] = value;
+        result[lowerKey] = value
     }
 
     // Add pseudo-headers if ther included in options
-    if (options.method) result[http2.constants.HTTP2_HEADER_METHOD] = options.method;
-    if (options.path) result[http2.constants.HTTP2_HEADER_PATH] = options.path;
-    if (options.scheme) result[http2.constants.HTTP2_HEADER_SCHEME] = options.scheme;
+    if (options.method) result[http2.constants.HTTP2_HEADER_METHOD] = options.method
+    if (options.path) result[http2.constants.HTTP2_HEADER_PATH] = options.path
+    if (options.scheme) result[http2.constants.HTTP2_HEADER_SCHEME] = options.scheme
     if (options.authority && !result[http2.constants.HTTP2_HEADER_AUTHORITY]) 
-        result[http2.constants.HTTP2_HEADER_AUTHORITY] = options.authority;
+        result[http2.constants.HTTP2_HEADER_AUTHORITY] = options.authority
 
-    return result;
+    return result
 }
 
 function _fetchHttp2(server, originOptions, requestOptions, body) {

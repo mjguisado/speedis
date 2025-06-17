@@ -1,7 +1,7 @@
 import path from 'path'
 import os from 'os'
 import * as crypto from 'crypto'
-import { generatePath, _fetch } from './origin.js'
+import { generatePath, _fetch, getForwardedHeaders } from './origin.js'
 import * as utils from '../utils/utils.js'
 import * as bff from './bff.js'
 import { errorHandler } from './error.js'
@@ -282,19 +282,30 @@ export async function _get(server, opts, request) {
 
     // We create options for an HTTP/S request to the required path
     // based on the default ones that must not be modified.
-    const requestOptions = opts.origin.http2Options 
-        ? { headers: {} }
-        : { ...opts.origin.http1xOptions }
+    let requestOptions = {}
+    if (!opts.origin.http2Options) {
+        requestOptions = { ...opts.origin.http1xOptions }
+        if (server.agent) requestOptions.agent = server.agent
+    } else {
+        requestOptions.headers = {}
+    }
         
-    requestOptions.method = request.method
+    const forwardedHeaders = getForwardedHeaders(
+        request.headers,
+        opts.origin.headersToForward,
+        opts.origin.headersToExclude
+    )
 
-    if (server.agent) requestOptions.agent = server.agent
+    const finalHeaders = { ...forwardedHeaders, ...requestOptions.headers }
+    requestOptions.headers = finalHeaders
+
+    requestOptions.method = request.method
 
     // To make the request to the origin server, we remove from 
     // the received URL the prefix that was used to route the request
     // to this instance of the plugin
     requestOptions.path = generatePath(request)
-
+    
     // Check if there is an entry stored in the cache.
     let cachedResponse = null
     try {

@@ -155,6 +155,16 @@ export function initOriginConfigValidator(ajv) {
                         },
                         http1xOptions: { $ref: "#/definitions/requestOptions" },
                         agentOptions: { $ref: "#/definitions/agentOptions" },
+                        headersToForward: {
+                            type: "array",
+                            items: { type: "string" },
+                            default: []
+                        },
+                        headersToExclude: {
+                            type: "array",
+                            items: { type: "string" },
+                            default: []
+                        },
                         originTimeout: { type: "integer" },
                         originBreaker: { type: "boolean", default: false },
                         originBreakerOptions: { $ref: "#/definitions/circuitBreakerOptions" }
