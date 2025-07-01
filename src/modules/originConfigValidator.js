@@ -256,11 +256,12 @@ export function initOriginConfigValidator(ajv) {
                             items: {
                                 type: "object",
                                 minProperties: 1,
-                                maxProperties: 2,
+                                maxProperties: 3,
                                 required: ["urlPattern"],
                                 properties: {
                                     urlPattern: { type: "string" },
-                                    perUser: { type: "boolean", default: false }
+                                    perUser: { type: "boolean", default: false },
+                                    ttl: { type: "integer", default: -1 }
                                 }
                             }
                         },

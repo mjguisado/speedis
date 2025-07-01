@@ -129,6 +129,7 @@ The following table describes the supported fields in the cacheable configuratio
 |-----|----|---------|-------|-----------|
 |`urlPattern`|String|`true`||URL patterns that are considered cacheable.|
 |`perUser`|Boolean|`false`|`false`|Indicates whether the response for a given URL should be cached separately for each authenticated user.|
+|`ttl`|Number|`false`|`Infinity`|This parameter defines how long the response will be stored in the cache.|
 
 ### Lock configuration object
 The following table describes the supported fields in the lock configuration object.
