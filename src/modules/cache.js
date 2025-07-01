@@ -39,10 +39,12 @@ export function initCache(server, opts) {
     // separately for each user.
     server.decorateRequest('cacheable')
     server.decorateRequest('cacheable_per_user')
+    server.decorateRequest('cacheable_ttl')
+
     server.addHook('onRequest', async (request, reply) => {
         request.cacheable = false
         request.cacheable_per_user = false
-
+        request.cacheable_per_user = Infinity
         // Only the safe methods are cacheables
         // https://developer.mozilla.org/en-US/docs/Glossary/Safe/HTTP
         if (['GET', 'HEAD'].includes(request.method)) {
@@ -50,6 +52,7 @@ export function initCache(server, opts) {
                 if (cacheable.re.test(request.raw.url)) {
                     request.cacheable = true
                     request.cacheable_per_user = cacheable.perUser
+                    request.cacheable_ttl = cacheable.ttl
                     break
                 }
             }
@@ -583,8 +586,9 @@ export async function _get(server, opts, request) {
                 server.redisBreaker
                     ? await server.redisBreaker.fire('json.merge', [request.urlKey, '$', payload])
                     : await server.redis.json.merge(request.urlKey, '$', payload)
+                    
                 // Set the TTL for the cache entry           
-                if (!Number.isNaN(ttl) && ttl > 0) {
+                if (Number.isFinite(ttl) && ttl > 0) {
                     server.redisBreaker
                         ? await server.redisBreaker.fire('expire', [request.urlKey, ttl])
                         : await server.redis.expire(request.urlKey, ttl)
@@ -599,6 +603,7 @@ export async function _get(server, opts, request) {
     } else {
 
         if (writeCache) {
+            cacheEntry.ttl = request.cacheable_ttl
             // Apply transformations to the cache entry before storing it in the cache.
             if (opts.bff) bff.transform(opts, bff.CACHE_REQUEST, cacheEntry)
             const ttl = parseInt(cacheEntry.ttl)
@@ -606,8 +611,9 @@ export async function _get(server, opts, request) {
                 server.redisBreaker
                     ? await server.redisBreaker.fire('json.set', [request.urlKey, '$', cacheEntry])
                     : await server.redis.json.set(request.urlKey, '$', cacheEntry)
+
                 // Set the TTL for the cache entry           
-                if (!Number.isNaN(ttl) && ttl > 0) {
+                if (Number.isFinite(ttl) && ttl > 0) {
                     server.redisBreaker
                         ? await server.redisBreaker.fire('expire', [request.urlKey, ttl])
                         : await server.redis.expire(request.urlKey, ttl)

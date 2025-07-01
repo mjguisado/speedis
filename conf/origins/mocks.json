@@ -60,7 +60,8 @@
     "cache": {
         "cacheables": [
             {
-                "urlPattern": "/mocks/items/public-.*"
+                "urlPattern": "/mocks/items/public-.*",
+                "ttl": 20
             },
             {
                 "urlPattern": "/mocks/items/.*",
