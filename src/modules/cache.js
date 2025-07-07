@@ -44,7 +44,7 @@ export function initCache(server, opts) {
     server.addHook('onRequest', async (request, reply) => {
         request.cacheable = false
         request.cacheable_per_user = false
-        request.cacheable_per_user = Infinity
+        request.cacheable_ttl = Infinity
         // Only the safe methods are cacheables
         // https://developer.mozilla.org/en-US/docs/Glossary/Safe/HTTP
         if (['GET', 'HEAD'].includes(request.method)) {
