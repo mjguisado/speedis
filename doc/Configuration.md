@@ -1,6 +1,12 @@
 # Speedis main configuration
 The optional file ./conf/speedis.conf contains a JSON object with the general configuration of the Speedis server.
+In Speedis, each remote server is referred to as an `origin`.
+The behavior of Speedis for each origin is defined using a JSON configuration object.
+These configurations can be stored either as files in a folder or in a Redis database.
+During initialization, Speedis will load all available configurations.
+In the Speedis configuration, you must set either the `localOriginsConfigs` or `remoteOriginsConfigs` parameter.
 The following table describes the supported fields.
+
 |Field|Type|Mandatory|Default|Description|
 |-----|----|---------|-------|-----------|
 |`maxNumberOfWorkers`|Number|`false`|[os.availableParallelism()](https://nodejs.org/api/os.html#osavailableparallelism)|This parameters limits the number of workers.|
@@ -8,11 +14,18 @@ The following table describes the supported fields.
 |`logLevel`|String|`false`|`info`|Logging level for the main service (`trace`, `debug`, `info`, `warn`, `error`, `fatal`).|
 |`metricServerPort`|Number|`false`|3003|The port on which the metrics service is running.|
 |`metricServerLogLevel`|String|`false`|`info`|Logging level for the metric service (`trace`, `debug`, `info`, `warn`, `error`, `fatal`).|
+|`localOriginsConfigs`|String|`false`||Disk location of the origin configuration files. It can be either an absolute or a relative path. If a relative path is provided, Speedis will resolve it to an absolute path using the current working directory.|
+|`remoteOriginsConfigs`|[Object]|`false`||Redis database where the origin configuration objects are stored. Speedis connects to this database to retrieve the configurations during initialization.|
+
+## Remote Origin Configs object
+The following table describes the supported fields in the remote origin configs object.
+|Field|Type|Mandatory|Default|Description|
+|-----|----|---------|-------|-----------|
+|`redisOptions`|Object|`true`||Speedis uses [node-redis](https://github.com/redis/node-redis) to connect to the Redis database where the cached contents are stored. This object defines the connection details. Its format is almost identical to the [createClient configuration](https://github.com/redis/node-redis/blob/master/docs/client-configuration.md). The main difference is that, since the configuration is in JSON format, parameters defined as JavaScript entities in the original client configuration are not supported.|
+|`originsConfigsKeys`|[String]|`true`||List of Redis keys that store origin configurations.|
+
 
 # Origins configurations
-In Speedis, each remote server is referred to as an `origin`.
-The configuration of Speedis’ behavior for each origin is defined in a configuration file which contains a JSON object and is located in ./conf/origin/.
-During initialization, Speedis will load all configuration files located in that folder.
 The following table describes the supported fields.
 |Field|Type|Mandatory|Default|Description|
 |-----|----|---------|-------|-----------|

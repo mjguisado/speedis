@@ -1,4 +1,4 @@
-import { createClient, SchemaFieldTypes } from 'redis'
+import { createClient, SCHEMA_FIELD_TYPE } from 'redis'
 import { SESSION_INDEX_NAME, SESSION_PREFIX } from '../plugins/session.js'
 import CircuitBreaker from 'opossum'
 
@@ -28,9 +28,9 @@ export async function initRedis(server, opts) {
             await client.ft.create(
                 SESSION_INDEX_NAME,
                 {
-                    sub: SchemaFieldTypes.TAG,
+                    sub: SCHEMA_FIELD_TYPE.TAG,
                     iat: {
-                        type: SchemaFieldTypes.NUMERIC,
+                        type: SCHEMA_FIELD_TYPE.NUMERIC,
                         SORTABLE: true
                     }
                 },

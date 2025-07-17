@@ -30,25 +30,48 @@ const config = await
 
 const ajv = new Ajv({ useDefaults: true })
 
-const validateSpeedis = ajv.compile(
-    {
-        type: "object",
-        additionalProperties: false,
-        properties: {
-            maxNumberOfWorkers: { type: "number", default: os.availableParallelism() },
-            port: { type: "number", default: 3001 },
-            logLevel: {
-                enum: ["fatal", "error", "warn", "info", "debug", "trace"],
-                default: "info"
-            },
-            metricServerPort: { type: "number", default: 3003 },
-            metricServerLogLevel: {
-                enum: ["fatal", "error", "warn", "info", "debug", "trace"],
-                default: "info"
+const validateSpeedis = ajv.compile({
+    type: "object",
+    additionalProperties: false,
+    oneOf: [
+        {
+            required: ["localOriginsConfigs"],
+            not: { required: ["remoteOriginsConfigs"] }
+        },
+        {
+            required: ["remoteOriginsConfigs"],
+            not: { required: ["localOriginsConfigs"] }
+        }
+    ],
+    properties: {
+        maxNumberOfWorkers: { type: "number", default: os.availableParallelism() },
+        port: { type: "number", default: 3001 },
+        logLevel: {
+            enum: ["fatal", "error", "warn", "info", "debug", "trace"],
+            default: "info"
+        },
+        metricServerPort: { type: "number", default: 3003 },
+        metricServerLogLevel: {
+            enum: ["fatal", "error", "warn", "info", "debug", "trace"],
+            default: "info"
+        },
+        localOriginsConfigs: { type: "string" },
+        remoteOriginsConfigs: {
+            type: "object",
+            additionalProperties: false,
+            required: ["redisOptions", "originsConfigsKeys" ],
+            properties: {
+                redisOptions: {
+                    type: "object",
+                },
+                originsConfigsKeys: {
+                    type: "array",
+                    items: { type: "string" }
+                }
             }
         }
     }
-)
+})
 
 if (!validateSpeedis(config)) {
     console.error("Invalid configuration file:", configurationFilename)
@@ -112,9 +135,11 @@ if (cluster.isPrimary) {
 
     // See: https://fastify.dev/docs/latest/Guides/Testing/#separating-concerns-makes-testing-easy
 
-    const server = await app(
+    const server = await app (
         { logger: { level: config.logLevel } },
-        ajv
+        ajv,
+        config.localOriginsConfigs,
+        config.remoteOriginsConfigs
     )
 
     // Run the server!
