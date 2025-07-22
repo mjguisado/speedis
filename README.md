@@ -19,7 +19,7 @@ Implementing a shared HTTP cache provides benefits among which the following are
 ## Features.
 
 ### Fast and lightweight.
-Speedis is built on top of the [Fastify](https://fastify.dev/) web framework to ensure [high performance](https://fastify.dev/benchmarks/) and efficient request handling.
+Speedis is built on [Node.js](https://nodejs.org), using the [Fastify](https://fastify.dev/) web framework to ensure [high performance](https://fastify.dev/benchmarks/) and efficient request handling.
 This framework allows users to extend its functionality by implementing [plugins](https://fastify.dev/docs/latest/Reference/Plugins/).
 The core of Speedis is developed as a Fastify plugin.
 Speedis creates an instance of the plugin for each origin configuration file.
