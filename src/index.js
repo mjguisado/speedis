@@ -33,16 +33,6 @@ const ajv = new Ajv({ useDefaults: true })
 const validateSpeedis = ajv.compile({
     type: "object",
     additionalProperties: false,
-    oneOf: [
-        {
-            required: ["localOriginsConfigs"],
-            not: { required: ["remoteOriginsConfigs"] }
-        },
-        {
-            required: ["remoteOriginsConfigs"],
-            not: { required: ["localOriginsConfigs"] }
-        }
-    ],
     properties: {
         maxNumberOfWorkers: { type: "number", default: os.availableParallelism() },
         port: { type: "number", default: 3001 },
@@ -55,7 +45,7 @@ const validateSpeedis = ajv.compile({
             enum: ["fatal", "error", "warn", "info", "debug", "trace"],
             default: "info"
         },
-        localOriginsConfigs: { type: "string" },
+        localOriginsConfigs: { type: "string", nullable: true, default: null },
         remoteOriginsConfigs: {
             type: "object",
             additionalProperties: false,

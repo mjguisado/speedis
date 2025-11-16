@@ -6,11 +6,13 @@ req_extensions     = req_ext
 distinguished_name = dn
 
 [dn]
-CN = mocks.local
+CN = mocks.localhost
 
 [req_ext]
 subjectAltName = @alt_names
 
 [alt_names]
-DNS.1 = mocks.local
+DNS.1 = mocks.localhost
 DNS.2 = mocks
+DNS.3 = mocks2.localhost
+DNS.4 = mocks2

@@ -17,26 +17,6 @@ export async function app(
 
     // Load the origin's configuration.
     let originsConfigs = []  
-    if (localOriginsConfigs) {
-        const originsBasedir = (null === localOriginsConfigs)
-            ? path.join(process.cwd(), 'conf', 'origins')
-            : path.isAbsolute(localOriginsConfigs)
-                ? localOriginsConfigs
-                : path.resolve(localOriginsConfigs);
-        
-        server.log.debug("Origins configuration location:" + originsBasedir)
-        const originFiles = await fs.readdir(originsBasedir)
-        originFiles.forEach((originFile) => {
-            const originFilePath = path.join(originsBasedir, originFile)
-            originsConfigs.push(
-                fs.readFile(originFilePath, 'utf8')
-                    .then(jsonString => { return JSON.parse(jsonString) })
-                    .catch(error => {
-                        server.log.error(error, 'Error loading the origin configuration file ' + originFilePath)
-                    }))
-        })
-        originsConfigs = await Promise.all(originsConfigs)
-    } 
     if (remoteOriginsConfigs) {
         let configdb = null
         try {
@@ -62,7 +42,25 @@ export async function app(
             }
         }
         if (configdb) await configdb.close()
-    }
+    } else {
+        const originsBasedir = (null === localOriginsConfigs)
+            ? path.join(process.cwd(), 'conf', 'origins')
+            : path.isAbsolute(localOriginsConfigs)
+                ? localOriginsConfigs
+                : path.resolve(localOriginsConfigs);       
+        server.log.debug("Origins configuration location:" + originsBasedir)
+        const originFiles = await fs.readdir(originsBasedir)
+        originFiles.forEach((originFile) => {
+            const originFilePath = path.join(originsBasedir, originFile)
+            originsConfigs.push(
+                fs.readFile(originFilePath, 'utf8')
+                    .then(jsonString => { return JSON.parse(jsonString) })
+                    .catch(error => {
+                        server.log.error(error, 'Error loading the origin configuration file ' + originFilePath)
+                    }))
+        })
+        originsConfigs = await Promise.all(originsConfigs)
+    } 
 
     // For each valid origin, we register an instance of the plugin that manages it.
     const originConfigValidator = initOriginConfigValidator(ajv)

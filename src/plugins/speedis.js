@@ -48,7 +48,7 @@ export default async function (server, opts) {
 
             generateUrlKey(opts, request)
 
-            if (cache.isPurgeRequest(opts, request))
+            if (cache.isPurgeRequest(server, opts, request))
                 return cache.purge(server, opts, request, reply)
 
             let response = request.cacheable

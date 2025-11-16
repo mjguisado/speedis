@@ -22,7 +22,7 @@ export function initVariantsTracker(server, opts) {
     // https://fastify.dev/docs/latest/Reference/Reply/#senddata
     server.addHook('onSend', async (request, reply, payload) => {
 
-        if (isPurgeRequest(opts, request)
+        if (isPurgeRequest(server, opts, request)
             || (opts.oauth2 &&
                 request.raw.url.startsWith(path.join(opts.prefix, opts.oauth2.prefix)))
         ) return

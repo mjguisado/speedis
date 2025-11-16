@@ -6,11 +6,11 @@ import * as utils from '../utils/utils.js'
 import * as bff from './bff.js'
 import { errorHandler } from './error.js'
 
-let purgeUrlPrefix
-
 export function initCache(server, opts) {
 
-    purgeUrlPrefix = path.join(opts.prefix, opts.cache.purgePath)
+    let purgeUrlPrefix = path.join(opts.prefix, opts.cache.purgePath)
+    server.decorate('purgeUrlPrefix', purgeUrlPrefix)
+
 
     // When Local Requests Coalescing is enabled, this variable 
     // stores the promises associated with ongoing origin server requests.
@@ -72,10 +72,10 @@ export function initCache(server, opts) {
 }
 
 // This function checks whether the request corresponds to a cache purge operation.
-export function isPurgeRequest(opts, request) {
+export function isPurgeRequest(server, opts, request) {
     return opts.cache
         && request.method === "DELETE"
-        && request.raw.url.startsWith(purgeUrlPrefix)
+        && request.raw.url.startsWith(server.purgeUrlPrefix)
 }
 
 // See: https://developer.mozilla.org/en-US/docs/Web/HTTP/Resources_and_specifications
@@ -823,11 +823,13 @@ export async function purge(server, opts, request, reply) {
         if (cacheEviction.indexOf('*') > -1) {
             // See: https://github.com/redis/node-redis/blob/master/docs/scan-iterators.md
             // See: https://github.com/redis/node-redis/blob/master/docs/v4-to-v5.md#scan-iterators
-            for await (const entry of server.redis.scanIterator({
+            for await (const keys of server.redis.scanIterator({
                 MATCH: cacheEviction,
                 COUNT: 100
             })) {
-                result += await server.redis.unlink((entry))
+                if (Array.isArray(keys) && keys.length) {
+                    result += await server.redis.unlink(...keys); // multi-key
+                }
             }
         } else {
             result = await server.redis.unlink(cacheEviction)

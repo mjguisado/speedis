@@ -11,10 +11,10 @@ spec:
   ingressClassName: nginx
   tls:
   - hosts:
-      - mocks.local
+      - mocks.localhost
     secretName: mocks-tls-secret  
   rules:
-    - host: mocks.local
+    - host: mocks.localhost
       http:
         paths:
           - path: /(.*)

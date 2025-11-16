@@ -6,11 +6,11 @@ req_extensions     = req_ext
 distinguished_name = dn
 
 [dn]
-CN = mocks.local
+CN = keycloak.localhost
 
 [req_ext]
 subjectAltName = @alt_names
 
 [alt_names]
-DNS.1 = mocks.local
-DNS.2 = mocks
+DNS.1 = keycloak.localhost
+DNS.2 = keycloak
