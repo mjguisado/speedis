@@ -21,19 +21,19 @@
     },
     "homepage": "https://github.com/mjguisado/speedis#readme",
     "dependencies": {
-        "fastify": "^5.4.0",
+        "fastify": "^5.6.2",
         "fastify-raw-body": "^5.0.0",
-        "jose": "^6.0.12",
+        "jose": "^6.1.1",
         "jsonpath": "^1.1.1",
         "jwt-decode": "^4.0.0",
-        "openid-client": "^6.6.2",
+        "openid-client": "^6.8.1",
         "opossum": "^9.0.0",
         "prom-client": "^15.1.3",
-        "redis": "^5.6.0"
+        "redis": "^5.9.0"
     },
     "devDependencies": {
         "@fastify/caching": "^9.0.3",
-        "@fastify/etag": "^6.0.3",
-        "nodemon": "^3.1.10"
+        "@fastify/etag": "^6.1.0",
+        "nodemon": "^3.1.11"
     }
 }

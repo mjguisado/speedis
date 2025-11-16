@@ -1,0 +1,53 @@
+{
+    "id": "mocks2",
+    "prefix": "/mocks2",
+    "logLevel": "warn",
+    "exposeErrors": true,
+    "origin": {
+        "http2Options": {
+            "authority": "https://mocks2:3030",
+            "options": {
+                "rejectUnauthorized": false,
+                "timeout": 1000
+            }
+        },
+        "originTimeout": 1000,
+        "originBreaker": true,
+        "originBreakerOptions": {
+            "errorThresholdPercentage": 25,
+            "resetTimeout": 2000
+        }
+    },
+    "redis": {
+        "redisOptions": {
+            "url": "redis://redis:6379"
+        },
+        "redisTimeout": 500,
+        "redisBreaker": true,
+        "redisBreakerOptions": {
+            "errorThresholdPercentage": 25,
+            "resetTimeout": 5000
+        },
+        "disableOriginOnRedisOutage": true
+    },
+    "cache": {
+        "cacheables": [
+            {
+                "urlPattern": "/mocks/items/public-.*",
+                "ttl": 20
+            }
+        ],
+        "ignoredQueryParams": [
+            "cc",
+            "delay"
+        ],
+        "localRequestsCoalescing": true,
+        "distributedRequestsCoalescing": true,
+        "distributedRequestsCoalescingOptions": {
+            "lockTTL": 750,
+            "retryCount": 3,
+            "retryDelay": 500,
+            "retryJitter": 250
+        }
+    }
+}

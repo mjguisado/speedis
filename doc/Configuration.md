@@ -14,8 +14,18 @@ The following table describes the supported fields.
 |`logLevel`|String|`false`|`info`|Logging level for the main service (`trace`, `debug`, `info`, `warn`, `error`, `fatal`).|
 |`metricServerPort`|Number|`false`|3003|The port on which the metrics service is running.|
 |`metricServerLogLevel`|String|`false`|`info`|Logging level for the metric service (`trace`, `debug`, `info`, `warn`, `error`, `fatal`).|
-|`localOriginsConfigs`|String|`false`||Disk location of the origin configuration files. It can be either an absolute or a relative path. If a relative path is provided, Speedis will resolve it to an absolute path using the current working directory.|
+|`localOriginsConfigs`|String|`false`|`null`|Disk location of the origin configuration files. This setting is only used if the remoteOriginsConfigs configuration parameter is not defined. Its value can be `null`, an absolute path, or a relative path. If set to `null`, Speedis will use the conf/origin folder inside the current working directory. If a relative path is provided, Speedis will resolve it to an absolute path based on the current working directory.|
 |`remoteOriginsConfigs`|[Object]|`false`||Redis database where the origin configuration objects are stored. Speedis connects to this database to retrieve the configurations during initialization.|
+
+Below is an example of remoteOriginsConfigs.
+```json
+  "remoteOriginsConfigs":  {
+    "redisOptions": {
+      "url": "redis://redis:6379"
+    },
+    "originsConfigsKeys" : [ "origin:mocks" ]
+  }
+```
 
 ## Remote Origin Configs object
 The following table describes the supported fields in the remote origin configs object.

@@ -42,7 +42,7 @@ export function initMetrics(server, opts) {
     server.addHook('onRequest', async (request, reply) => {
         if (oauth2UrlPrefix && request.raw.url.startsWith(oauth2UrlPrefix)) {
             request.target = 'oauth2'
-        } else if (isPurgeRequest(opts, request)) {
+        } else if (isPurgeRequest(server, opts, request)) {
             request.target = 'purge'
         } else if (request.cacheable) {
             request.target = 'cache'

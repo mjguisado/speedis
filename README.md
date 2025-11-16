@@ -108,9 +108,9 @@ Depending on the domain through which a request is received, the request path se
 Additionally, this folder contains a script to generate a self-signed certificate for the domain used in the configuration.
 In the included example, the following workflow is defined
 
-https://mocks.local/v1/items?x=1&y=2 -> http://speedis:3001/mocks/v1/items?x=1&y=2 -> http://mocks:3030/v1/items?x=1&y=2
+https://mocks.localhost/v1/items?x=1&y=2 -> http://speedis:3001/mocks/v1/items?x=1&y=2 -> http://mocks:3030/v1/items?x=1&y=2
 
-Note: Proper DNS resolution is required for mocks.local, speedis, and mocks to function correctly.
+Note: Proper DNS resolution is required for mocks.localhost, speedis, and mocks to function correctly.
 
 ### OAuth2-based Access Control
 Speedis can be used as a backend for web or mobile applications. In modern applications, securing access to sensitive resources is crucial. Speedis relies on OAuth2 to provide limited access to the resources it caches. Specifically, Speedis uses the Authentication Code Flow, implementing the roles of Resource Server and Client. If you are not familiar with OAuth2, you can refer to a brief [introduction](./doc/OAuth2.md) focusing on the parts of the framework used in Speedis.
