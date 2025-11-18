@@ -827,8 +827,12 @@ export async function purge(server, opts, request, reply) {
                 MATCH: cacheEviction,
                 COUNT: 100
             })) {
+                // https://redis.io/docs/latest/develop/clients/nodejs/transpipe/#execute-a-pipeline
                 if (Array.isArray(keys) && keys.length) {
-                    result += await server.redis.unlink(...keys); // multi-key
+                    const unlinks = [];
+                    for (let key of keys) unlinks.push(server.redis.unlink(key))
+                    const batchResult = await Promise.all(unlinks)
+                    result += batchResult.reduce((acc, val) => acc + val, 0)
                 }
             }
         } else {
@@ -846,4 +850,5 @@ export async function purge(server, opts, request, reply) {
         server.log.error(error, msg)
         return errorHandler(reply, 500, msg, opts.exposeErrors, error)
     }
+    
 }

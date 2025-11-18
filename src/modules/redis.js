@@ -4,7 +4,7 @@ import CircuitBreaker from 'opossum'
 
 export async function initRedis(server, opts) {
 
-    let client = null;
+    let client = null
 
     // Connecting to Redis
     // See: https://redis.io/docs/latest/develop/clients/nodejs/produsage/#handling-reconnections
@@ -58,29 +58,70 @@ export async function initRedis(server, opts) {
      * @returns {object} - Proxy object that behaves just like the original Redis client, but with a timeout behavior added to each command.
      */
     function wrapRedisWithTimeout(client, timeout) {
+
         const handler = {
+        
             get(target, prop, receiver) {
+        
                 const original = target[prop]
-                // Module JSON is a special case, we need to wrap its methods
+        
+                // Module JSON is a special case, we need to wrap its methods               
                 if ('object' === typeof original && ('json' === prop || 'ft' === prop)) {
                     return wrapRedisWithTimeout(original, timeout)
                 }
+                
                 if (typeof original !== 'function') return original
+
+                // 1) Promise-like -> race with timeout
                 return (...args) => {
-                    const command = Promise.race([
-                        original.apply(target, args),
-                        new Promise((_, reject) =>
-                            setTimeout(() => reject(
-                                new Error(`Origin: ${opts.id}. Redis command ${prop} timed out after ${timeout} ms.`)
-                            ), timeout)
-                        )
-                    ])
-                    return command
+
+                    let result = original.apply(target, args)
+
+                    // 1) Promise-like -> race with timeout
+                    if (result && typeof result.then === 'function') {
+                        return Promise.race([
+                            original.apply(target, args),
+                            new Promise((_, reject) =>
+                                setTimeout(() => reject(
+                                    new Error(`Origin: ${opts.id}. Redis command ${prop} timed out after ${timeout} ms.`)
+                                ), timeout)
+                            )
+                        ])
+                    }
+
+                    // 2) Async iterable -> wrap next() with timeout
+                    if (result && typeof result === 'object' && typeof result[Symbol.asyncIterator] === 'function') {
+                        const it = result[Symbol.asyncIterator]()
+                        return {
+                            [Symbol.asyncIterator]() { return this },
+                            next(...args) {
+                                return Promise.race([
+                                    it.next(...args),
+                                    new Promise((_, reject) =>
+                                        setTimeout(() => reject(
+                                            new Error(`Origin: ${opts.id}. Redis iterator ${prop}.next() timed out after ${timeout} ms.`)
+                                        ), timeout)
+                                    )
+                                ])
+                            },                          
+                            return(...args) {
+                                return it.return ? it.return(...args) : Promise.resolve({ done: true, value: undefined })
+                            },
+                            throw(err) {
+                                return it.throw ? it.throw(err) : Promise.reject(err)
+                            }
+                        }
+                    }
+
+                    // 3) Others (synchronous / void)
+                    return result
+
                 }
             }
         }
         return new Proxy(client, handler)
     }
+
 
     /**
      * Executes a Redis command with support for both standard and RedisJSON operations.
