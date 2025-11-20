@@ -2,7 +2,6 @@ import fastify from 'fastify'
 import path from 'path'
 import fs from 'fs/promises'
 import speedisPlugin from './plugins/speedis.js'
-import { createClient } from 'redis'
 import Ajv from "ajv"
 import { initOriginConfigValidator } from './modules/originConfigValidator.js'
 
@@ -10,26 +9,23 @@ export async function app(
     opts = {}, 
     ajv = new Ajv({ useDefaults: true }),
     localOriginsConfigs,
-    remoteOriginsConfigs) {
+    configdb,
+    originsConfigsKeys) {
 
     // Register the Prometheus metrics.
     const server = fastify(opts)
 
     // Load the origin's configuration.
     let originsConfigs = []  
-    if (remoteOriginsConfigs) {
-        let configdb = null
+    if (configdb) {
+        let client = null
         try {
-            configdb = await createClient(remoteOriginsConfigs.redisOptions)
-            .on('error', error => {
-                server.log.error(error, `Remote origins configuration database connection lost.`)
-            })
-            .connect()
+            client = await configdb.connect()
             server.log.info(`Remote origins configuration database connection established.`)
         } catch (error) {           
-            throw new Error(`Unable to connect to the remote origins configuration database during startup.`, { cause: error })
+            throw new Error(`Unable to connect to the remote origins configuration database.`, { cause: error })
         }
-        for (const originKey of remoteOriginsConfigs.originsConfigsKeys) {
+        for (const originKey of originsConfigsKeys) {
             try {
                 const origin = await configdb.json.get(originKey)
                 if (origin) {
@@ -41,7 +37,7 @@ export async function app(
                 server.log.error(error, 'Error loading the origin configuration key ' + originKey)
             }
         }
-        if (configdb) await configdb.close()
+        if (client) await client.close()
     } else {
         const originsBasedir = (null === localOriginsConfigs)
             ? path.join(process.cwd(), 'conf', 'origins')

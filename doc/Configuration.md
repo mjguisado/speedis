@@ -1,11 +1,16 @@
 # Speedis main configuration
-The optional file ./conf/speedis.conf contains a JSON object with the general configuration of the Speedis server.
+
 In Speedis, each remote server is referred to as an `origin`.
 The behavior of Speedis for each origin is defined using a JSON configuration object.
-These configurations can be stored either as files in a folder or in a Redis database.
+This guide explains how to configure Speedis to load its main configuration and its per-origin configurations either from from local files or remotely from Redis.
 During initialization, Speedis will load all available configurations.
-In the Speedis configuration, you must set either the `localOriginsConfigs` or `remoteOriginsConfigs` parameter.
-The following table describes the supported fields.
+
+If the USE_REDIS_CONFIG environment variable is not set, Speedis tries to reads the main configuration from the local file ./conf/speedis.json.
+If the USE_REDIS_CONFIG environment variable is set (truthy) Speedis connects to Redis to fetch the main configuration from a JSON stored at SPEEDIS_CONFIG_KEY (default speedis:config:main).
+
+If no configuration is found anywhere, Speedis logs a warning and continues with built-in defaults.
+
+The following table describes the supported fields in the main configuration.
 
 |Field|Type|Mandatory|Default|Description|
 |-----|----|---------|-------|-----------|
@@ -14,29 +19,13 @@ The following table describes the supported fields.
 |`logLevel`|String|`false`|`info`|Logging level for the main service (`trace`, `debug`, `info`, `warn`, `error`, `fatal`).|
 |`metricServerPort`|Number|`false`|3003|The port on which the metrics service is running.|
 |`metricServerLogLevel`|String|`false`|`info`|Logging level for the metric service (`trace`, `debug`, `info`, `warn`, `error`, `fatal`).|
-|`localOriginsConfigs`|String|`false`|`null`|Disk location of the origin configuration files. This setting is only used if the remoteOriginsConfigs configuration parameter is not defined. Its value can be `null`, an absolute path, or a relative path. If set to `null`, Speedis will use the conf/origin folder inside the current working directory. If a relative path is provided, Speedis will resolve it to an absolute path based on the current working directory.|
-|`remoteOriginsConfigs`|[Object]|`false`||Redis database where the origin configuration objects are stored. Speedis connects to this database to retrieve the configurations during initialization.|
-
-Below is an example of remoteOriginsConfigs.
-```json
-  "remoteOriginsConfigs":  {
-    "redisOptions": {
-      "url": "redis://redis:6379"
-    },
-    "originsConfigsKeys" : [ "origin:mocks" ]
-  }
-```
-
-## Remote Origin Configs object
-The following table describes the supported fields in the remote origin configs object.
-|Field|Type|Mandatory|Default|Description|
-|-----|----|---------|-------|-----------|
-|`redisOptions`|Object|`true`||Speedis uses [node-redis](https://github.com/redis/node-redis) to connect to the Redis database where the cached contents are stored. This object defines the connection details. Its format is almost identical to the [createClient configuration](https://github.com/redis/node-redis/blob/master/docs/client-configuration.md). The main difference is that, since the configuration is in JSON format, parameters defined as JavaScript entities in the original client configuration are not supported.|
-|`originsConfigsKeys`|[String]|`true`||List of Redis keys that store origin configurations.|
-
+|`localOriginsConfigs`|String|`false`|`null`|Disk location of the origin configuration files. This setting is only used if the USE_REDIS_CONFIG environment variable is not defined. Its value can be `null`, an absolute path, or a relative path. If set to `null`, Speedis will use the conf/origin folder inside the current working directory. If a relative path is provided, Speedis will resolve it to an absolute path based on the current working directory.|
+|`originsConfigsKeys`|[String]|`true` if USE_REDIS_CONFIG|[]|List of Redis keys that store origin configurations.|
 
 # Origins configurations
+
 The following table describes the supported fields.
+
 |Field|Type|Mandatory|Default|Description|
 |-----|----|---------|-------|-----------|
 |`id`|String|`true`||Origin’s ID|

@@ -7,29 +7,84 @@ import { app } from './app.js'
 import { register, collectDefaultMetrics, AggregatorRegistry } from 'prom-client'
 import Ajv from "ajv"
 import { open } from 'inspector';
+import { createClient } from 'redis';
 
-// Load the origin's configuration.
-const configurationFilename = path.join(process.cwd(), 'conf', 'speedis.json')
-const config = await
-    fs.stat(configurationFilename)
-        .then(() => {
-            return fs.readFile(configurationFilename, 'utf8')
-        })
-        .then((data) => {
-            return JSON.parse(data)
-        })
-        .catch(err => {
-            if (err.code === 'ENOENT') {
-                console.warn('Configuration file not found:', configurationFilename)
-                return {}
-            } else {
-                console.log(err, 'Error loading the configuration file ' + configurationFilename)
-                process.exit(1)
+/*
+Speedis also uses Redis as both a cache and as a background job queue via node-resque.
+You can customize how this are used via your environment variables.
+
+REDIS_URL="redis://localhost:6379/0"
+
+The full set of options you can provide to REDIS_URL is: REDIS_URL="redis://{user}:{password}@{host}:{port}/{database}".
+Note that you cannot use an @ or : in your username or password when using REDIS_URL.
+Alternatively to REDIS_URL, you can set the following environment variables directly: REDIS_HOST, REDIS_PORT, REDIS_DB, and REDIS_USER, REDIS_PASS which do allow all special characters.
+To use an in-memory redis, set REDIS_URL="redis://mock".
+*/
+
+let config = {}
+let configdb = null
+
+if (process.env.USE_REDIS_CONFIG) {
+    console.info('Loading the Speedis configuration from Redis')
+    try {
+        if (process.env.REDIS_URL) {
+            configdb = createClient({ url: process.env.REDIS_URL })
+        } else {
+            const socket = {
+                host: process.env.REDIS_HOST || '127.0.0.1',
+                port: process.env.REDIS_PORT ? parseInt(process.env.REDIS_PORT) : 6379
             }
+            const opts = { socket }
+            if (process.env.REDIS_USER) opts.username = process.env.REDIS_USER
+            if (process.env.REDIS_PASS) opts.password = process.env.REDIS_PASS
+            if (process.env.REDIS_DB) opts.database = parseInt(process.env.REDIS_DB)
+            configdb = createClient(opts)
+        }
+        configdb.on('error', error => {
+            console.error('Speedis configuration database connection lost.', error.message)
         })
+        await configdb.connect()
+        console.info(`Successfully connected to Redis to fetch the Speedis configuration.`)
+    } catch (error) {
+        console.error('Unable to connect to Redis to fetch the Speedis configuration.', error.message)
+    }
+
+    try {
+        const speedisConfigKey = process.env.SPEEDIS_CONFIG_KEY || 'speedis:config:main'
+        config = await configdb.json.get(speedisConfigKey)
+        if (!config) {
+            config = {}
+            console.warn('Speedis configuration key not found: ' + speedisConfigKey)
+        }
+    } catch (error) {
+        console.error('Error loading Speedis configuration from Redis:', error.message)
+    } finally {
+        try {
+            if (configdb) await configdb.close()
+        } catch (_) {}
+    }
+
+} else {
+    const configurationFilename = path.join(process.cwd(), 'conf', 'speedis.json')
+    console.info('Loading the Speedis configuration file: ' + configurationFilename)
+    try {
+        await fs.stat(configurationFilename)
+        const data = await fs.readFile(configurationFilename, 'utf8')
+        config = JSON.parse(data)
+    } catch (error) {
+        if (error.code === 'ENOENT') {
+            console.warn('Speedis configuration file not found: ', configurationFilename)
+        } else {
+            console.error('Error loading the Speedis configuration file: ' + configurationFilename, error.message)
+        }
+    }
+}
+
+if (Object.keys(config).length === 0) {
+    console.warn('Using default Speedis configuration.')
+}
 
 const ajv = new Ajv({ useDefaults: true })
-
 const validateSpeedis = ajv.compile({
     type: "object",
     additionalProperties: false,
@@ -45,20 +100,11 @@ const validateSpeedis = ajv.compile({
             enum: ["fatal", "error", "warn", "info", "debug", "trace"],
             default: "info"
         },
-        localOriginsConfigs: { type: "string", nullable: true, default: null },
-        remoteOriginsConfigs: {
-            type: "object",
-            additionalProperties: false,
-            required: ["redisOptions", "originsConfigsKeys" ],
-            properties: {
-                redisOptions: {
-                    type: "object",
-                },
-                originsConfigsKeys: {
-                    type: "array",
-                    items: { type: "string" }
-                }
-            }
+        localOriginsConfigs:  { type: "string", nullable: true, default: null },
+        originsConfigsKeys: {
+            type: "array",
+            items: { type: "string" },
+            default: []
         }
     }
 })
@@ -124,12 +170,12 @@ if (cluster.isPrimary) {
     }
 
     // See: https://fastify.dev/docs/latest/Guides/Testing/#separating-concerns-makes-testing-easy
-
     const server = await app (
         { logger: { level: config.logLevel } },
         ajv,
         config.localOriginsConfigs,
-        config.remoteOriginsConfigs
+        configdb,
+        config.originsConfigsKeys
     )
 
     // Run the server!
