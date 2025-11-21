@@ -50,8 +50,8 @@ helm install haproxy-kubernetes-ingress haproxytech/kubernetes-ingress --create-
 ```
 7. Deploy the Ingress to access Speedis:
 ```sh
-kubectl create secret tls mocks-tls-secret --cert=../3rparties/haproxy/certs/mocks.localhost.pem --key=../3rparties/haproxy/certs/mocks.localhost.pem --namespace=speedis --dry-run=client -o yaml | kubectl apply -f -
-kubectl apply -f ./3rparties/haproxy-ingress.yaml
+kubectl create secret tls mocks-tls-secret --cert=../3rparties/haproxy/certs/mocks.pem --key=../3rparties/haproxy/certs/mocks.pem --namespace=speedis --dry-run=client -o yaml | kubectl apply -f -
+kubectl apply -f ./haproxy-ingress.yaml
 ```
 After executing the previous steps, you can retrieve the details of the new service that has been created:
 ```sh
@@ -78,5 +78,5 @@ To test the deployment, you can use the examples of request found in [./Requests
 
 **HTTP Request to Speedis via HAProxy**
 ```sh
-curl -vkXGET -H 'Host: mocks.localhost' 'https://127.0.0.1:51785/mocks/items/RealBetis?delay=300&cc=public,max-age=10&a=alfa&b=beta&c='
+curl -vkXGET -H 'Host: mocks.localhost' 'https://127.0.0.1:51785/mocks/items/public-real-betis?delay=300&cc=public,max-age=10'
 ```
