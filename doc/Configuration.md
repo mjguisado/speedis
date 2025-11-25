@@ -16,7 +16,7 @@ The following table describes the supported fields in the main configuration.
 |-----|----|---------|-------|-----------|
 |`maxNumberOfWorkers`|Number|`false`|[os.availableParallelism()](https://nodejs.org/api/os.html#osavailableparallelism)|This parameters limits the number of workers.|
 |`port`|Number|`false`|3001|The port on which the main service is running.|
-|`logLevel`|String|`false`|`info`|Logging level for the main service (`trace`, `debug`, `info`, `warn`, `error`, `fatal`).|
+|`fastify`|Object|`false`||Options object which is used to customize the Fastify server instance. Its format is described in this [url](https://fastify.dev/docs/latest/Reference/Server/)|
 |`metricServerPort`|Number|`false`|3003|The port on which the metrics service is running.|
 |`metricServerLogLevel`|String|`false`|`info`|Logging level for the metric service (`trace`, `debug`, `info`, `warn`, `error`, `fatal`).|
 |`localOriginsConfigs`|String|`false`|`null`|Disk location of the origin configuration files. This setting is only used if the USE_REDIS_CONFIG environment variable is not defined. Its value can be `null`, an absolute path, or a relative path. If set to `null`, Speedis will use the conf/origin folder inside the current working directory. If a relative path is provided, Speedis will resolve it to an absolute path based on the current working directory.|

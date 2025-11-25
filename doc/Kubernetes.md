@@ -39,6 +39,7 @@ kubectl apply -f ./mocks-service.yaml
 ```sh
 kubectl create configmap speedis-config  --from-file=../conf/speedis.json --namespace=speedis --dry-run=client -o yaml | kubectl apply -f -
 kubectl create configmap speedis-origins --from-file=../conf/origins --namespace=speedis --dry-run=client -o yaml | kubectl apply -f -
+kubectl create configmap speedis-certs --from-file=../conf/certs --namespace=speedis --dry-run=client -o yaml | kubectl apply -f -
 kubectl apply -f ./speedis-deployment.yaml
 kubectl apply -f ./speedis-service.yaml
 ```

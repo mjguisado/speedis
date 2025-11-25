@@ -30,6 +30,8 @@ spec:
           subPath: speedis.json
         - name: speedis-origins
           mountPath: /usr/src/app/conf/origins
+        - name: speedis-certs
+          mountPath: /usr/src/app/conf/certs
       volumes:
       - name: speedis-config
         configMap:
@@ -37,3 +39,6 @@ spec:
       - name: speedis-origins
         configMap:
           name: speedis-origins
+      - name: speedis-certs
+        configMap:
+          name: speedis-certs

@@ -24,6 +24,9 @@ To use an in-memory redis, set REDIS_URL="redis://mock".
 let config = {}
 let configdb = null
 
+const configurationFilename = path.join(process.cwd(), 'conf', 'speedis.json')
+const speedisConfigKey = process.env.SPEEDIS_CONFIG_KEY || 'speedis:config:main'
+
 if (process.env.USE_REDIS_CONFIG) {
     console.info('Loading the Speedis configuration from Redis')
     try {
@@ -50,7 +53,6 @@ if (process.env.USE_REDIS_CONFIG) {
     }
 
     try {
-        const speedisConfigKey = process.env.SPEEDIS_CONFIG_KEY || 'speedis:config:main'
         config = await configdb.json.get(speedisConfigKey)
         if (!config) {
             config = {}
@@ -65,7 +67,6 @@ if (process.env.USE_REDIS_CONFIG) {
     }
 
 } else {
-    const configurationFilename = path.join(process.cwd(), 'conf', 'speedis.json')
     console.info('Loading the Speedis configuration file: ' + configurationFilename)
     try {
         await fs.stat(configurationFilename)
@@ -88,13 +89,65 @@ const ajv = new Ajv({ useDefaults: true })
 const validateSpeedis = ajv.compile({
     type: "object",
     additionalProperties: false,
+    definitions: {
+        // https://fastify.dev/docs/latest/Reference/Server/#factory      
+        fastifyOptions: {
+            type: "object",
+            additionalProperties: true,
+            properties: {
+                http:  { type: "object", nullable: true, default: null },
+                http2: { type: "boolean", default: false },
+                https: { type: "object", nullable: true, default: null},
+                connectionTimeout: { type: "integer", default: 0 },
+                keepAliveTimeout: { type: "integer", default: 72000 },
+                // forceCloseConnections: {},
+                maxRequestsPerSocket: { type: "integer", default: 0 },
+                requestTimeout: { type: "integer", default: 0 },
+                bodyLimit: { type: "integer", default: 1048576 },
+                onProtoPoisoning: { enum: ["error", "remove", "ignore"], default: "error" },
+                onConstructorPoisoning: { enum: ["error", "remove", "ignore"], default: "error" },
+                // logger: {},
+                // loggerInstance: {
+                // serverFactory: {},
+                requestIdHeader: { type: "boolean", default: false },
+                requestIdLogLabel: { type: "string", default: "reqId" },               
+                // genReqId: {},
+                // trustProxy: { default: false },
+                pluginTimeout: { type: "integer", default: 10000 },
+                // querystringParser: {},
+                exposeHeadRoutes: { type: "boolean", default: true },
+                return503OnClosing: { type: "boolean", default: true },
+                ajv: { type: "object" },
+                serializerOpts: { type: "object" },
+                http2SessionTimeout: { type: "integer", default: 72000 },
+                // frameworkErrors: {},
+                // clientErrorHandler: {},
+                // rewriteUrl: {},
+                allowErrorHandlerOverride: { type: "boolean", default: false },
+                routerOptions: {
+                    type: "object",
+                    additionalProperties: true,
+                    properties: {
+                        allowUnsafeRegex: { type: "boolean", default: false },
+                        buildPrettyMeta: { type: "object" },
+                        caseSensitive: { type: "boolean", default: true },
+                        constraints: { type: "object" },
+                        // defaultRoute: {},
+                        ignoreDuplicateSlashes: { type: "boolean", default: false },
+                        ignoreTrailingSlash: { type: "boolean", default: false },
+                        maxParamLength: { type: "integer", default: 100 },
+                        // onBadUrl: {},
+                        // querystringParser: {},
+                        useSemicolonDelimiter: { type: "boolean", default: false }
+                    }
+                }
+            }
+        }
+    },
     properties: {
         maxNumberOfWorkers: { type: "number", default: os.availableParallelism() },
+        fastify: { $ref: "#/definitions/fastifyOptions" },
         port: { type: "number", default: 3001 },
-        logLevel: {
-            enum: ["fatal", "error", "warn", "info", "debug", "trace"],
-            default: "info"
-        },
         metricServerPort: { type: "number", default: 3003 },
         metricServerLogLevel: {
             enum: ["fatal", "error", "warn", "info", "debug", "trace"],
@@ -110,7 +163,11 @@ const validateSpeedis = ajv.compile({
 })
 
 if (!validateSpeedis(config)) {
-    console.error("Invalid configuration file:", configurationFilename)
+    if (process.env.USE_REDIS_CONFIG) {
+        console.error("Invalid configuration. Key: ", speedisConfigKey)
+    } else {
+        console.error("Invalid configuration file:", configurationFilename)
+    }
     console.error(validateSpeedis.errors)
     process.exit(1)
 }
@@ -171,7 +228,7 @@ if (cluster.isPrimary) {
 
     // See: https://fastify.dev/docs/latest/Guides/Testing/#separating-concerns-makes-testing-easy
     const server = await app (
-        { logger: { level: config.logLevel } },
+        config.fastify,
         ajv,
         config.localOriginsConfigs,
         configdb,

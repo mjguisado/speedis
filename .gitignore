@@ -6,3 +6,5 @@ mocks/certs/*
 3rparties/haproxy/certs/*.pem
 3rparties/keycloak/certs/*.crt
 3rparties/keycloak/certs/*.key
+conf/certs/*.crt
+conf/certs/*.key

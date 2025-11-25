@@ -12,3 +12,4 @@ node_modules
 conf
 !conf/speedis.json
 !conf/origins
+!conf/certs

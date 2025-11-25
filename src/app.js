@@ -6,7 +6,7 @@ import Ajv from "ajv"
 import { initOriginConfigValidator } from './modules/originConfigValidator.js'
 
 export async function app(
-    opts = {}, 
+    opts,
     ajv = new Ajv({ useDefaults: true }),
     localOriginsConfigs,
     configdb,
@@ -46,7 +46,7 @@ export async function app(
                 : path.resolve(localOriginsConfigs);       
         server.log.debug("Origins configuration location:" + originsBasedir)
         const originFiles = await fs.readdir(originsBasedir)
-        originFiles.forEach((originFile) => {
+        originFiles.filter(file => file.endsWith('.json')).forEach((originFile) => {
             const originFilePath = path.join(originsBasedir, originFile)
             originsConfigs.push(
                 fs.readFile(originFilePath, 'utf8')
