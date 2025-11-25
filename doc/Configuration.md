@@ -22,6 +22,35 @@ The following table describes the supported fields in the main configuration.
 |`localOriginsConfigs`|String|`false`|`null`|Disk location of the origin configuration files. This setting is only used if the USE_REDIS_CONFIG environment variable is not defined. Its value can be `null`, an absolute path, or a relative path. If set to `null`, Speedis will use the conf/origin folder inside the current working directory. If a relative path is provided, Speedis will resolve it to an absolute path based on the current working directory.|
 |`originsConfigsKeys`|[String]|`true` if USE_REDIS_CONFIG|[]|List of Redis keys that store origin configurations.|
 
+To enable HTTP2 support for Speedis, the setup would look something like this:
+
+```json
+  "fastify": {
+      "http2": true,
+      "https": {
+        "allowHTTP1": true,
+        "key":  "-----BEGIN PRIVATE KEY-----\nMIIE ... 74A==\n-----END PRIVATE KEY-----\n",
+        "cert": "-----BEGIN CERTIFICATE-----\nMIID ... 5jo\n-----END CERTIFICATE-----\n"
+      }
+  },
+```
+
+The contents of the self-signed certificates for Speedis can be generated using the following command.
+```sh
+./conf/generate_self_signed_cert.sh
+```
+
+You can then generate the fastify.https.key and fastify.https.cert attributes with the command:
+```sh
+./conf/dump_self_signed_cert.sh
+```
+
+Here’s an example of an HTTP2 request:
+```sh
+curl -kv -http2 --resolve speedis.localhost:3001:127.0.0.1 'https://speedis.localhost:3001/mocks/mocks/items/public-real-betis?delay=300&cc=public,max-age=10' 
+```
+
+
 # Origins configurations
 
 The following table describes the supported fields.
