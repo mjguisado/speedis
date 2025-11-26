@@ -15,27 +15,33 @@ cd speedis
 Some Speedis components require or support HTTPS traffic, which requires generating SSL certificates.
 You can generate all the necessary self-signed certificates with a single command.
 ```sh
-./generate_self_signed_cert.sh
+./generate_self_signed_certs.sh
 ```
 or create them individually if needed.
+### Mocks Server
+The mock server can run over HTTP/2 when started with the environment variable MOCKS_HTTP2=true.
+In practice, HTTP/2 is effectively tied to HTTPS, since browsers only support HTTP/2 over secure connections.
+The supported domains are mocks, mocks.localhost, mocks2 & mocks2.localhost
+```sh
+./mocks/generate_self_signed_cert.sh
+```
+### Speedis
+The speedis server can run over HTTPS & HTTP/2.
+In practice, HTTP/2 is effectively tied to HTTPS, since browsers only support HTTP/2 over secure connections.
+The supported domains are speedis and speedis.localhost.
+```sh
+./docs/generate_self_signed_cert.sh
+```
+### HAProxy
+The supported domains are: speedis, speedis.localhost, mocks, mocks.localhost, mocks2 & mocks2.localhost
+```sh
+./3rparties/haproxy/generate_self_signed_cert.sh
+```
 ### Keycloak
 Keycloak requires TLS. 
 The supported domains are keycloak & keycloak.localhost.
 ```sh
 ./3rparties/keycloak/generate_self_signed_cert.sh
-```
-### HAProxy
-Generate self-signed certificate to test HAProxy TLS termination.
-The supported domains are mocks and mocks.localhost.
-```sh
-./3rparties/haproxy/generate_self_signed_cert.sh
-```
-### Mocks Server
-The mock server can run over HTTP/2 when started with the environment variable MOCKS_HTTP2=true, as it relies on SSL for secure communication.
-You can generate a self-signed certificate using the following command.
-The supported domains are mocks and mocks.localhost.
-```sh
-./mocks/generate_self_signed_cert.sh
 ```
 ## **Start the environment**  
 Run the following command to start all services:  

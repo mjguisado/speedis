@@ -11,10 +11,10 @@ if (process.env.MOCKS_HTTP2 === 'true') {
         logger: { level: 'warn' },
         http2: true,
         https: {
+            allowHTTP1: true,
             key: fs.readFileSync('./certs/mocks.key'),
-            cert: fs.readFileSync('./certs/mocks.crt'),
-        },
-        allowHTTP1: true
+            cert: fs.readFileSync('./certs/mocks.crt')
+        }
     }
 }
 
