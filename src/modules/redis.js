@@ -8,7 +8,12 @@ export async function initRedis(server, opts) {
 
     // Connecting to Redis
     // See: https://redis.io/docs/latest/develop/clients/nodejs/produsage/#handling-reconnections
-    client = createClient(opts.redis.redisOptions)
+    // See: https://github.com/redis/node-redis/blob/master/docs/v5.md#unstable-commands
+    client = createClient({
+        ...opts.redis.redisOptions,
+        RESP: 3,
+        unstableResp3: true
+    })
     client.on('error', error => {
         server.log.error(error, `Origin: ${opts.id}. Redis connection lost.`)
     })
@@ -24,14 +29,15 @@ export async function initRedis(server, opts) {
         // which is why it is created using the Redis client before setting 
         // the per-operation timeouts.
         try {
-            // Documentation: https://redis.io/commands/ft.create/
-            await client.ft.create(
-                SESSION_INDEX_NAME,
+            // https://redis.io/docs/latest/develop/clients/nodejs/queryjson/#add-the-index
+            await client.ft.create( SESSION_INDEX_NAME,
                 {
-                    sub: SCHEMA_FIELD_TYPE.TAG,
-                    iat: {
+                    'sub': {
+                        type: SCHEMA_FIELD_TYPE.TAG,
+                    },
+                    'iat': {
                         type: SCHEMA_FIELD_TYPE.NUMERIC,
-                        SORTABLE: true
+                        SORTABLE: true,
                     }
                 },
                 {
@@ -59,28 +65,34 @@ export async function initRedis(server, opts) {
      */
     function wrapRedisWithTimeout(client, timeout) {
 
-        const handler = {
-        
+        return new Proxy(client, {
+
             get(target, prop, receiver) {
-        
-                const original = target[prop]
-        
-                // Module JSON is a special case, we need to wrap its methods               
-                if ('object' === typeof original && ('json' === prop || 'ft' === prop)) {
-                    return wrapRedisWithTimeout(original, timeout)
-                }
+
+                // Always retrieve the real value from the target while respecting Proxy invariants.
+                const original = Reflect.get(target, prop, receiver)
+
+                // If the property is a non-configurable and non-writable data property,
+                // the Proxy MUST return the exact original value or it will break invariants.
+                // For example: json or ft modules
+                const desc = Object.getOwnPropertyDescriptor(target, prop)
+                if (desc && !desc.configurable && !desc.writable && 'value' in desc) {
+                    return original 
+                }                 
                 
+                // If it's not a function, just return the property as-is.
                 if (typeof original !== 'function') return original
 
-                // 1) Promise-like -> race with timeout
+                // Wrap function calls to add timeout behavior.
                 return (...args) => {
 
+                    // Execute the actual Redis command.
                     let result = original.apply(target, args)
 
-                    // 1) Promise-like -> race with timeout
+                    // Case 1: The Redis command returns a Promise → wrap in Promise.race() for timeout.
                     if (result && typeof result.then === 'function') {
                         return Promise.race([
-                            original.apply(target, args),
+                            result,
                             new Promise((_, reject) =>
                                 setTimeout(() => reject(
                                     new Error(`Origin: ${opts.id}. Redis command ${prop} timed out after ${timeout} ms.`)
@@ -89,7 +101,8 @@ export async function initRedis(server, opts) {
                         ])
                     }
 
-                    // 2) Async iterable -> wrap next() with timeout
+                    // Case 2: The Redis command returns an async iterator (e.g., SCAN).
+                    // We wrap the iterator's next() method with a timeout as well.
                     if (result && typeof result === 'object' && typeof result[Symbol.asyncIterator] === 'function') {
                         const it = result[Symbol.asyncIterator]()
                         return {
@@ -113,15 +126,14 @@ export async function initRedis(server, opts) {
                         }
                     }
 
-                    // 3) Others (synchronous / void)
+                    // Case 3: Non-promise, non-iterator result → simply return it.
                     return result
 
                 }
             }
-        }
-        return new Proxy(client, handler)
+        })
+        
     }
-
 
     /**
      * Executes a Redis command with support for both standard and RedisJSON operations.

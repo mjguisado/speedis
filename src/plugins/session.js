@@ -172,39 +172,37 @@ export default async function (server, opts) {
             const sessions = server.redisBreaker
                 ? await server.redisBreaker.fire('ft.search', [
                     SESSION_INDEX_NAME,
-                    `@sub:{${sub}}`,
+                    `@sub:{\"${sub}\"}`,
                     {
-                        SORTBY: {
-                            BY: 'iat',
-                            DIRECTION: 'DESC' // or 'ASC (default if DIRECTION is not present)
-                        }
+                        SORTBY: { BY: 'iat', DIRECTION: 'DESC'},
+                        RETURN: ['id'],
+                        DIALECT: 2
                     }
                 ])
                 : await server.redis.ft.search(
                     SESSION_INDEX_NAME,
                     `@sub:{\"${sub}\"}`,
                     {
-                        SORTBY: {
-                            BY: 'iat',
-                            DIRECTION: 'DESC' // or 'ASC (default if DIRECTION is not present)
-                        },
+                        SORTBY: { BY: 'iat', DIRECTION: 'DESC'},
+                        RETURN: ['id'],
                         DIALECT: 2
                     }
                 )
-            if (sessions.total > 0) {
+
+            if (sessions.total_results > 0) {
                 const sessionsToInvalidate = []
-                for (const session of sessions.documents) {
+                for (const session of sessions.results) {
                     sessionsToInvalidate.push(
-                        invalidateSession(session.id, session.value)
+                        invalidateSession(session.id)
                     )
                 }
                 const invalidations = await Promise.allSettled(sessionsToInvalidate)
                 invalidations.forEach((invalidation, i) => {
                     if (invalidation.status === 'rejected') {
-                        server.log.warn(`Failed to invalidate session ${sessions.documents[i].id.replace(SESSION_PREFIX, '')}:`, invalidation.reason)
+                        server.log.warn(invalidation.reason, `Failed to invalidate session ${sessions.results[i].id.replace(SESSION_PREFIX, '')}`)
                     }
                 })
-                reply.code(204).headers({ date: now }).send()
+                return reply.code(204).headers({ date: now }).send()
             } else {
                 return reply.code(404).headers({ date: now }).send()
             }
@@ -220,13 +218,11 @@ export default async function (server, opts) {
         }
     })
 
-    async function invalidateSession(sessionKey, tokens) {
+    async function invalidateSession(sessionKey) {
 
-        if (!tokens) {
-            tokens = server.redisBreaker
-                ? await server.redisBreaker.fire('hGetAll', [sessionKey])
-                : await server.redis.hGetAll(sessionKey)
-        }
+        const tokens = server.redisBreaker
+            ? await server.redisBreaker.fire('hGetAll', [sessionKey])
+            : await server.redis.hGetAll(sessionKey)
         if (Object.keys(tokens).length > 0) {
             await openidClient.tokenRevocation(
                 server.authServerConfiguration,

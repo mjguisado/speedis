@@ -24,7 +24,7 @@
             "url": "redis://redis:6379"
         },
         "redisTimeout": 500,
-        "redisBreaker": true,
+        "redisBreaker": false,
         "redisBreakerOptions": {
             "errorThresholdPercentage": 25,
             "resetTimeout": 5000
@@ -100,12 +100,13 @@
         "baseUrl": "https://mocks.localhost",
         "clientId": "speedis-client",
         "clientSecret": "MqSjdYcZPkoamoTZi8viqzmpGdxp3pOw",
-        "discoverySupported": false,
+        "discoverySupported": true,
         "authorizationServerMetadataLocation": "https://keycloak:8443/realms/speedis/.well-known/oauth-authorization-server",
         "authorizationServerMetadata": {
             "issuer": "https://keycloak.localhost:8443/realms/speedis",
             "authorization_endpoint": "https://keycloak.localhost:8443/realms/speedis/protocol/openid-connect/auth",
             "token_endpoint": "https://keycloak:8443/realms/speedis/protocol/openid-connect/token",
+            "revocation_endpoint": "https://keycloak:8443/realms/speedis/protocol/openid-connect/revoke",
             "jwks_uri": "https://keycloak:8443/realms/speedis/protocol/openid-connect/certs",
             "end_session_endpoint" : "https://keycloak.localhost:8443/realms/speedis/protocol/openid-connect/logout"
         },
