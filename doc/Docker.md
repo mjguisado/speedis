@@ -96,7 +96,7 @@ docker compose up redis -d
 ```
 Load the origin configurations
 ```sh
-./conf/loadRemoteOriginsConfigs.sh
+./conf/loadConfigsToRedis.sh
 ```
 Start the rest of the service including Speedis
 ```sh

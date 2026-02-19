@@ -273,10 +273,11 @@ function _fetchHttp1x(originOptions, requestOptions, body) {
 
         const request = (requestOptions.protocol === 'https:' ? https : http)
             .request(requestOptions, (res) => {
-                let rawData = ''
-                res.on('data', chunk => { rawData += chunk })
+                const chunks = []
+                res.on('data', chunk => chunks.push(chunk))
                 res.on('end', () => {
                     if (timeoutId) clearTimeout(timeoutId)
+                    const rawData = Buffer.concat(chunks).toString()
                     resolve({ statusCode: res.statusCode, headers: res.headers, body: rawData })
                 })
             })
