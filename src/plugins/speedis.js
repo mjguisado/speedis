@@ -4,7 +4,7 @@ import * as bff from '../modules/bff.js'
 import * as cache from '../modules/cache.js'
 import * as utils from '../utils/utils.js'
 import sessionPlugin from './session.js'
-import { initOrigin, generateUrlKey, proxy } from '../modules/origin.js'
+import { initOrigin, generateUrlKey, proxy, generatePath } from '../modules/origin.js'
 import { initRedis } from '../modules/redis.js'
 import { initOAuth2 } from '../modules/oauth2.js'
 import { initVariantsTracker } from '../modules/variantTracker.js'
@@ -44,7 +44,10 @@ export default async function (server, opts) {
 
         try {
 
-            if (opts.bff) bff.transform(opts, bff.CLIENT_REQUEST, request)
+            if (opts.bff) {
+                request.path = generatePath(request)
+                bff.transform(opts, bff.CLIENT_REQUEST, request)
+            }
 
             generateUrlKey(opts, request)
 
