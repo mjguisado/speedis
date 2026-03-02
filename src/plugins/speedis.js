@@ -16,11 +16,6 @@ export default async function (server, opts) {
     // This parameter determines whether descriptive error 
     // messages are included in the response body
     server.decorate('exposeErrors', opts.exposeErrors)
-    /*
-    const remoteBaseUrl = opts.origin.http2Options
-        ? opts.origin.http2Options.authority
-        : `${opts.origin.http1xOptions.protocol}//${opts.origin.http1xOptions.host}:${opts.origin.http1xOptions.port}`
-    */
    
     // Module init
     await initOrigin(server, opts)
