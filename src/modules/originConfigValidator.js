@@ -158,7 +158,7 @@ export function initOriginConfigValidator(ajv) {
                         headersToForward: {
                             type: "array",
                             items: { type: "string" },
-                            default: []
+                            default: ["*"]
                         },
                         headersToExclude: {
                             type: "array",

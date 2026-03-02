@@ -218,6 +218,9 @@ export async function proxy(server, opts, request) {
         requestOptions.headers['authorization'] = `Bearer ${request.session.access_token}`
     }
 
+    // We set the method to the one used in the original request.
+    requestOptions.method = request.method
+
     if (opts.bff) transform(opts, ORIGIN_REQUEST, requestOptions)
 
     const fetch = server.originBreaker
