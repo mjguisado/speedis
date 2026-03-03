@@ -13,11 +13,17 @@ cd speedis
 ```
 ## **Generate self signed certificate**
 Some Speedis components require or support HTTPS traffic, which requires generating SSL certificates.
-You can generate all the necessary self-signed certificates with a single command.
+You can generate all the necessary certificates with a single command.
+The certificates are generated using the Speedis Root CA certificate located in the ./ca/certs directory.
 ```sh
 ./generate_certificates.sh
 ```
 or create them individually if needed.
+### CA Certificate
+The Speedis Root CA certificate is used to sign the certificates of the other components.
+```sh
+./ca/generate_certificate.sh
+```
 ### Mocks Server
 The mock server can run over HTTP/2 when started with the environment variable MOCKS_HTTP2=true.
 In practice, HTTP/2 is effectively tied to HTTPS, since browsers only support HTTP/2 over secure connections.

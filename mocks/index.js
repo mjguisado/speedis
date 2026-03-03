@@ -5,7 +5,7 @@ import { collectDefaultMetrics, register, Counter, Histogram } from 'prom-client
 
 // Build Fastify options depending on env var
 let fastifyOptions = {
-    logger: { level: 'debug' },
+    logger: { level: 'warn' },
     http2: true,
     https: {
         allowHTTP1: true,
@@ -61,7 +61,7 @@ mockServer.get('/metrics', async (request, reply) => {
 await mockServer.register(mocksPlugin, {
     id: "mocks",
     prefix: "/mocks",
-    logLevel: "debug"
+    logLevel: "warn"
 })
 
 try {
