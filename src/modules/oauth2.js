@@ -7,8 +7,10 @@ import { errorHandler } from './error.js'
 export async function initOAuth2(server, opts) {
 
     // Configuration is an abstraction over the OAuth 2.0
+  
     // Authorization Server metadata and OAuth 2.0 Client metadata
     let authServerConfiguration = null
+
     // Configuration instances are obtained either through:
     if (opts.oauth2.discoverySupported) {
         // (RECOMMENDED) the discovery function that discovers the OAuth 2.0
@@ -36,6 +38,20 @@ export async function initOAuth2(server, opts) {
     const jwksUri = new URL(authServerConfiguration.serverMetadata().jwks_uri)
     const jwks = createRemoteJWKSet(jwksUri)
     server.decorate('jwks', jwks)
+
+    // Precompile the regular expressions of the authentication strategies
+    opts.oauth2.authStrategies.forEach(strategy => {
+        strategy.compiledPatterns = []
+        strategy.urlPatterns.forEach(pattern => {
+            try {
+                strategy.compiledPatterns.push(new RegExp(pattern))
+            } catch (error) {
+                server.log.fatal(error, 
+                    `Origin: ${opts.id}. urlPattern ${pattern} in authStrategies is not a valid regular expression.`)
+                throw new Error(`Origin: ${opts.id}. The OAuth2 authStrategies configuration is invalid.`, { cause: error })
+            }
+        })
+    })
 
     server.decorateRequest('session')
     async function decorateRequestWithSessionData(request, tokens) {
@@ -73,8 +89,32 @@ export async function initOAuth2(server, opts) {
 
     }
 
-    server.decorateRequest("id_session", null)
     server.addHook('onRequest', async (request, reply) => {
+
+        // Determine which authentication strategy applies to this URL
+        let authStrategy = null
+        for (const strategy of opts.oauth2.authStrategies) {
+            for (const regex of strategy.compiledPatterns) {
+                if (regex.test(request.path)) {
+                    authStrategy = strategy
+                    break
+                }
+            }
+            if (authStrategy) break
+        }
+
+        // If there is no strategy defined, deny access
+        if (!authStrategy) {
+            const msg = `Origin: ${opts.id}. No authentication strategy defined for ${request.raw.url}.`
+            server.log.error(msg)
+            return errorHandler(reply, 403, msg, opts.exposeErrors)
+        }
+
+        // If the grantType is "none", we do nothing.
+        if ('none' === authStrategy.grantType) {
+            return
+        }
+
         let tokens = {}
         if (request.headers?.cookie) {
             // Parse the Cookie header
@@ -100,6 +140,7 @@ export async function initOAuth2(server, opts) {
                 }
             }
         }
+
         if (Object.keys(tokens).length > 0) {
             try {
                 await decorateRequestWithSessionData(request, tokens)

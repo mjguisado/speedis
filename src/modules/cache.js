@@ -1,7 +1,7 @@
 import path from 'path'
 import os from 'os'
 import * as crypto from 'crypto'
-import { generatePath, _fetch, getForwardedHeaders } from './origin.js'
+import { _fetch, getForwardedHeaders } from './origin.js'
 import * as utils from '../utils/utils.js'
 import * as bff from './bff.js'
 import { errorHandler } from './error.js'
@@ -307,7 +307,7 @@ export async function _get(server, opts, request) {
     // To make the request to the origin server, we remove from 
     // the received URL the prefix that was used to route the request
     // to this instance of the plugin
-    requestOptions.path = generatePath(request)
+    requestOptions.path = request.path
     
     // Check if there is an entry stored in the cache.
     let cachedResponse = null

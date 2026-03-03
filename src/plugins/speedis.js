@@ -17,6 +17,12 @@ export default async function (server, opts) {
     // messages are included in the response body
     server.decorate('exposeErrors', opts.exposeErrors)
    
+    // The path of the request without the prefix
+    server.decorateRequest("path", null)
+    server.addHook('onRequest', async (request, reply) => {    
+        request.path = generatePath(request)
+    })
+
     // Module init
     await initOrigin(server, opts)
     if (opts.redis) await initRedis(server, opts)
@@ -40,7 +46,6 @@ export default async function (server, opts) {
         try {
 
             if (opts.bff) {
-                request.path = generatePath(request)
                 bff.transform(opts, bff.CLIENT_REQUEST, request)
             }
 

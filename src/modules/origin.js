@@ -113,9 +113,8 @@ export function generatePath(request) {
     return request.url.replace(prefix, "")
 }
 
-
 export function generateUrlKey(opts, request, fieldNames = utils.parseVaryHeader(request)) {
-    let path = generatePath(request)
+    let path = request.path
     const [base, queryString] = path.split("?")
     if (queryString) {
         const params = new URLSearchParams(queryString)
@@ -212,7 +211,7 @@ export async function proxy(server, opts, request) {
     // To make the request to the origin server, we remove from 
     // the received URL the prefix that was used to route the request
     // to this instance of the plugin
-    requestOptions.path = generatePath(request)
+    requestOptions.path = request.path
 
     if (request.session?.access_token) {
         requestOptions.headers['authorization'] = `Bearer ${request.session.access_token}`

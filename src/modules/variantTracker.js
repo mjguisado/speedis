@@ -1,7 +1,6 @@
 import path from 'path'
 import * as crypto from 'crypto'
 import { isPurgeRequest } from './cache.js'
-import { generatePath } from './origin.js'
 import { transform, VARIANTS_TRACKER } from './bff.js'
 
 export function initVariantsTracker(server, opts) {
@@ -40,7 +39,7 @@ export function initVariantsTracker(server, opts) {
             // of type request or response. Therefore, we build a response that 
             // can hold the data to be transformed.
             const mockResponse = {
-                path: generatePath(request),
+                path: request.path,
                 statusCode: reply.statusCode,
                 headers: reply.getHeaders(),
                 body: payload

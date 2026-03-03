@@ -299,6 +299,7 @@ export function initOriginConfigValidator(ajv) {
                         "clientSecret",
                         "discoverySupported",
                         "postAuthRedirectUri",
+                        "authStrategies"
                     ],
                     allOf: [
                         {
@@ -357,7 +358,12 @@ export function initOriginConfigValidator(ajv) {
                         authorizationCodeTtl: { type: "number", default: 300 },
                         sessionIdCookieName: { type: "string", default: "speedis_session" },
                         postAuthRedirectUri: { type: "string" },
-                        logoutRequest: { type: "object", default: {} },
+                        logoutRequest:  { type: "object", default: {} },
+                        authStrategies: {
+                            type: "array",
+                            minItems: 1,
+                            default: [{ urlPatterns: [".*"], grantType: "none" }]
+                        }
                     }
                 },
                 redis: {

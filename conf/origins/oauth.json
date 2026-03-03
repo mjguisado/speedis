@@ -1,17 +1,16 @@
 {
-    "id": "mocks",
-    "prefix": "/api",
-    "logLevel": "warn",
+    "id": "oauth",
+    "prefix": "/oauth",
+    "logLevel": "debug",
     "exposeErrors": true,
     "origin": {
-        "http1xOptions": {
-            "host": "mocks",
-            "port": 3030,
-            "timeout": 1000
+        "http2Options": {
+            "authority": "https://mocks:3030",
+            "options": {
+                "rejectUnauthorized": false,
+                "timeout": 1000
+            }
         },
-        "agentOptions": {
-            "keepAlive": true
-        },  
         "originTimeout": 1000,
         "originBreaker": true,
         "originBreakerOptions": {
@@ -59,24 +58,20 @@
        "authStrategies": [
             {
                 "urlPatterns": [
-                    "/mocks/items/public-.*",
-                    "/mocks/health",
-                    "/mocks/version"
+                    "/mocks/public/.*"
                 ],
                 "grantType": "none"
             },
             {
                 "urlPatterns": [
-                    "/mocks/api/internal/.*",
-                    "/mocks/webhooks/.*"
+                    "/mocks/basic/.*"
                 ],
                 "grantType": "client_credentials",
                 "scope": "basic"
             },
             {
                 "urlPatterns": [
-                    "/mocks/users/.*",
-                    "/mocks/profile/.*"
+                    "/mocks/private/.*"
                 ],
                 "grantType": "authorization_code",
                 "authorizationRequest": {
