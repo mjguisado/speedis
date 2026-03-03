@@ -46,6 +46,7 @@ services:
       - KC_BOOTSTRAP_ADMIN_PASSWORD=admin
       - KC_HTTPS_CERTIFICATE_FILE=/opt/keycloak/conf/certs/keycloak.crt
       - KC_HTTPS_CERTIFICATE_KEY_FILE=/opt/keycloak/conf/certs/keycloak.key
+      - KEYCLOAK_LOGLEVEL=DEBUG
     volumes:
       - ./3rparties/keycloak/certs:/opt/keycloak/conf/certs:ro
       - ./3rparties/haproxy/certs/mocks.pem:/opt/keycloak/conf/truststores/mocks.pem:ro

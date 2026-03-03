@@ -11,7 +11,6 @@ export function initCache(server, opts) {
     let purgeUrlPrefix = path.join(opts.prefix, opts.cache.purgePath)
     server.decorate('purgeUrlPrefix', purgeUrlPrefix)
 
-
     // When Local Requests Coalescing is enabled, this variable 
     // stores the promises associated with ongoing origin server requests.
     const ongoingFetch = opts.cache.localRequestsCoalescing
