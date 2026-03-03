@@ -35,14 +35,14 @@ To enable HTTP2 support for Speedis, the setup would look something like this:
   },
 ```
 
-The contents of the self-signed certificates for Speedis can be generated using the following command.
+The certificates for Speedis can be generated using the following command.
 ```sh
-./conf/generate_self_signed_cert.sh
+./conf/generate_certificate.sh
 ```
 
 You can then generate the fastify.https.key and fastify.https.cert attributes with the command:
 ```sh
-./conf/dump_self_signed_cert.sh
+./conf/dump_certificate.sh
 ```
 
 Here’s an example of an HTTP2 request:

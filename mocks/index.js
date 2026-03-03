@@ -4,17 +4,13 @@ import mocksPlugin from './plugins/mocks.js'
 import { collectDefaultMetrics, register, Counter, Histogram } from 'prom-client'
 
 // Build Fastify options depending on env var
-let fastifyOptions = { logger: { level: 'warn' } }
-
-if (process.env.MOCKS_HTTP2 === 'true') {
-    fastifyOptions = {
-        logger: { level: 'warn' },
-        http2: true,
-        https: {
-            allowHTTP1: true,
-            key: fs.readFileSync('./certs/mocks.key'),
-            cert: fs.readFileSync('./certs/mocks.crt')
-        }
+let fastifyOptions = {
+    logger: { level: 'debug' },
+    http2: true,
+    https: {
+        allowHTTP1: true,
+        key:  fs.readFileSync('./certs/mocks.key'),
+        cert: fs.readFileSync('./certs/mocks.crt')
     }
 }
 
@@ -65,7 +61,7 @@ mockServer.get('/metrics', async (request, reply) => {
 await mockServer.register(mocksPlugin, {
     id: "mocks",
     prefix: "/mocks",
-    logLevel: "warn"
+    logLevel: "debug"
 })
 
 try {
