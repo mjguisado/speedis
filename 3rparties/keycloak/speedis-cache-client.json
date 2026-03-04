@@ -1,5 +1,5 @@
 {
-  "clientId": "speedis-client",
+  "clientId": "speedis-cache-client",
   "name": "",
   "description": "",
   "rootUrl": "",
@@ -22,7 +22,7 @@
   "standardFlowEnabled": true,
   "implicitFlowEnabled": false,
   "directAccessGrantsEnabled": false,
-  "serviceAccountsEnabled": false,
+  "serviceAccountsEnabled": true,
   "publicClient": false,
   "frontchannelLogout": true,
   "protocol": "openid-connect",
@@ -42,6 +42,7 @@
     "request.object.encryption.enc": "any",
     "dpop.bound.access.tokens": "false",
     "id.token.as.detached.signature": "false",
+    "logout.confirmation.enabled": "false",
     "client.secret.creation.time": "1763211108",
     "request.object.encryption.alg": "any",
     "client.introspection.response.allow.jwt.claim.enabled": "false",
@@ -59,9 +60,10 @@
   "nodeReRegistrationTimeout": -1,
   "defaultClientScopes": [
     "web-origins",
+    "service_account",
     "acr",
-    "profile",
     "roles",
+    "profile",
     "basic",
     "email"
   ],

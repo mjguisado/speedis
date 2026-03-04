@@ -23,9 +23,10 @@ Once created, the new realm will appear in the list of realms.
 
 In the left-hand menu, click on “Clients”, then click the “Import client” link.
 <img src="./img/keycloak_list_clients.png"/>
-Upload the contents of the ./3rparties/keycloak/speedis-client.json file into the Resource file field and click Save.
+Upload the contents of the ./3rparties/keycloak/speedis-cache-client.json file into the Resource file field and click Save.
 <img src="./img/keycloak_import_client.png"/>
 Once created, the new realm will appear in the list of clients.
+Repeat the process for the ./3rparties/keycloak/speedis-oauth-client.json file.
 
 4. **Create an user.**
 

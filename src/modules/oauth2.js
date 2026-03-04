@@ -1,7 +1,7 @@
 import { jwtVerify, createRemoteJWKSet } from 'jose'
 import { jwtDecode } from "jwt-decode"
 import * as openIdClient from 'openid-client'
-import { SESSION_PREFIX } from '../plugins/session.js'
+import { SESSION_PREFIX } from '../plugins/oauth2.js'
 import { errorHandler } from './error.js'
 
 export async function initOAuth2(server, opts) {
@@ -108,16 +108,20 @@ export async function initOAuth2(server, opts) {
 
     async function manageClientCredentialsGrant(request, reply, authStrategy) {
         
-        let clientCredentialsResponse = server.clientCredentialsResponse
+        let clientCredentialsResponse = null
 
-        const now = Math.floor(Date.now() / 1000)
         const bufferTime = 10 // 10 seconds of buffer time
-
-        // If the token is not valid, we need to get a new one.
-        if (clientCredentialsResponse?.decodedToken?.exp > now + bufferTime) {
+        const jitter = Math.floor(0.1 * Math.random() * bufferTime)
+        const now = Math.floor(Date.now() / 1000)
+        const minExp = now + bufferTime + jitter
+        
+        // If the token is still valid, use it
+        if (server?.clientCredentialsResponse?.decodedToken?.exp > minExp) {
+            clientCredentialsResponse = server.clientCredentialsResponse
         } else {
-            let amITheFetcher = false
-            // Only one thread will get a new token.
+            // If the token is not valid, we need to get a new one.
+            // Only one thread will get a new token.            
+            let isTokenRefreshOwner = false
             if (!server.clientCredentialsResponsePromise) {
                 server.clientCredentialsResponsePromise = openIdClient.clientCredentialsGrant(
                     authServerConfiguration,
@@ -125,7 +129,7 @@ export async function initOAuth2(server, opts) {
                         scope: authStrategy.scope
                     }
                 )
-                amITheFetcher = true
+                isTokenRefreshOwner = true
             }
             // The other threads will wait for the token to be renewed.             
             try {
@@ -134,14 +138,14 @@ export async function initOAuth2(server, opts) {
                     clientCredentialsResponse.decodedToken = 
                         jwtDecode(clientCredentialsResponse.access_token)
                 } catch (error) {
-                    server.log.error(error, `Origin: ${opts.id}. Error validating cached client credentials token.`)
-                    return errorHandler(reply, 500, `Origin: ${opts.id}. Error validating cached client credentials token.`, opts.exposeErrors, error)
+                    server.log.error(error, `Origin: ${opts.id}. Error decoding new client credentials token.`)
+                    return errorHandler(reply, 500, `Origin: ${opts.id}. Error decoding new client credentials token.`, opts.exposeErrors, error)
                 }
             } catch (error) {              
                 server.log.error(error, `Origin: ${opts.id}. Error getting a new client credentials token.`)
                 return errorHandler(reply, 500, `Origin: ${opts.id}. Error getting a new client credentials token.`, opts.exposeErrors, error)
             } finally {
-                if (amITheFetcher) {
+                if (isTokenRefreshOwner) {
                     server.clientCredentialsResponse = clientCredentialsResponse
                     server.clientCredentialsResponsePromise = null
                 }
@@ -152,40 +156,10 @@ export async function initOAuth2(server, opts) {
 
     }
 
-
-    server.addHook('onRequest', async (request, reply) => {
-
-        // Determine which authentication strategy applies to this URL
-        let authStrategy = null
-        for (const strategy of opts.oauth2.authStrategies) {
-            for (const regex of strategy.compiledPatterns) {
-                if (regex.test(request.path)) {
-                    authStrategy = strategy
-                    break
-                }
-            }
-            if (authStrategy) break
-        }
-
-        // If there is no strategy defined, deny access
-        if (!authStrategy) {
-            const msg = `Origin: ${opts.id}. No authentication strategy defined for ${request.raw.url}.`
-            server.log.error(msg)
-            return errorHandler(reply, 403, msg, opts.exposeErrors)
-        }
-
-        // Case 1: If the grantType is "none", we do nothing.
-        if ('none' === authStrategy.grantType) {
-            return
-        }
-
-        // Case 2: If the grantType is "client_credentials", we expect the access token in the Authorization header.
-        if ('client_credentials' === authStrategy.grantType) {          
-            await manageClientCredentialsGrant(request, reply, authStrategy)
-            return
-        }
+    async function manageAuthorizationCodeGrant(request, reply, authStrategy) {
 
         let tokens = {}
+
         if (request.headers?.cookie) {
             // Parse the Cookie header
             const cookies = request.headers?.cookie
@@ -242,6 +216,42 @@ export async function initOAuth2(server, opts) {
                 }
             }
         }
+    }
+
+    server.addHook('onRequest', async (request, reply) => {
+
+        // Determine which authentication strategy applies to this URL
+        let authStrategy = null
+        for (const strategy of opts.oauth2.authStrategies) {
+            for (const regex of strategy.compiledPatterns) {
+                if (regex.test(request.path)) {
+                    authStrategy = strategy
+                    break
+                }
+            }
+            if (authStrategy) break
+        }
+
+        // If there is no strategy defined, deny access
+        if (!authStrategy) {
+            const msg = `Origin: ${opts.id}. No authentication strategy defined for ${request.raw.url}.`
+            server.log.error(msg)
+            return errorHandler(reply, 403, msg, opts.exposeErrors)
+        }
+
+        switch (authStrategy?.grantType) {
+            case 'none':
+                return
+            case 'client_credentials':
+                return await manageClientCredentialsGrant(request, reply, authStrategy)
+            case 'authorization_code':
+                return await manageAuthorizationCodeGrant(request, reply, authStrategy)
+            default:
+                const msg = `Origin: ${opts.id}. Unsupported grant type ${authStrategy.grantType}.`
+                server.log.error(msg)
+                return errorHandler(reply, 500, msg, opts.exposeErrors)
+        }
+
     })
 
 }

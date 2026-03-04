@@ -1,5 +1,5 @@
 import { createClient, SCHEMA_FIELD_TYPE } from 'redis'
-import { SESSION_INDEX_NAME, SESSION_PREFIX } from '../plugins/session.js'
+import { SESSION_INDEX_NAME, SESSION_PREFIX } from '../plugins/oauth2.js'
 import CircuitBreaker from 'opossum'
 
 export async function initRedis(server, opts) {

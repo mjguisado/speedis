@@ -3,7 +3,7 @@ import os from 'os'
 import * as bff from '../modules/bff.js'
 import * as cache from '../modules/cache.js'
 import * as utils from '../utils/utils.js'
-import sessionPlugin from './session.js'
+import oauth2Plugin from './oauth2.js'
 import { initOrigin, generateUrlKey, proxy, generatePath } from '../modules/origin.js'
 import { initRedis } from '../modules/redis.js'
 import { initOAuth2 } from '../modules/oauth2.js'
@@ -30,7 +30,7 @@ export default async function (server, opts) {
     if (opts.bff) await bff.initBff(server, opts)
     if (opts.oauth2) {
         await initOAuth2(server, opts)
-        await server.register(sessionPlugin, opts.oauth2)
+        await server.register(oauth2Plugin, opts.oauth2)
     }
     if (opts.variantsTracker) initVariantsTracker(server, opts)
 

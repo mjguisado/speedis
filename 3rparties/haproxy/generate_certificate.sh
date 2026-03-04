@@ -13,10 +13,12 @@ openssl x509 -req -days 365 -sha256 \
   -extfile <(cat <<-EOF
     extendedKeyUsage=serverAuth
     subjectAltName=\
+      DNS:oauth,\
+      DNS:oauth.localhost,\
       DNS:mocks,\
       DNS:mocks.localhost,\
       DNS:speedis,\
-      DNS:speedis.localhost\
+      DNS:speedis.localhost
 EOF
 )
 cat $DIR/certs/haproxy.crt $DIR/certs/haproxy.key > $DIR/certs/haproxy.pem
