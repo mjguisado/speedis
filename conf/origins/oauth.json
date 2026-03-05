@@ -64,10 +64,10 @@
             },
             {
                 "urlPatterns": [
-                    "/mocks/basic/.*"
+                    "/mocks/restricted/.*"
                 ],
                 "grantType": "client_credentials",
-                "scope": "basic"
+                "scope": "restricted"
             },
             {
                 "urlPatterns": [
@@ -76,7 +76,7 @@
                 "grantType": "authorization_code",
                 "authorizationRequest": {
                     "redirect_uri": "https://oauth.localhost/oauth2/callback",
-                    "scope": "openid profile email"
+                    "scope": "private"
                 },
                 "pkceEnabled": true,
                 "postAuthRedirectUri": "https://oauth.localhost/mocks/items/RealBetis?delay=300&cc=public,max-age=10&a=alfa&b=beta&c=",

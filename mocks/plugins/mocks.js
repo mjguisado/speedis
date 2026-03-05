@@ -116,8 +116,7 @@ export default async function (server, opts) {
         await common(request, reply)
         return reply.send({
             id: request.params.uuid,
-            name: `Item ${request.params.uuid}`,
-            message: 'This endpoint does not require authentication'
+            name: `Item ${request.params.uuid}`
         })
     })
     const users = [
@@ -257,8 +256,7 @@ export default async function (server, opts) {
                 ssn: '***-**-1234'
             },
             scope: 'private',
-            user_id: request.tokenPayload.sub,
-            message: 'This endpoint requires scope: private'
+            user_id: request.tokenPayload.sub
         })
     })
 
@@ -275,8 +273,7 @@ export default async function (server, opts) {
             signature: 'SHA256:xyz789...',
             executed_at: new Date().toISOString(),
             scope: 'signed',
-            user_id: request.tokenPayload.sub,
-            message: 'This endpoint requires scope: private'
+            user_id: request.tokenPayload.sub
         })
     })
 
@@ -291,7 +288,6 @@ export default async function (server, opts) {
         return reply.send({
             users: users,
             scope: 'basic + private + signed',
-            message: 'This endpoint requires all scopes: basic, private, signed',
             accessed_by: request.tokenPayload.sub
         })
     })
