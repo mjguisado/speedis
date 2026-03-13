@@ -234,7 +234,16 @@ export function initOriginConfigValidator(ajv) {
                 bff: {
                     type: "object",
                     additionalProperties: false,
-                    required: ["transformations"],
+                    // transformations is required only when enabled !== false
+                    if: {
+                        not: {
+                            properties: { enabled: { const: false } },
+                            required: ["enabled"]
+                        }
+                    },
+                    then: {
+                        required: ["transformations"]
+                    },
                     properties: {
                         enabled: { type: "boolean", default: true },
                         actionsLibraries: {
@@ -284,7 +293,16 @@ export function initOriginConfigValidator(ajv) {
                 variantsTracker: {
                     type: "object",
                     additionalProperties: false,
-                    required: ["urlPatterns"],
+                    // urlPatterns is required only when enabled !== false
+                    if: {
+                        not: {
+                            properties: { enabled: { const: false } },
+                            required: ["enabled"]
+                        }
+                    },
+                    then: {
+                        required: ["urlPatterns"]
+                    },
                     properties: {
                         enabled: { type: "boolean", default: true },
                         urlPatterns: {
@@ -446,16 +464,27 @@ export function initOriginConfigValidator(ajv) {
                 oauth2: {
                     type: "object",
                     additionalProperties: false,
-                    required: [
-                        "id",
-                        "baseUrl",
-                        "clientId",
-                        "clientSecret",
-                        "discoverySupported",
-                        "postAuthRedirectUri",
-                        "authStrategies"
-                    ],
                     allOf: [
+                        {
+                            // Required fields only when enabled !== false
+                            if: {
+                                not: {
+                                    properties: { enabled: { const: false } },
+                                    required: ["enabled"]
+                                }
+                            },
+                            then: {
+                                required: [
+                                    "id",
+                                    "baseUrl",
+                                    "clientId",
+                                    "clientSecret",
+                                    "discoverySupported",
+                                    "postAuthRedirectUri",
+                                    "authStrategies"
+                                ]
+                            }
+                        },
                         {
                             if: {
                                 properties: {
