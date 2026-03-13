@@ -37,12 +37,12 @@ export function initCache(server, opts) {
     // is cacheable and, if so, whether the response should be cached 
     // separately for each user.
     server.decorateRequest('cacheable')
-    server.decorateRequest('cacheable_per_user')
+    server.decorateRequest('cacheable_private')
     server.decorateRequest('cacheable_ttl')
 
     server.addHook('onRequest', async (request, reply) => {
         request.cacheable = false
-        request.cacheable_per_user = false
+        request.cacheable_private = false
         request.cacheable_ttl = Infinity
         // Only the safe methods are cacheables
         // https://developer.mozilla.org/en-US/docs/Glossary/Safe/HTTP
@@ -50,7 +50,7 @@ export function initCache(server, opts) {
             for (const cacheable of opts.cache.cacheables) {
                 if (cacheable.re.test(request.raw.url)) {
                     request.cacheable = true
-                    request.cacheable_per_user = cacheable.perUser
+                    request.cacheable_private = cacheable.private
                     request.cacheable_ttl = cacheable.ttl
                     break
                 }
@@ -61,7 +61,7 @@ export function initCache(server, opts) {
     // This hook verifies that cacheable per-user requests include the user’s ID.
     // This ID is set by a hook in the OAuth2 module.
     server.addHook('preValidation', async (request, reply) => {
-        if (request.cacheable_per_user && !request.session?.sub) {
+        if (request.cacheable_private && !request.session?.sub) {
             const msg = `Origin: ${opts.id}. This resource ${request.raw.url} is cacheable per user, but the user could not be determined.`
             server.log.error(msg)
             return errorHandler(reply, 401, msg, opts.exposeErrors)

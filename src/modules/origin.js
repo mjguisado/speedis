@@ -139,7 +139,7 @@ export function generateUrlKey(opts, request, fieldNames = utils.parseVaryHeader
     let urlKey = opts.cache?.includeOriginIdInUrlKey
         ? opts.id
         : ''
-    if (request.cacheable_per_user) {
+    if (request.cacheable_private) {
         urlKey += (urlKey.length > 0 ? ':' : '') + request.session.sub
     }
     urlKey += path.replaceAll('/', ':')

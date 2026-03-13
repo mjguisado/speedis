@@ -283,6 +283,34 @@ export function initOriginConfigValidator(ajv) {
                             then: {
                                 required: ["distributedRequestsCoalescingOptions"]
                             }
+                        },
+                        {
+                            if: {
+                                properties: {
+                                    cacheables: {
+                                        type: "array",
+                                        contains: {
+                                            type: "object",
+                                            properties: {
+                                                private: { const: true }
+                                            },
+                                            required: ["private"]
+                                        }
+                                    }
+                                },
+                                required: ["cacheables"]
+                            },
+                            then: {
+                                required: ["authentication"],
+                                properties: {
+                                    authentication: {
+                                        not: {
+                                            properties: { enabled: { const: false } },
+                                            required: ["enabled"]
+                                        }
+                                    }
+                                }
+                            }
                         }
                     ],
                     properties: {

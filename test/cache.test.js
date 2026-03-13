@@ -38,7 +38,7 @@ suite('Speedis - Origin', () => {
                     },
                     {
                         "urlPattern": "/mocks/items/.*",
-                        "perUser": true
+                        "private": true
                     }
                 ],
                 "ignoredQueryParams": [
