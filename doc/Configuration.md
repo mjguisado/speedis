@@ -18,15 +18,13 @@ When `USE_REDIS_CONFIG` is enabled, Speedis needs to connect to Redis to fetch t
 The simplest way is to use a single connection string:
 
 ```bash
-REDIS_URL="redis://localhost:6379/0"
+REDIS_URL="redis://{user}:{password}@{host}:{port}/{database}"
 ```
-
-The full format is: `REDIS_URL="redis://{user}:{password}@{host}:{port}/{database}"`
-
 **Note:** You cannot use `@` or `:` characters in your username or password when using `REDIS_URL`.
 
 ### Option 2: Using individual environment variables
-Alternatively, you can set each connection parameter separately. This method allows all special characters in usernames and passwords:
+Alternatively, you can set each connection parameter separately.
+This method allows all special characters in usernames and passwords:
 
 ```bash
 REDIS_HOST="localhost"
@@ -37,7 +35,8 @@ REDIS_PASS="my:p@ssword"
 ```
 
 ### Configuration key
-By default, Speedis looks for the main configuration at the Redis key `speedis:config:main`. You can customize this with:
+By default, Speedis looks for the main configuration at the Redis key `speedis:config:main`.
+You can customize this with:
 
 ```bash
 SPEEDIS_CONFIG_KEY="my:custom:config:key"
@@ -57,7 +56,7 @@ The following table describes the supported fields in the main configuration.
 |`localOriginsConfigs`|String|`false`|`null`|Disk location of the origin configuration files. This setting is only used if the USE_REDIS_CONFIG environment variable is not defined. Its value can be `null`, an absolute path, or a relative path. If set to `null`, Speedis will use the conf/origin folder inside the current working directory. If a relative path is provided, Speedis will resolve it to an absolute path based on the current working directory.|
 |`originsConfigsKeys`|[String]|`true` if USE_REDIS_CONFIG|[]|List of Redis keys that store origin configurations.|
 
-To enable HTTP2 support for Speedis, the setup would look something like this:
+**Note:** To enable HTTP2 support for Speedis, the setup would look something like this:
 
 ```json
   "fastify": {
@@ -82,10 +81,8 @@ You can then generate the fastify.https.key and fastify.https.cert attributes wi
 
 Here’s an example of an HTTP2 request:
 ```sh
-curl -kv -http2 --resolve speedis.localhost:3001:127.0.0.1 'https://speedis.localhost:3001/mocks/mocks/items/public-real-betis?delay=300&cc=public,max-age=10' 
+curl -kv -http2 --resolve speedis.localhost:3001:127.0.0.1 'https://speedis.localhost:3001/mocks/mocks/public/items/real-betis?delay=300&cc=public,max-age=10'
 ```
-
-
 # Origins configurations
 
 The following table describes the supported fields.
