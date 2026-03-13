@@ -25,20 +25,20 @@ suite('Speedis - Origin', () => {
             "id": "mocks",
             "prefix": "/mocks",
             "origin": {
-                "http1xOptions": {
-                    "host": "mocks",
-                    "port": 3030,
-                    "timeout": 2000
+                "http2Options": {
+                    "authority": "https://mocks.localhost:3030",
+                    "options": {
+                        "rejectUnauthorized": false,
+                        "timeout": 1000
+                    }
                 }
             },
             "cache": {
                 "cacheables": [
                     {
-                        "urlPattern": "/mocks/items/public-.*"
-                    },
-                    {
-                        "urlPattern": "/mocks/items/.*",
-                        "private": true
+                        "urlPattern": "/mocks/public/items/.*",
+                        "private": false,
+                        "ttl": 20
                     }
                 ],
                 "ignoredQueryParams": [
@@ -65,17 +65,17 @@ suite('Speedis - Origin', () => {
 
     test('PURGE - 404', async (t) => {
         t.plan(1)
-        let url = '/mocks/mocks/items/public-' + crypto.randomUUID()
+        let url = '/mocks/mocks/public/items/' + crypto.randomUUID()
         let response = await server.inject({
             method: 'DELETE',
             url: url.replace('/mocks/mocks/', '/mocks/purge/mocks/')
         })
         t.assert.strictEqual(response.statusCode, 404)
     })
-
+   
     test('PURGE - 204', async (t) => {
         t.plan(2)
-        let url = '/mocks/mocks/items/public-' + crypto.randomUUID()
+        let url = '/mocks/mocks/public/items/' + crypto.randomUUID()
 
         url += '?cc=' + encodeURIComponent('public,max-age=60')
         let response = await server.inject({
@@ -96,7 +96,7 @@ suite('Speedis - Origin', () => {
         let clientmaxage = 1
         let originmaxage = clientmaxage * 2
 
-        let url = '/mocks/mocks/items/public-' + crypto.randomUUID()
+        let url = '/mocks/mocks/public/items/' + crypto.randomUUID()
         url += '?cc=' + encodeURIComponent(`public,max-age=${originmaxage}`)
         let response = await server.inject({
             method: 'GET',
@@ -158,7 +158,7 @@ suite('Speedis - Origin', () => {
         let clientminfresh = 1
         let originmaxage = clientminfresh * 2
 
-        let url = '/mocks/mocks/items/public-' + crypto.randomUUID()
+        let url = '/mocks/mocks/public/items/' + crypto.randomUUID()
         url += '?cc=' + encodeURIComponent(`public,max-age=${originmaxage}`)
         let response = await server.inject({
             method: 'GET',
@@ -220,7 +220,7 @@ suite('Speedis - Origin', () => {
         let clientmaxstale = 1
         let originmaxage = clientmaxstale
 
-        let url = '/mocks/mocks/items/public-' + crypto.randomUUID()
+        let url = '/mocks/mocks/public/items/' + crypto.randomUUID()
         url += '?cc=' + encodeURIComponent(`public,max-age=${originmaxage}`)
         let response = await server.inject({
             method: 'GET',
@@ -297,7 +297,7 @@ suite('Speedis - Origin', () => {
 
         let originmaxage = 2
 
-        let url = '/mocks/mocks/items/public-' + crypto.randomUUID()
+        let url = '/mocks/mocks/public/items/' + crypto.randomUUID()
         url += '?cc=' + encodeURIComponent(`public,max-age=${originmaxage}`)
         let response = await server.inject({
             method: 'GET',
@@ -338,7 +338,7 @@ suite('Speedis - Origin', () => {
 
         let originmaxage = 2
 
-        let url = '/mocks/mocks/items/public-' + crypto.randomUUID()
+        let url = '/mocks/mocks/public/items/' + crypto.randomUUID()
         url += '?cc=' + encodeURIComponent(`public,max-age=${originmaxage}`)
         let response = await server.inject({
             method: 'GET',
@@ -367,7 +367,7 @@ suite('Speedis - Origin', () => {
 
         let originmaxage = 2
 
-        let url = '/mocks/mocks/items/public-' + crypto.randomUUID()
+        let url = '/mocks/mocks/public/items/' + crypto.randomUUID()
         url += '?cc=' + encodeURIComponent(`public,max-age=${originmaxage},no-cache`)
         let response = await server.inject({
             method: 'GET',
@@ -394,7 +394,7 @@ suite('Speedis - Origin', () => {
 
         let originmaxage = 2
 
-        let url = '/mocks/mocks/items/public-' + crypto.randomUUID()
+        let url = '/mocks/mocks/public/items/' + crypto.randomUUID()
         url += '?cc=' + encodeURIComponent(`public,max-age=${originmaxage},private`)
         let response = await server.inject({
             method: 'GET',
@@ -421,7 +421,7 @@ suite('Speedis - Origin', () => {
 
         let originmaxage = 2
 
-        let url = '/mocks/mocks/items/public-' + crypto.randomUUID()
+        let url = '/mocks/mocks/public/items/' + crypto.randomUUID()
         url += '?cc=' + encodeURIComponent(`public,max-age=${originmaxage},private="x-mocks-custom-header-1,x-mocks-custom-header-2"`)
         let response = await server.inject({
             method: 'GET',
@@ -455,7 +455,7 @@ suite('Speedis - Origin', () => {
 
         let originmaxage = 2
 
-        let url = '/mocks/mocks/items/public-' + crypto.randomUUID()
+        let url = '/mocks/mocks/public/items/' + crypto.randomUUID()
         url += '?cc=' + encodeURIComponent(`public,max-age=${originmaxage},no-cache="x-mocks-custom-header-1,x-mocks-custom-header-2"`)
         let response = await server.inject({
             method: 'GET',
@@ -488,13 +488,13 @@ suite('Speedis - Origin', () => {
         t.plan(1)
         let originmaxage = 10
         const uuid = crypto.randomUUID()
-        let url = '/mocks/mocks/items/public-' + uuid
+        let url = '/mocks/mocks/public/items/' + uuid
         url += '?cc=' + encodeURIComponent(`public,max-age=${originmaxage}`)
         let response = await server.inject({
             method: 'GET',
             url: url,
             headers: {
-                'if-none-match': '"*", W/"' + crypto.randomUUID() + `", "*", W/"public-${uuid}"`
+                'if-none-match': '"*", W/"' + crypto.randomUUID() + `", "*", W/"${uuid}"`
             }
         })
         t.assert.strictEqual(response.statusCode, 400)
@@ -504,7 +504,7 @@ suite('Speedis - Origin', () => {
         t.plan(1)
         let originmaxage = 10
         const uuid = crypto.randomUUID()
-        let url = '/mocks/mocks/items/public-' + uuid
+        let url = '/mocks/mocks/public/items/' + uuid
         url += '?cc=' + encodeURIComponent(`public,max-age=${originmaxage}`)
         let response = await server.inject({
             method: 'GET',
@@ -520,7 +520,7 @@ suite('Speedis - Origin', () => {
         t.plan(2)
         let originmaxage = 10
         const uuid = crypto.randomUUID()
-        let url = '/mocks/mocks/items/public-' + uuid
+        let url = '/mocks/mocks/public/items/' + uuid
         url += '?cc=' + encodeURIComponent(`public,max-age=${originmaxage}`)
         let response = await server.inject({
             method: 'GET',
@@ -544,13 +544,13 @@ suite('Speedis - Origin', () => {
         t.plan(1)
         let originmaxage = 4
         const uuid = crypto.randomUUID()
-        let url = '/mocks/mocks/items/public-' + uuid
+        let url = '/mocks/mocks/public/items/' + uuid
         url += '?cc=' + encodeURIComponent(`public,max-age=${originmaxage}`)
         let response = await server.inject({
             method: 'GET',
             url: url,
             headers: {
-                'if-none-match': 'W/"' + crypto.randomUUID() + `", W/"public-${uuid}"`
+                'if-none-match': 'W/"' + crypto.randomUUID() + `", W/"${uuid}"`
             }
         })
         t.assert.strictEqual(response.statusCode, 304)
@@ -560,7 +560,7 @@ suite('Speedis - Origin', () => {
         t.plan(1)
         let originmaxage = 10
         const uuid = crypto.randomUUID()
-        let url = '/mocks/mocks/items/public-' + uuid
+        let url = '/mocks/mocks/public/items/' + uuid
         url += '?cc=' + encodeURIComponent(`public,max-age=${originmaxage}`)
         let response = await server.inject({
             method: 'GET',
@@ -576,7 +576,7 @@ suite('Speedis - Origin', () => {
         t.plan(2)
         let originmaxage = 10
         const uuid = crypto.randomUUID()
-        let url = '/mocks/mocks/items/public-' + uuid
+        let url = '/mocks/mocks/public/items/' + uuid
         url += '?cc=' + encodeURIComponent(`public,max-age=${originmaxage}`)
         let response = await server.inject({
             method: 'GET',

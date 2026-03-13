@@ -5,11 +5,12 @@ But they can be easyly adapted to works with Speedis deployed in a Kubernetes en
 
 ## **Request to the Mocked origin server (HTTP/1)**
 ```sh
-curl -vk --http1.1 --resolve mocks.localhost:3030:127.0.0.1 'https://mocks.localhost:3030/mocks/public/items/real-betis'
+curl -vk --http1.1 --resolve mocks.localhost:3030:127.0.0.1 'https://mocks.localhost:3030/mocks/public/items/real-betis?delay=300&cc=public,max-age=10'
 ```
+
 ## **Request to the Mocked origin server (HTTP/2)**
 ```sh
-curl -vk --http2 --resolve mocks.localhost:3030:127.0.0.1 'https://mocks.localhost:3030/mocks/public/items/real-betis'
+curl -vk --http2 --resolve mocks.localhost:3030:127.0.0.1 'https://mocks.localhost:3030/mocks/public/items/real-betis?delay=300&cc=public,max-age=10'
 ```
 ## **Request to Speedis**
 ```sh

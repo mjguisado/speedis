@@ -11,7 +11,7 @@ suite('Speedis - Origin', () => {
         server = fastify({
             logger: { level: 'info' }
         })
-        
+
         const plugins = new Map()
 
         server.register(
@@ -23,14 +23,17 @@ suite('Speedis - Origin', () => {
                 "metrics": false,
                 "origin": {
                     "http1xOptions": {
+                        "protocol": "https:",
                         "host": "mocks",
                         "port": 3030,
                         "timeout": 1000
-                    }
+                    },
+                    "headersToForward": ["*"],
+                    "headersToExclude": []
                 }
             }
         )
-        plugins.set("proxy","/proxy")
+        plugins.set("proxy", "/proxy")
 
         server.register(
             speedisPlugin,
@@ -41,15 +44,18 @@ suite('Speedis - Origin', () => {
                 "metrics": false,
                 "origin": {
                     "http1xOptions": {
+                        "protocol": "https:",
                         "host": "mocks",
                         "port": 3030,
                         "timeout": 1000
                     },
+                    "headersToForward": ["*"],
+                    "headersToExclude": [],
                     "originTimeout": 1000
                 }
             }
         )
-        plugins.set("proxy-timeout","/proxy-timeout")
+        plugins.set("proxy-timeout", "/proxy-timeout")
 
         server.register(
             speedisPlugin,
@@ -60,17 +66,20 @@ suite('Speedis - Origin', () => {
                 "metrics": false,
                 "origin": {
                     "http1xOptions": {
+                        "protocol": "https:",
                         "host": "mocks",
                         "port": 3030,
                         "timeout": 1000
                     },
+                    "headersToForward": ["*"],
+                    "headersToExclude": [],
                     "agentOptions": {
                         "keepAlive": true
                     }
                 }
             }
         )
-        plugins.set("proxy-agent","/proxy-agent")
+        plugins.set("proxy-agent", "/proxy-agent")
 
         server.register(
             speedisPlugin,
@@ -81,10 +90,13 @@ suite('Speedis - Origin', () => {
                 "metrics": false,
                 "origin": {
                     "http1xOptions": {
+                        "protocol": "https:",
                         "host": "mocks",
                         "port": 3030,
                         "timeout": 1000
                     },
+                    "headersToForward": ["*"],
+                    "headersToExclude": [],
                     "agentOptions": {
                         "keepAlive": true
                     },
@@ -92,7 +104,7 @@ suite('Speedis - Origin', () => {
                 }
             }
         )
-        plugins.set("proxy-agent-timeout","/proxy-agent-timeout")
+        plugins.set("proxy-agent-timeout", "/proxy-agent-timeout")
 
         server.register(
             speedisPlugin,
@@ -103,10 +115,13 @@ suite('Speedis - Origin', () => {
                 "metrics": false,
                 "origin": {
                     "http1xOptions": {
+                        "protocol": "https:",
                         "host": "mocks",
                         "port": 3030,
                         "timeout": 1000
                     },
+                    "headersToForward": ["*"],
+                    "headersToExclude": [],
                     "agentOptions": {
                         "keepAlive": true
                     },
@@ -119,17 +134,17 @@ suite('Speedis - Origin', () => {
                 }
             }
         )
-        plugins.set("proxy-agent-timeout-circuit-breaker","/proxy-agent-timeout-circuit-breaker")
+        plugins.set("proxy-agent-timeout-circuit-breaker", "/proxy-agent-timeout-circuit-breaker")
 
         server.decorate('plugins', plugins)
-        
+
         await server.ready()
-        
+
     })
 
-     test('Proxy', async (t) => {
+    test('Proxy', async (t) => {
         t.plan(1)
-        let url = '/proxy/mocks/items/public-' + crypto.randomUUID()
+        let url = '/proxy/mocks/public/items/' + crypto.randomUUID()
         let response = await server.inject({
             method: 'GET',
             url: url
@@ -139,7 +154,7 @@ suite('Speedis - Origin', () => {
 
     test('Proxy - Agent', async (t) => {
         t.plan(1)
-        let url = '/proxy-agent/mocks/items/public-' + crypto.randomUUID()
+        let url = '/proxy-agent/mocks/public/items/' + crypto.randomUUID()
         let response = await server.inject({
             method: 'GET',
             url: url
@@ -149,7 +164,7 @@ suite('Speedis - Origin', () => {
 
     test('Proxy - Timeout', async (t) => {
         t.plan(2)
-        let url = '/proxy-timeout/mocks/items/public-' + crypto.randomUUID()
+        let url = '/proxy-timeout/mocks/public/items/' + crypto.randomUUID()
         let response = await server.inject({
             method: 'GET',
             url: url + '?delay=800'
@@ -165,7 +180,7 @@ suite('Speedis - Origin', () => {
 
     test('Proxy - Agent - Timeout', async (t) => {
         t.plan(2)
-        let url = '/proxy-agent-timeout/mocks/items/public-' + crypto.randomUUID()
+        let url = '/proxy-agent-timeout/mocks/public/items/' + crypto.randomUUID()
         let response = await server.inject({
             method: 'GET',
             url: url + '?delay=800'
@@ -182,36 +197,36 @@ suite('Speedis - Origin', () => {
     test('Proxy - Agent - Timeout - Circuit Breaker - CLOSED', async (t) => {
         t.plan(11)
         let url, response
-        for (let counter = 0; counter < 5; counter ++) {
-            url = '/proxy-agent-timeout/mocks/items/public-' + crypto.randomUUID()
+        for (let counter = 0; counter < 5; counter++) {
+            url = '/proxy-agent-timeout/mocks/public/items/' + crypto.randomUUID()
             response = await server.inject({
                 method: 'GET',
                 url: url
             })
             t.assert.strictEqual(200, response.statusCode)
         }
-        url = '/proxy-agent-timeout/mocks/items/public-' + crypto.randomUUID() + '?delay=2500'
+        url = '/proxy-agent-timeout/mocks/public/items/' + crypto.randomUUID() + '?delay=2500'
         response = await server.inject({
             method: 'GET',
             url: url + '?delay=1200'
         })
         t.assert.strictEqual(504, response.statusCode)
-        for (let counter = 0; counter < 5; counter ++) {
-            url = '/proxy-agent-timeout/mocks/items/public-' + crypto.randomUUID()
+        for (let counter = 0; counter < 5; counter++) {
+            url = '/proxy-agent-timeout/mocks/public/items/' + crypto.randomUUID()
             response = await server.inject({
                 method: 'GET',
                 url: url
             })
             t.assert.strictEqual(200, response.statusCode)
-        }        
+        }
     })
 
     test('Proxy - Agent - Timeout - Circuit Breaker - OPEN', async (t) => {
         t.plan(12)
         let url, response
         // CB CLOSED => 200
-        for (let counter = 0; counter < 4; counter ++) {
-            url = '/proxy-agent-timeout-circuit-breaker/mocks/items/public-' + crypto.randomUUID()
+        for (let counter = 0; counter < 4; counter++) {
+            url = '/proxy-agent-timeout-circuit-breaker/mocks/public/items/' + crypto.randomUUID()
             response = await server.inject({
                 method: 'GET',
                 url: url
@@ -219,8 +234,8 @@ suite('Speedis - Origin', () => {
             t.assert.strictEqual(200, response.statusCode)
         }
         // (2x504) / (3x200) > 25% => CB OPENED
-        for (let counter = 0; counter < 2; counter ++) {
-            url = '/proxy-agent-timeout-circuit-breaker/mocks/items/public-' + crypto.randomUUID() + '?delay=2500'
+        for (let counter = 0; counter < 2; counter++) {
+            url = '/proxy-agent-timeout-circuit-breaker/mocks/public/items/' + crypto.randomUUID() + '?delay=2500'
             response = await server.inject({
                 method: 'GET',
                 url: url + '?delay=1200'
@@ -228,8 +243,8 @@ suite('Speedis - Origin', () => {
             t.assert.strictEqual(504, response.statusCode)
         }
         // CB OPENED => 500
-        for (let counter = 0; counter < 2; counter ++) {
-            url = '/proxy-agent-timeout-circuit-breaker/mocks/items/public-' + crypto.randomUUID()
+        for (let counter = 0; counter < 2; counter++) {
+            url = '/proxy-agent-timeout-circuit-breaker/mocks/public/items/' + crypto.randomUUID()
             response = await server.inject({
                 method: 'GET',
                 url: url
@@ -239,14 +254,14 @@ suite('Speedis - Origin', () => {
         // Wait to HALF OPENED
         await new Promise((resolve) => setTimeout(resolve, 2000))
         // CB HALF CLOSED and then CB CLOSED
-        for (let counter = 0; counter < 4; counter ++) {
-            url = '/proxy-agent-timeout-circuit-breaker/mocks/items/public-' + crypto.randomUUID()
+        for (let counter = 0; counter < 4; counter++) {
+            url = '/proxy-agent-timeout-circuit-breaker/mocks/public/items/' + crypto.randomUUID()
             response = await server.inject({
                 method: 'GET',
                 url: url
             })
             t.assert.strictEqual(200, response.statusCode)
-        } 
+        }
     })
 
     after(async () => {
