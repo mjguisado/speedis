@@ -18,7 +18,6 @@ REDIS_URL="redis://localhost:6379/0"
 The full set of options you can provide to REDIS_URL is: REDIS_URL="redis://{user}:{password}@{host}:{port}/{database}".
 Note that you cannot use an @ or : in your username or password when using REDIS_URL.
 Alternatively to REDIS_URL, you can set the following environment variables directly: REDIS_HOST, REDIS_PORT, REDIS_DB, and REDIS_USER, REDIS_PASS which do allow all special characters.
-To use an in-memory redis, set REDIS_URL="redis://mock".
 */
 
 let config = {}

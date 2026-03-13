@@ -10,6 +10,41 @@ If the USE_REDIS_CONFIG environment variable is set (truthy) Speedis connects to
 
 If no configuration is found anywhere, Speedis logs a warning and continues with built-in defaults.
 
+## Environment variables for Redis connection
+
+When `USE_REDIS_CONFIG` is enabled, Speedis needs to connect to Redis to fetch the configuration. You can configure this connection using environment variables.
+
+### Option 1: Using REDIS_URL
+The simplest way is to use a single connection string:
+
+```bash
+REDIS_URL="redis://localhost:6379/0"
+```
+
+The full format is: `REDIS_URL="redis://{user}:{password}@{host}:{port}/{database}"`
+
+**Note:** You cannot use `@` or `:` characters in your username or password when using `REDIS_URL`.
+
+### Option 2: Using individual environment variables
+Alternatively, you can set each connection parameter separately. This method allows all special characters in usernames and passwords:
+
+```bash
+REDIS_HOST="localhost"
+REDIS_PORT="6379"
+REDIS_DB="0"
+REDIS_USER="myuser"
+REDIS_PASS="my:p@ssword"
+```
+
+### Configuration key
+By default, Speedis looks for the main configuration at the Redis key `speedis:config:main`. You can customize this with:
+
+```bash
+SPEEDIS_CONFIG_KEY="my:custom:config:key"
+```
+
+---
+
 The following table describes the supported fields in the main configuration.
 
 |Field|Type|Mandatory|Default|Description|
