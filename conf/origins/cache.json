@@ -16,6 +16,19 @@
         "originBreakerOptions": {
             "errorThresholdPercentage": 25,
             "resetTimeout": 2000
+        },
+        "authentication": {
+            "scheme": "Bearer",
+            "bearer": {
+                "jwksUri": "https://keycloak:8443/realms/speedis/protocol/openid-connect/certs"
+            },
+            "idTransformation": {
+                "hash": {
+                    "enabled": true,
+                    "algorithm": "sha256",
+                    "hex": true
+                }
+            }
         }
     },
     "redis": {
@@ -31,19 +44,6 @@
         "disableOriginOnRedisOutage": true
     },
     "cache": {
-        "authentication": {
-            "scheme": "Bearer",
-            "bearer": {
-                "jwksUri": "https://keycloak:8443/realms/speedis/protocol/openid-connect/certs"
-            },
-            "idTransformation": {
-                "hash": {
-                    "enabled": true,
-                    "algorithm": "sha256",
-                    "hex": true
-                }
-            }
-        },
         "cacheables": [
             {
                 "urlPattern": "/mocks/public/items/.*",

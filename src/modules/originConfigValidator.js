@@ -1,77 +1,185 @@
+/**
+ * Initializes and compiles the origin configuration validator using AJV (Another JSON Schema Validator).
+ *
+ * This validator enforces complex conditional requirements between different modules:
+ * - Redis dependency management based on enabled modules
+ * - Authentication requirements for private caching
+ * - Module-specific required fields only when modules are enabled
+ *
+ * @param {Object} ajv - An instance of AJV validator
+ * @returns {Function} Compiled validation function
+ */
 export function initOriginConfigValidator(ajv) {
     return ajv.compile(
         {
             type: "object",
             additionalProperties: false,
             required: ["id", "prefix", "origin"],
-            // Redis is required unless all modules that need it are absent or explicitly disabled
-            if: {
-                not: {
-                    allOf: [
-                        {
-                            // variantsTracker is absent or explicitly disabled
-                            anyOf: [
+
+            // Root-level conditional validations
+            // These rules apply to the entire configuration object and enforce cross-module dependencies
+            allOf: [
+                {
+                    /**
+                     * CONDITIONAL RULE #1: Redis dependency validation
+                     *
+                     * Logic: Redis is REQUIRED if ANY of these modules are enabled:
+                     * - cache
+                     * - oauth2
+                     * - variantsTracker
+                     *
+                     * Implementation: Using double negation for clarity
+                     * IF NOT (all modules are absent or disabled)
+                     * THEN redis is required
+                     *
+                     * This translates to: "If at least one module needs Redis, then Redis must be configured"
+                     */
+                    if: {
+                        not: {
+                            allOf: [
                                 {
-                                    not: {
-                                        required: ["variantsTracker"]
-                                    }
+                                    // variantsTracker is absent OR explicitly disabled (enabled: false)
+                                    anyOf: [
+                                        {
+                                            // Module is not present in configuration
+                                            not: {
+                                                required: ["variantsTracker"]
+                                            }
+                                        },
+                                        {
+                                            // Module is present but explicitly disabled
+                                            type: "object",
+                                            properties: {
+                                                variantsTracker: {
+                                                    type: "object",
+                                                    properties: { enabled: { const: false } },
+                                                    required: ["enabled"]
+                                                }
+                                            }
+                                        }
+                                    ]
                                 },
                                 {
-                                    type: "object",
-                                    properties: {
-                                        variantsTracker: {
+                                    // cache is absent OR explicitly disabled (enabled: false)
+                                    anyOf: [
+                                        {
+                                            // Module is not present in configuration
+                                            not: {
+                                                required: ["cache"]
+                                            }
+                                        },
+                                        {
+                                            // Module is present but explicitly disabled
                                             type: "object",
-                                            properties: { enabled: { const: false } },
-                                            required: ["enabled"]
+                                            properties: {
+                                                cache: {
+                                                    type: "object",
+                                                    properties: { enabled: { const: false } },
+                                                    required: ["enabled"]
+                                                }
+                                            }
                                         }
-                                    }
-                                }
-                            ]
-                        },
-                        {
-                            // cache is absent or explicitly disabled
-                            anyOf: [
-                                {
-                                    not: {
-                                        required: ["cache"]
-                                    }
+                                    ]
                                 },
                                 {
-                                    type: "object",
-                                    properties: {
-                                        cache: {
+                                    // oauth2 is absent OR explicitly disabled (enabled: false)
+                                    anyOf: [
+                                        {
+                                            // Module is not present in configuration
+                                            not: {
+                                                required: ["oauth2"]
+                                            }
+                                        },
+                                        {
+                                            // Module is present but explicitly disabled
                                             type: "object",
-                                            properties: { enabled: { const: false } },
-                                            required: ["enabled"]
+                                            properties: {
+                                                oauth2: {
+                                                    type: "object",
+                                                    properties: { enabled: { const: false } },
+                                                    required: ["enabled"]
+                                                }
+                                            }
                                         }
-                                    }
-                                }
-                            ]
-                        },
-                        {
-                            // oauth2 is absent or explicitly disabled
-                            anyOf: [
-                                {
-                                    not: {
-                                        required: ["oauth2"]
-                                    }
-                                },
-                                {
-                                    type: "object",
-                                    properties: {
-                                        oauth2: {
-                                            type: "object",
-                                            properties: { enabled: { const: false } },
-                                            required: ["enabled"]
-                                        }
-                                    }
+                                    ]
                                 }
                             ]
                         }
-                    ]
+                    },
+                    then: { required: ["redis"] }
+                },
+                {
+                    /**
+                     * CONDITIONAL RULE #2: Authentication requirement for private caching
+                     *
+                     * Logic: origin.authentication is REQUIRED when:
+                     * 1. cache module is enabled (enabled !== false)
+                     * 2. AND at least one cacheable entry has private: true
+                     *
+                     * Rationale: Private caching requires user identification to create separate
+                     * cache entries per user. The authentication configuration defines how to
+                     * extract user identifiers from requests.
+                     *
+                     * Implementation notes:
+                     * - Uses JSON Schema "contains" to check if array has at least one matching element
+                     * - Ensures authentication is not only present but also enabled
+                     */
+                    if: {
+                        properties: {
+                            cache: {
+                                type: "object",
+                                allOf: [
+                                    {
+                                        // Condition 1: cache.enabled !== false
+                                        // Note: This allows both enabled: true and missing enabled property (defaults to true)
+                                        not: {
+                                            properties: { enabled: { const: false } },
+                                            required: ["enabled"]
+                                        }
+                                    },
+                                    {
+                                        // Condition 2: At least one cacheable has private: true
+                                        // Uses "contains" keyword to check array elements
+                                        properties: {
+                                            cacheables: {
+                                                type: "array",
+                                                contains: {
+                                                    type: "object",
+                                                    properties: {
+                                                        private: { const: true }
+                                                    },
+                                                    required: ["private"]
+                                                }
+                                            }
+                                        },
+                                        required: ["cacheables"]
+                                    }
+                                ]
+                            }
+                        },
+                        required: ["cache"]
+                    },
+                    then: {
+                        // When conditions are met, require origin.authentication and ensure it's enabled
+                        properties: {
+                            origin: {
+                                type: "object",
+                                required: ["authentication"],
+                                properties: {
+                                    authentication: {
+                                        type: "object",
+                                        // Ensure authentication.enabled !== false
+                                        not: {
+                                            properties: { enabled: { const: false } },
+                                            required: ["enabled"]
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
-            },
-            then: { required: ["redis"] },
+            ],
             definitions: {
                 circuitBreakerOptions: {
                     type: "object",
@@ -171,15 +279,30 @@ export function initOriginConfigValidator(ajv) {
                 },
                 exposeErrors: { type: "boolean", default: false },
                 metrics: { type: "boolean", default: true },
+                /**
+                 * ORIGIN CONFIGURATION
+                 *
+                 * Defines how Speedis connects to and communicates with the upstream origin server.
+                 * Supports both HTTP/2 and HTTP/1.x protocols (mutually exclusive).
+                 */
                 origin: {
                     type: "object",
                     additionalProperties: false,
+
+                    // Must configure either HTTP/2 or HTTP/1.x (but not both)
                     oneOf: [
                         { required: ["http2Options"] },
                         { required: ["http1xOptions"] }
                     ],
+
                     allOf: [
                         {
+                            /**
+                             * CONDITIONAL: HTTP/2 exclusivity
+                             *
+                             * If HTTP/2 is configured, then HTTP/1.x options and agent options
+                             * must NOT be present (they are incompatible).
+                             */
                             if: {
                                 required: ["http2Options"]
                             },
@@ -193,6 +316,12 @@ export function initOriginConfigValidator(ajv) {
                             }
                         },
                         {
+                            /**
+                             * CONDITIONAL: Circuit breaker options requirement
+                             *
+                             * If originBreaker is explicitly enabled (true), then
+                             * originBreakerOptions must be provided.
+                             */
                             if: {
                                 properties: {
                                     originBreaker: { const: true }
@@ -204,6 +333,7 @@ export function initOriginConfigValidator(ajv) {
                             }
                         }
                     ],
+
                     properties: {
                         http2Options: {
                             type: "object",
@@ -228,13 +358,129 @@ export function initOriginConfigValidator(ajv) {
                         },
                         originTimeout: { type: "integer" },
                         originBreaker: { type: "boolean", default: false },
-                        originBreakerOptions: { $ref: "#/definitions/circuitBreakerOptions" }
+                        originBreakerOptions: { $ref: "#/definitions/circuitBreakerOptions" },
+
+                        /**
+                         * AUTHENTICATION CONFIGURATION
+                         *
+                         * Defines how to extract user identifiers from requests for private caching.
+                         * This is PASSIVE authentication - it extracts user info but doesn't manage login flows.
+                         *
+                         * Note: This is different from oauth2 module which ACTIVELY manages authentication flows.
+                         *
+                         * Required when: cache module has private cacheables (see root-level conditional rule #2)
+                         */
+                        authentication: {
+                            type: "object",
+                            additionalProperties: false,
+
+                            allOf: [
+                                {
+                                    /**
+                                     * CONDITIONAL: Bearer token configuration requirement
+                                     *
+                                     * If scheme is "Bearer", then bearer configuration object is required
+                                     * to specify JWT validation settings.
+                                     */
+                                    if: {
+                                        properties: { scheme: { const: "Bearer" } },
+                                        required: ["scheme"]
+                                    },
+                                    then: {
+                                        required: ["bearer"]
+                                    }
+                                }
+                            ],
+
+                            properties: {
+                                enabled: { type: "boolean", default: true },
+                                scheme: { type: "string", enum: ["Basic", "Bearer"], default: "Basic" },
+
+                                /**
+                                 * Bearer token validation settings
+                                 * Used when scheme is "Bearer"
+                                 */
+                                bearer: {
+                                    type: "object",
+                                    additionalProperties: false,
+
+                                    allOf: [
+                                        {
+                                            /**
+                                             * CONDITIONAL: JWKS URI requirement
+                                             *
+                                             * If JWT signature verification is enabled (default behavior),
+                                             * then jwksUri must be provided to fetch public keys for validation.
+                                             *
+                                             * Logic: IF NOT (verifyJwtSignature === false) THEN jwksUri is required
+                                             */
+                                            if: {
+                                                not: {
+                                                    properties: { verifyJwtSignature: { const: false } },
+                                                    required: ["verifyJwtSignature"]
+                                                }
+                                            },
+                                            then: {
+                                                required: ["jwksUri"]
+                                            }
+                                        }
+                                    ],
+
+                                    properties: {
+                                        claim: { type: "string", default: "sub" },
+                                        allowUnsigned: { type: "boolean", default: false },
+                                        verifyJwtSignature: { type: "boolean", default: true },
+                                        jwksUri: { type: "string" }
+                                    }
+                                },
+
+                                /**
+                                 * User ID transformation settings
+                                 *
+                                 * Defines how to transform the extracted user identifier before using it
+                                 * in cache keys (e.g., adding prefix/suffix, hashing for privacy).
+                                 *
+                                 * Note: Currently defined in schema but not implemented in code.
+                                 */
+                                idTransformation: {
+                                    type: "object",
+                                    additionalProperties: false,
+                                    properties: {
+                                        prefix: { type: "string", default: "" },
+                                        suffix: { type: "string", default: "" },
+                                        hash: {
+                                            type: "object",
+                                            additionalProperties: false,
+                                            properties: {
+                                                enabled: { type: "boolean", default: true },
+                                                algorithm: { type: "string", default: "sha256" },
+                                                hex: { type: "boolean", default: true }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
                 },
+                /**
+                 * BFF (Backend For Frontend) MODULE
+                 *
+                 * Enables request/response transformations at various phases of the request lifecycle.
+                 * Can modify headers, body, or other aspects of requests and responses.
+                 */
                 bff: {
                     type: "object",
                     additionalProperties: false,
-                    // transformations is required only when enabled !== false
+
+                    /**
+                     * CONDITIONAL: transformations requirement
+                     *
+                     * If bff module is enabled (enabled !== false), then transformations array is required.
+                     * This prevents enabling the module without defining what transformations to apply.
+                     *
+                     * Logic: IF NOT (enabled === false) THEN transformations is required
+                     */
                     if: {
                         not: {
                             properties: { enabled: { const: false } },
@@ -244,6 +490,7 @@ export function initOriginConfigValidator(ajv) {
                     then: {
                         required: ["transformations"]
                     },
+
                     properties: {
                         enabled: { type: "boolean", default: true },
                         actionsLibraries: {
@@ -290,10 +537,25 @@ export function initOriginConfigValidator(ajv) {
                         },
                     }
                 },
+
+                /**
+                 * VARIANTS TRACKER MODULE
+                 *
+                 * Tracks different response variants for the same URL to help identify
+                 * cache key variations and optimize caching strategies.
+                 */
                 variantsTracker: {
                     type: "object",
                     additionalProperties: false,
-                    // urlPatterns is required only when enabled !== false
+
+                    /**
+                     * CONDITIONAL: urlPatterns requirement
+                     *
+                     * If variantsTracker module is enabled (enabled !== false), then urlPatterns
+                     * array is required to specify which URLs should be tracked.
+                     *
+                     * Logic: IF NOT (enabled === false) THEN urlPatterns is required
+                     */
                     if: {
                         not: {
                             properties: { enabled: { const: false } },
@@ -303,6 +565,7 @@ export function initOriginConfigValidator(ajv) {
                     then: {
                         required: ["urlPatterns"]
                     },
+
                     properties: {
                         enabled: { type: "boolean", default: true },
                         urlPatterns: {
@@ -312,12 +575,28 @@ export function initOriginConfigValidator(ajv) {
                         }
                     }
                 },
+                /**
+                 * CACHE MODULE
+                 *
+                 * Configures HTTP caching behavior including what to cache, cache key generation,
+                 * and request coalescing strategies.
+                 *
+                 * Note: Authentication for private caching is configured in origin.authentication,
+                 * not here. See root-level conditional rule #2 for authentication requirements.
+                 */
                 cache: {
                     type: "object",
                     additionalProperties: false,
                     required: ["cacheables"],
+
                     allOf: [
                         {
+                            /**
+                             * CONDITIONAL: Distributed request coalescing options requirement
+                             *
+                             * If distributedRequestsCoalescing is enabled, then the options
+                             * object must be provided to configure lock TTL, retry behavior, etc.
+                             */
                             if: {
                                 properties: {
                                     distributedRequestsCoalescing: { const: true }
@@ -327,39 +606,9 @@ export function initOriginConfigValidator(ajv) {
                             then: {
                                 required: ["distributedRequestsCoalescingOptions"]
                             }
-                        },
-                        {
-                            // If any cacheable has private: true, authentication must exist and be enabled
-                            if: {
-                                properties: {
-                                    cacheables: {
-                                        type: "array",
-                                        contains: {
-                                            type: "object",
-                                            properties: {
-                                                private: { const: true }
-                                            },
-                                            required: ["private"]
-                                        }
-                                    }
-                                },
-                                required: ["cacheables"]
-                            },
-                            then: {
-                                required: ["authentication"],
-                                properties: {
-                                    authentication: {
-                                        type: "object",
-                                        not: {
-                                            type: "object",
-                                            properties: { enabled: { const: false } },
-                                            required: ["enabled"]
-                                        }
-                                    }
-                                }
-                            }
                         }
                     ],
+
                     properties: {
                         enabled: { type: "boolean", default: true },
                         purgePath: { type: "string", default: "/purge" },
@@ -385,65 +634,14 @@ export function initOriginConfigValidator(ajv) {
                                 retryJitter: { type: "integer" }
                             }
                         },
-                        authentication: {
-                            type: "object",
-                            additionalProperties: false,
-                            allOf: [
-                                {
-                                    if: {
-                                        properties: { scheme: { const: "Bearer" } },
-                                        required: ["scheme"]
-                                    },
-                                    then: {
-                                        required: ["bearer"]
-                                    }
-                                }
-                            ],
-                            properties: {
-                                enabled: { type: "boolean", default: true },
-                                scheme: { type: "string", enum: ["Basic", "Bearer"], default: "Basic" },
-                                bearer: {
-                                    type: "object",
-                                    additionalProperties: false,
-                                    allOf: [
-                                        {
-                                            if: {
-                                                not: {
-                                                    properties: { verifyJwtSignature: { const: false } },
-                                                    required: ["verifyJwtSignature"]
-                                                }
-                                            },
-                                            then: {
-                                                required: ["jwksUri"]
-                                            }
-                                        }
-                                    ],
-                                    properties: {
-                                        claim: { type: "string", default: "sub" },
-                                        allowUnsigned: { type: "boolean", default: false },
-                                        verifyJwtSignature: { type: "boolean", default: true },
-                                        jwksUri: { type: "string" }
-                                    }
-                                },
-                                idTransformation: {
-                                    type: "object",
-                                    additionalProperties: false,
-                                    properties: {
-                                        prefix: { type: "string", default: "" },
-                                        suffix: { type: "string", default: "" },
-                                        hash: {
-                                            type: "object",
-                                            additionalProperties: false,
-                                            properties: {
-                                                enabled: { type: "boolean", default: true },
-                                                algorithm: { type: "string", default: "sha256" },
-                                                hex: { type: "boolean", default: true }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        },
+                        /**
+                         * Cacheables array - defines which URLs should be cached
+                         *
+                         * Each entry specifies:
+                         * - urlPattern: regex pattern to match URLs
+                         * - private: if true, cache separately per user (requires origin.authentication)
+                         * - ttl: time-to-live in seconds (-1 means use HTTP cache headers)
+                         */
                         cacheables: {
                             type: "array",
                             minItems: 1,
@@ -461,12 +659,29 @@ export function initOriginConfigValidator(ajv) {
                         }
                     }
                 },
+                /**
+                 * OAUTH2 MODULE
+                 *
+                 * Actively manages OAuth 2.0 authentication flows including login, token management,
+                 * and session handling. This is ACTIVE authentication (manages login flows).
+                 *
+                 * Note: This is different from origin.authentication which is PASSIVE
+                 * (only extracts user info from existing tokens for caching purposes).
+                 */
                 oauth2: {
                     type: "object",
                     additionalProperties: false,
+
                     allOf: [
                         {
-                            // Required fields only when enabled !== false
+                            /**
+                             * CONDITIONAL: Core OAuth2 fields requirement
+                             *
+                             * If oauth2 module is enabled (enabled !== false), then all core
+                             * configuration fields are required.
+                             *
+                             * Logic: IF NOT (enabled === false) THEN these fields are required
+                             */
                             if: {
                                 not: {
                                     properties: { enabled: { const: false } },
@@ -486,6 +701,12 @@ export function initOriginConfigValidator(ajv) {
                             }
                         },
                         {
+                            /**
+                             * CONDITIONAL: Discovery endpoint requirement
+                             *
+                             * If discoverySupported is true, then authorizationServerMetadataLocation
+                             * must be provided (URL to fetch OAuth server metadata dynamically).
+                             */
                             if: {
                                 properties: {
                                     discoverySupported: { const: true }
@@ -497,6 +718,12 @@ export function initOriginConfigValidator(ajv) {
                             }
                         },
                         {
+                            /**
+                             * CONDITIONAL: Static metadata requirement
+                             *
+                             * If discoverySupported is false, then authorizationServerMetadata
+                             * must be provided (static OAuth server configuration).
+                             */
                             if: {
                                 properties: {
                                     discoverySupported: { const: false }
@@ -508,6 +735,7 @@ export function initOriginConfigValidator(ajv) {
                             }
                         }
                     ],
+
                     properties: {
                         enabled: { type: "boolean", default: true },
                         id: { type: "string" },
@@ -550,12 +778,27 @@ export function initOriginConfigValidator(ajv) {
                         }
                     }
                 },
+                /**
+                 * REDIS MODULE
+                 *
+                 * Configures Redis connection for caching, session storage, and distributed locking.
+                 *
+                 * Required when: Any of cache, oauth2, or variantsTracker modules are enabled
+                 * (see root-level conditional rule #1)
+                 */
                 redis: {
                     type: "object",
                     additionalProperties: false,
                     required: ["redisOptions"],
+
                     allOf: [
                         {
+                            /**
+                             * CONDITIONAL: Circuit breaker options requirement
+                             *
+                             * If redisBreaker is enabled, then redisBreakerOptions must be provided
+                             * to configure circuit breaker behavior for Redis operations.
+                             */
                             if: {
                                 properties: {
                                     redisBreaker: { const: true }
@@ -567,6 +810,7 @@ export function initOriginConfigValidator(ajv) {
                             }
                         }
                     ],
+
                     properties: {
                         redisOptions: {
                             type: "object",

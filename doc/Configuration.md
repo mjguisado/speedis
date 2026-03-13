@@ -83,6 +83,45 @@ The agentOptions parameter is only valid when http1xOptions is used.
 |`originTimeout`|Number|`false`||Specifies the maximum time allowed for retrieving the resource from the origin server before the request is considered a failure.|
 |`originBreaker`|Boolean|`false`|`false`|Enables (`true`) or disables (`false`) the origin's circuit breaker mechanism.|
 |`originBreakerOptions`|Object|`true` if originBreaker is `true`||Speedis leverages [Opossum](https://nodeshift.dev/opossum/) to implement the circuit breaker mechanism. This field is used to define the circuit braker options. Its format is almost identical to the original [options](https://nodeshift.dev/opossum/#circuitbreaker). The main difference is that, since the configuration is in JSON format, parameters defined as JavaScript entities in the original options are not supported. Additionally, options related to caching and coalescing features are also not supported.|
+|`authentication`|Object|`true` if cache has private cacheables||Defines how to extract user identifiers from requests for private caching. This is passive authentication - it extracts user info but doesn't manage login flows. See "Origin authentication" below for details.|
+
+### Origin authentication
+When cache entries are configured as private (per-user caching), the user identifier becomes part of the cache key.
+To extract the user identifier, Speedis supports several standard [HTTP authentication](https://www.rfc-editor.org/rfc/rfc7235.html) [schemes](https://www.iana.org/assignments/http-authschemes/http-authschemes.xhtml).
+
+**Important distinction:** `origin.authentication` is for **passive** user identification (extracting user IDs from existing credentials for caching purposes). This is different from the `oauth2` module which **actively** manages authentication flows (login, token management, sessions).
+
+The following table describes the supported fields for the `origin.authentication` configuration object.
+
+|Field|Type|Mandatory|Default|Description|
+|-----|----|---------|-------|-----------|
+|`enabled`|Boolean|`false`|`true`|Enables (`true`) or disables (`false`) authentication for this origin.|
+|`scheme`|String|`false`|`Basic`|[Authentication scheme](https://www.iana.org/assignments/http-authschemes/http-authschemes.xhtml) used to extract user identifiers. Supported values: `Basic`, `Bearer`.|
+|`bearer`|Object|`true` if scheme is `Bearer`||Bearer token validation options. Required when `scheme` is `Bearer`. See below for details.|
+|`idTransformation`|Object|`false`||Defines how the user identifier is transformed before being used in cache keys (e.g. hashing). See below for details.|
+
+#### Bearer token validation options
+The `bearer` object is only used when `scheme` is set to `Bearer`.
+
+|Field|Type|Mandatory|Default|Description|
+|-----|----|---------|-------|-----------|
+|`claim`|String|`false`|`sub`|The JWT claim used as the user identifier.|
+|`allowUnsigned`|Boolean|`false`|`false`|If `true`, unsigned JWTs are accepted.|
+|`verifyJwtSignature`|Boolean|`false`|`true`|If `true`, Speedis verifies the JWT signature against the JWKS endpoint. If `false`, the token is accepted without signature verification.|
+|`jwksUri`|String|`true` if verifyJwtSignature is `true`||The URL of the JSON Web Key Set (JWKS) used to validate the JWT signature. Required when `verifyJwtSignature` is `true` (the default).|
+
+#### User ID transformation options
+The following table describes the supported fields for the `origin.authentication.idTransformation` configuration object.
+
+|Field|Type|Mandatory|Default|Description|
+|-----|----|---------|-------|-----------|
+|`prefix`|String|`false`|`""`|Prefix to prepend to the user identifier.|
+|`suffix`|String|`false`|`""`|Suffix to append to the user identifier.|
+|`hash.enabled`|Boolean|`false`|`true`|When caching responses per user, it is often useful to transform the user identifier before it becomes part of the cache key, in order to prevent exposing raw user IDs and to safeguard Personally Identifiable Information (PII). If `true`, the user identifier is hashed before being used in the cache key.|
+|`hash.algorithm`|String|`false`|`sha256`|Hash algorithm to use. Must be supported by Node.js `crypto.getHashes()`.|
+|`hash.hex`|Boolean|`false`|`true`|If `true`, the hash output is encoded as a hexadecimal string (default). Otherwise it will use a binary/base64 encoding.|
+
+**Note:** When `hash.enabled` is set to `true`, the prefix and suffix are applied to the hashed value of the user identifier. If hashing is disabled, they are applied to the raw user identifier instead.
 
 ## Backend-For-Frontend (BFF) configuration object
 Speedis can apply various transformations to incoming requests and outgoing responses throughout their lifecycle.
@@ -166,7 +205,6 @@ The following table describes the supported fields in the cache configuration ob
 |`distributedRequestsCoalescing`|Boolean|`false`|`false`|Enables (`true`) or disables (`false`) the request coalescing functionality across multiple instances.|
 |`distributedRequestsCoalescingOptions`|Object|`true` if distributedRequestsCoalescing is `true`||Configure the distributed lock mechanism used to implements the requests coalescing functionality across multiple instances. Its format is detailed below.|
 |`cacheables`|[Object]|`true`||List of URL patterns that are considered cacheable. Only request with method GET or HEAD can be cached. Its format is detailed below.|
-|`authentication`|Object|`false`||Defines how requests to the cache are authenticated and how the user identifier is handled. See "Cache authentication" below for details.|
 
 ### Lock configuration object
 The following table describes the supported fields in the lock configuration object.
@@ -182,42 +220,8 @@ The following table describes the supported fields in the cacheable configuratio
 |Field|Type|Mandatory|Default|Description|
 |-----|----|---------|-------|-----------|
 |`urlPattern`|String|`true`||URL patterns that are considered cacheable.|
-|`private`|Boolean|`false`|`false`|Indicates whether the response for a given URL should be cached separately for each authenticated user. If `true`, the authentication must be enabled for the cache.|
+|`private`|Boolean|`false`|`false`|Indicates whether the response for a given URL should be cached separately for each authenticated user. If `true`, `origin.authentication` must be configured.|
 |`ttl`|Number|`false`|`Infinity`|This parameter defines how long the response will be stored in the cache.|
-
-### Cache authentication
-Cache entries can be configured as private so that they are associated with a specific user.
-In that case, the user identifier becomes part of the cache key.
-To extract the user identifier, Speedis supports several standard [HTTP authentication](https://www.rfc-editor.org/rfc/rfc7235.html) [schemes](https://www.iana.org/assignments/http-authschemes/http-authschemes.xhtml).
-The following table describes the supported fields for the `cache.authentication` configuration object.
-
-|Field|Type|Mandatory|Default|Description|
-|-----|----|---------|-------|-----------|
-|`enabled`|Boolean|`false`|`true`|Enables (`true`) or disables (`false`) cache authentication.| 
-|`scheme`|String|`false`|`Basic`|[Authentication scheme](https://www.iana.org/assignments/http-authschemes/http-authschemes.xhtml) used to authenticate requests to the cache. Supported values: `Basic`, `Bearer`.| 
-|`bearer`|Object|`false`||Bearer token validation options. Required when `scheme` is `Bearer`. See below for details.|
-|`idTransformation`|Object|`false`||Defines how the user identifier is transformed before being used in cache keys (e.g. hashing). See below for details.|
-
-#### Bearer token validation options
-The `bearer` object is only used when `scheme` is set to `Bearer`.
-
-|Field|Type|Mandatory|Default|Description|
-|-----|----|---------|-------|-----------|
-|`claim`|String|`false`|`sub`|The JWT claim used as the user identifier.| 
-|`allowUnsigned`|Boolean|`false`|`false`|If `true`, unsigned JWTs are accepted.|
-|`verifyJwtSignature`|Boolean|`false`|`true`|If `true`, Speedis verifies the JWT signature against the JWKS endpoint. If `false`, the token is accepted without signature verification.| 
-|`jwksUri`|String|`conditional`||The URL of the JSON Web Key Set (JWKS) used to validate the JWT signature. Required when `verifyJwt` is `true` (the default).|
-
-#### Cache key transformation options
-The following table describes the supported fields for the `cache.authentication.idTransformation` configuration object.
-|Field|Type|Mandatory|Default|Description|
-|-----|----|---------|-------|-----------|
-|`prefix`|String|`false`|`""`|Prefix to prepend to the user identifier.|
-|`suffix`|String|`false`|`""`|Suffix to append to the user identifier.|
-|`hash.enabled`|Boolean|`false`|`true`|When caching responses per user, it is often useful to transform the user identifier before it becomes part of the cache key, in order to prevent exposing raw user IDs and to safeguard Personally Identifiable Information (PII). If `true`, the user identifier is hashed before being used in the cache key.| 
-|`hash.algorithm`|String|`false`|`sha256`|Hash algorithm to use. Must be supported by Node.js `crypto.getHashes()`.| 
-|`hash.hex`|Boolean|`false`|`true`|If `true`, the hash output is encoded as a hexadecimal string (default). Otherwise it will use a binary/base64 encoding.| 
-Note: When hash.enabled is set to true, the prefix and suffix are applied to the hashed value of the user identifier. If hashing is disabled, they are applied to the raw user identifier instead.
 
 ## OAuth2-based Access Control
 The following table describes the supported fields in the OAuth2-based Access Control configuration object.
