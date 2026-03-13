@@ -4,46 +4,72 @@ export function initOriginConfigValidator(ajv) {
             type: "object",
             additionalProperties: false,
             required: ["id", "prefix", "origin"],
-            // Redis is required if cache or oauth2 are present and enabled
+            // Redis is required unless all modules that need it are absent or explicitly disabled
             if: {
-                anyOf: [
-                    {
-                        // OAuth2 exists and is enabled (or enabled is not explicitly set to false)
-                        required: ["variantsTracker"],
-                        properties: {
-                            variantsTracker: {
-                                not: {
-                                    properties: { enabled: { const: false } },
-                                    required: ["enabled"]
+                not: {
+                    allOf: [
+                        {
+                            // variantsTracker is absent or explicitly disabled
+                            anyOf: [
+                                {
+                                    not: {
+                                        required: ["variantsTracker"]
+                                    }
+                                },
+                                {
+                                    type: "object",
+                                    properties: {
+                                        variantsTracker: {
+                                            type: "object",
+                                            properties: { enabled: { const: false } },
+                                            required: ["enabled"]
+                                        }
+                                    }
                                 }
-                            }
-                        }
-                    },                    
-                    {
-                        // Cache exists and is enabled (or enabled is not explicitly set to false)
-                        required: ["cache"],
-                        properties: {
-                            cache: {
-                                not: {
-                                    properties: { enabled: { const: false } },
-                                    required: ["enabled"]
+                            ]
+                        },
+                        {
+                            // cache is absent or explicitly disabled
+                            anyOf: [
+                                {
+                                    not: {
+                                        required: ["cache"]
+                                    }
+                                },
+                                {
+                                    type: "object",
+                                    properties: {
+                                        cache: {
+                                            type: "object",
+                                            properties: { enabled: { const: false } },
+                                            required: ["enabled"]
+                                        }
+                                    }
                                 }
-                            }
-                        }
-                    },
-                    {
-                        // OAuth2 exists and is enabled (or enabled is not explicitly set to false)
-                        required: ["oauth2"],
-                        properties: {
-                            oauth2: {
-                                not: {
-                                    properties: { enabled: { const: false } },
-                                    required: ["enabled"]
+                            ]
+                        },
+                        {
+                            // oauth2 is absent or explicitly disabled
+                            anyOf: [
+                                {
+                                    not: {
+                                        required: ["oauth2"]
+                                    }
+                                },
+                                {
+                                    type: "object",
+                                    properties: {
+                                        oauth2: {
+                                            type: "object",
+                                            properties: { enabled: { const: false } },
+                                            required: ["enabled"]
+                                        }
+                                    }
                                 }
-                            }
+                            ]
                         }
-                    }
-                ]
+                    ]
+                }
             },
             then: { required: ["redis"] },
             definitions: {
@@ -285,6 +311,7 @@ export function initOriginConfigValidator(ajv) {
                             }
                         },
                         {
+                            // If any cacheable has private: true, authentication must exist and be enabled
                             if: {
                                 properties: {
                                     cacheables: {
@@ -304,7 +331,9 @@ export function initOriginConfigValidator(ajv) {
                                 required: ["authentication"],
                                 properties: {
                                     authentication: {
+                                        type: "object",
                                         not: {
+                                            type: "object",
                                             properties: { enabled: { const: false } },
                                             required: ["enabled"]
                                         }

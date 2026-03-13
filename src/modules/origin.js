@@ -220,7 +220,7 @@ export async function proxy(server, opts, request) {
     // We set the method to the one used in the original request.
     requestOptions.method = request.method
 
-    if (opts.bff) transform(opts, ORIGIN_REQUEST, requestOptions)
+    if (opts?.bff?.enabled) transform(opts, ORIGIN_REQUEST, requestOptions)
 
     const fetch = server.originBreaker
         ? server.originBreaker.fire(server, opts, requestOptions, request.rawBody)
@@ -234,7 +234,7 @@ export async function proxy(server, opts, request) {
 
     // Apply transformations to the response received from the origin
     response.path = requestOptions.path
-    if (opts.bff) transform(opts, ORIGIN_RESPONSE, response)
+    if (opts?.bff?.enabled) transform(opts, ORIGIN_RESPONSE, response)
 
     return response
 

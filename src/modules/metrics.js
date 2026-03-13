@@ -34,7 +34,7 @@ export function initMetrics(server, opts) {
         })
     }
 
-    const oauth2UrlPrefix = opts.oauth2
+    const oauth2UrlPrefix = opts?.oauth2?.enabled
         ? path.join(opts.prefix, opts.oauth2.prefix)
         : false
 

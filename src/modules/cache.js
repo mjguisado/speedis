@@ -329,7 +329,7 @@ export async function _get(server, opts, request) {
         cachedResponse.path = requestOptions.path
 
         // Apply transformations to the entry fetched from the cache
-        if (opts.bff) bff.transform(opts, bff.CACHE_RESPONSE, cachedResponse)
+        if (opts?.bff?.enabled) bff.transform(opts, bff.CACHE_RESPONSE, cachedResponse)
 
         // See: https://www.rfc-editor.org/rfc/rfc9111.html#name-calculating-freshness-lifet
         const freshnessLifetime = utils.calculateFreshnessLifetime(cachedResponse)
@@ -434,7 +434,7 @@ export async function _get(server, opts, request) {
                 requestOptions.headers['authorization'] = `Bearer ${request.session.access_token}`
             }
             // Apply transformations to the request before sending it to the origin
-            if (opts.bff) bff.transform(opts, bff.ORIGIN_REQUEST, requestOptions)
+            if (opts?.bff?.enabled) bff.transform(opts, bff.ORIGIN_REQUEST, requestOptions)
 
             if (server.originBreaker) {
                 fetch = server.originBreaker.fire(server, opts, requestOptions, request.body)
@@ -458,7 +458,7 @@ export async function _get(server, opts, request) {
 
         // Apply transformations to the response received from the origin
         originResponse.path = requestOptions.path
-        if (opts.bff) bff.transform(opts, bff.ORIGIN_RESPONSE, originResponse)
+        if (opts?.bff?.enabled) bff.transform(opts, bff.ORIGIN_RESPONSE, originResponse)
 
         // Unsure that we have a valid Date Header
         utils.ensureValidDateHeader(originResponse, responseTime)
@@ -573,7 +573,7 @@ export async function _get(server, opts, request) {
         if (writeCache) {
             try {
                 // Apply transformations to the cache entry before storing it in the cache.
-                if (opts.bff) bff.transform(opts, bff.CACHE_REQUEST, cachedResponse)
+                if (opts?.bff?.enabled) bff.transform(opts, bff.CACHE_REQUEST, cachedResponse)
 
                 // Update the cache
                 const ttl = parseInt(cachedResponse.ttl)
@@ -604,7 +604,7 @@ export async function _get(server, opts, request) {
         if (writeCache) {
             cacheEntry.ttl = request.cacheable_ttl
             // Apply transformations to the cache entry before storing it in the cache.
-            if (opts.bff) bff.transform(opts, bff.CACHE_REQUEST, cacheEntry)
+            if (opts?.bff?.enabled) bff.transform(opts, bff.CACHE_REQUEST, cacheEntry)
             const ttl = parseInt(cacheEntry.ttl)
             try {
                 server.redisBreaker

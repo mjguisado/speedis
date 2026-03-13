@@ -22,7 +22,7 @@ export function initVariantsTracker(server, opts) {
     server.addHook('onSend', async (request, reply, payload) => {
 
         if (isPurgeRequest(server, opts, request)
-            || (opts.oauth2 &&
+            || (opts?.oauth2?.enabled  &&
                 request.raw.url.startsWith(path.join(opts.prefix, opts.oauth2.prefix)))
         ) return
 

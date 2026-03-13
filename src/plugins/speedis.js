@@ -26,13 +26,13 @@ export default async function (server, opts) {
     // Module init
     await initOrigin(server, opts)
     if (opts.redis) await initRedis(server, opts)
-    if (opts.cache) cache.initCache(server, opts)
-    if (opts.bff) await bff.initBff(server, opts)
-    if (opts.oauth2) {
+    if (opts?.cache?.enabled) cache.initCache(server, opts)
+    if (opts?.bff?.enabled) await bff.initBff(server, opts)
+    if (opts?.oauth2?.enabled) {
         await initOAuth2(server, opts)
         await server.register(oauth2Plugin, opts.oauth2)
     }
-    if (opts.variantsTracker) initVariantsTracker(server, opts)
+    if (opts?.variantsTracker?.enabled) initVariantsTracker(server, opts)
 
     // In Fastify, you can’t explicitly define the execution order of hooks of 
     // the same type (such as onRequest, preHandler, etc.), because all hooks 
@@ -45,7 +45,7 @@ export default async function (server, opts) {
 
         try {
 
-            if (opts.bff) {
+            if (opts?.bff?.enabled) {
                 bff.transform(opts, bff.CLIENT_REQUEST, request)
             }
 
@@ -62,7 +62,7 @@ export default async function (server, opts) {
                 response.headers['x-speedis-cache-status'] = 'CACHE_STATUS_UNDEFINED from ' + os.hostname()
             }
 
-            if (opts.bff) bff.transform(opts, bff.CLIENT_RESPONSE, response)
+            if (opts?.bff?.enabled) bff.transform(opts, bff.CLIENT_RESPONSE, response)
 
             return reply
                 .code(response.statusCode)
