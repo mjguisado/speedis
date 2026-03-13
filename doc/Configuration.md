@@ -64,10 +64,10 @@ The following table describes the supported fields.
 |`metrics`|Boolean|`false`|`true`|This parameter determines whether the metrics for this plugin are enabled. (`true` or `false`).|
 |`origin`|Object|`true`||This object defines all the details related to the origin server. Its format is detailed below.|
 |`bff`|Object|`false`||This object defines all the details related to the Backend-For-Frontend (BFF). Its format is detailed below.|
-|`variantsTracker`|Object|`false`||This object defines all the details related to the variant tracker. Its format is detailed below.|
-|`cache`|Object|`false`||This object defines all the details related to the cache. Its format is detailed below.|
+|`variantsTracker`|Object|`false`||This object defines all the details related to the Variant Tracker. Its format is detailed below.|
+|`cache`|Object|`false`||This object defines all the details related to the Cache. Its format is detailed below.|
 |`oauth2`|Object|`false`||This object defines all the details related to the OAuth2-based Access Control. Its format is detailed below.|
-|`redis`|Object|`true` if cache of oauth2 is enabled||This object defines all the details related to the redis database. Its format is detailed below.|
+|`redis`|Object|`true` if either variantsTracker, cache or oauth2 exists and is enabled.||This object defines all the details related to the redis database. Its format is detailed below.|
 
 ## Origin configuration object
 The following table describes the supported fields in the origin configuration object.
@@ -91,6 +91,7 @@ The architecture follows a Backend For Frontend (BFF) pattern, allowing for clie
 The following table describes the supported fields in the Backend-For-Frontend configuration object.
 |Field|Type|Mandatory|Default|Description|
 |-----|----|---------|-------|-----------|
+|`enabled`|Boolean|`false`|`true`|Enables (`true`) or disables (`false`) Backend For Frontend (BFF).| 
 |`actionsLibraries`|Object|`false`||An array containing the full paths to custom action libraries that extend the default set provided out of the box.|
 |`transformations`|[Object]|`true`||Array of objects that define the set of transformations that Speedis can apply to requests and responses at different stages. Its format is detailed below.|
 
@@ -149,28 +150,23 @@ Speedis includes out of the box two libreries
 The following table describes the supported fields in the variant tracker configuration object.
 |Field|Type|Mandatory|Default|Description|
 |-----|----|---------|-------|-----------|
+|`enabled`|Boolean|`false`|`true`|Enables (`true`) or disables (`false`) the Variant Tracker.| 
 |`urlPatterns`|[String]|`true`||List of URL patterns to track along with their variants.|
 
 ## Cache configuration object
 The following table describes the supported fields in the cache configuration object.
 |Field|Type|Mandatory|Default|Description|
 |-----|----|---------|-------|-----------|
+|`enabled`|Boolean|`false`|`true`|Enables (`true`) or disables (`false`) the Cache.| 
 |`purgePath`|String|`false`|`/purge`|URL path prefix used to trigger cache purge requests. Any DELETE request whose path starts with this prefix will be interpreted as a cache purge operation.|
-|`cacheables`|[Object]|`true`||List of URL patterns that are considered cacheable. Only request with method GET can be cached. Its format is detailed below.|
 |`includeOriginIdInUrlKey`|Boolean|`false`|`true`|This field determines whether the id of the origin is used to generate the url key for the entry (`true` or `false`).|
 |`ignoredQueryParams`|[String]|`false`||The url key is generated based on the URL requested from the origin. This field defines a list of query string parameters that will be ignored when forming the cache key for the entry.|
 |`sortQueryParams`|Boolean|`false`|`true`|The url key is generated based on the URL requested from the origin. This field determines whether the query string parameters should be sorted alphabetically before being used to generate the cache key for the entry (`true` or `false`). |
 |`localRequestsCoalescing`|Boolean|`false`|`true`|Enables (`true`) or disables (`false`) the request coalescing mechanism.|
 |`distributedRequestsCoalescing`|Boolean|`false`|`false`|Enables (`true`) or disables (`false`) the request coalescing functionality across multiple instances.|
 |`distributedRequestsCoalescingOptions`|Object|`true` if distributedRequestsCoalescing is `true`||Configure the distributed lock mechanism used to implements the requests coalescing functionality across multiple instances. Its format is detailed below.|
-
-## Cacheable configuration object
-The following table describes the supported fields in the cacheable configuration object.
-|Field|Type|Mandatory|Default|Description|
-|-----|----|---------|-------|-----------|
-|`urlPattern`|String|`true`||URL patterns that are considered cacheable.|
-|`perUser`|Boolean|`false`|`false`|Indicates whether the response for a given URL should be cached separately for each authenticated user.|
-|`ttl`|Number|`false`|`Infinity`|This parameter defines how long the response will be stored in the cache.|
+|`cacheables`|[Object]|`true`||List of URL patterns that are considered cacheable. Only request with method GET or HEAD can be cached. Its format is detailed below.|
+|`authentication`|Object|`false`||Defines how requests to the cache are authenticated and how the user identifier is handled. See "Cache authentication" below for details.|
 
 ### Lock configuration object
 The following table describes the supported fields in the lock configuration object.
@@ -181,10 +177,53 @@ The following table describes the supported fields in the lock configuration obj
 |`retryDelay`|Number|`true`||(Base delay between retries): Sets the waiting time (in milliseconds) between consecutive lock acquisition attempts. This helps prevent excessive contention when multiple processes try to acquire the same lock.|
 |`retryJitter`|Number|`true`||(Randomized delay variation): Introduces a random variation (in milliseconds) to the retry delay to reduce the likelihood of multiple processes retrying at the same time, which can help prevent contention spikes.|
 
+### Cacheable configuration object
+The following table describes the supported fields in the cacheable configuration object.
+|Field|Type|Mandatory|Default|Description|
+|-----|----|---------|-------|-----------|
+|`urlPattern`|String|`true`||URL patterns that are considered cacheable.|
+|`private`|Boolean|`false`|`false`|Indicates whether the response for a given URL should be cached separately for each authenticated user. If `true`, the authentication must be enabled for the cache.|
+|`ttl`|Number|`false`|`Infinity`|This parameter defines how long the response will be stored in the cache.|
+
+### Cache authentication
+Cache entries can be configured as private so that they are associated with a specific user.
+In that case, the user identifier becomes part of the cache key.
+To extract the user identifier, Speedis supports several standard [HTTP authentication](https://www.rfc-editor.org/rfc/rfc7235.html) [schemes](https://www.iana.org/assignments/http-authschemes/http-authschemes.xhtml).
+The following table describes the supported fields for the `cache.authentication` configuration object.
+
+|Field|Type|Mandatory|Default|Description|
+|-----|----|---------|-------|-----------|
+|`enabled`|Boolean|`false`|`true`|Enables (`true`) or disables (`false`) cache authentication.| 
+|`scheme`|String|`false`|`Basic`|[Authentication scheme](https://www.iana.org/assignments/http-authschemes/http-authschemes.xhtml) used to authenticate requests to the cache. Supported values: `Basic`, `Bearer`.| 
+|`bearer`|Object|`false`||Bearer token validation options. Required when `scheme` is `Bearer`. See below for details.|
+|`idTransformation`|Object|`false`||Defines how the user identifier is transformed before being used in cache keys (e.g. hashing). See below for details.|
+
+#### Bearer token validation options
+The `bearer` object is only used when `scheme` is set to `Bearer`.
+
+|Field|Type|Mandatory|Default|Description|
+|-----|----|---------|-------|-----------|
+|`claim`|String|`false`|`sub`|The JWT claim used as the user identifier.| 
+|`allowUnsigned`|Boolean|`false`|`false`|If `true`, unsigned JWTs are accepted.|
+|`verifyJwtSignature`|Boolean|`false`|`true`|If `true`, Speedis verifies the JWT signature against the JWKS endpoint. If `false`, the token is accepted without signature verification.| 
+|`jwksUri`|String|`conditional`||The URL of the JSON Web Key Set (JWKS) used to validate the JWT signature. Required when `verifyJwt` is `true` (the default).|
+
+#### Cache key transformation options
+The following table describes the supported fields for the `cache.authentication.idTransformation` configuration object.
+|Field|Type|Mandatory|Default|Description|
+|-----|----|---------|-------|-----------|
+|`prefix`|String|`false`|`""`|Prefix to prepend to the user identifier.|
+|`suffix`|String|`false`|`""`|Suffix to append to the user identifier.|
+|`hash.enabled`|Boolean|`false`|`true`|When caching responses per user, it is often useful to transform the user identifier before it becomes part of the cache key, in order to prevent exposing raw user IDs and to safeguard Personally Identifiable Information (PII). If `true`, the user identifier is hashed before being used in the cache key.| 
+|`hash.algorithm`|String|`false`|`sha256`|Hash algorithm to use. Must be supported by Node.js `crypto.getHashes()`.| 
+|`hash.hex`|Boolean|`false`|`true`|If `true`, the hash output is encoded as a hexadecimal string (default). Otherwise it will use a binary/base64 encoding.| 
+Note: When hash.enabled is set to true, the prefix and suffix are applied to the hashed value of the user identifier. If hashing is disabled, they are applied to the raw user identifier instead.
+
 ## OAuth2-based Access Control
 The following table describes the supported fields in the OAuth2-based Access Control configuration object.
 |Field|Type|Mandatory|Default|Description|
 |-----|----|---------|-------|-----------|
+|`enabled`|Boolean|`false`|`true`|Enables (`true`) or disables (`false`) Backend For Frontend (BFF).| 
 |`id`|String|`true`||Lorem ipsum dolor sit amet|
 |`prefix`|String|`false`|`/oauth2`|URL path prefix used to route incoming requests to the OAuth2 plugin.|
 |`logLevel`|String|`false`|`info`|Logging level for the OAuth2 (`trace`, `debug`, `info`, `warn`, `error`, `fatal`).|

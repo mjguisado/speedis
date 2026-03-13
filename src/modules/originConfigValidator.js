@@ -4,10 +4,45 @@ export function initOriginConfigValidator(ajv) {
             type: "object",
             additionalProperties: false,
             required: ["id", "prefix", "origin"],
+            // Redis is required if cache or oauth2 are present and enabled
             if: {
                 anyOf: [
-                    { required: ["cache"] },
-                    { required: ["oauth2"] }
+                    {
+                        // OAuth2 exists and is enabled (or enabled is not explicitly set to false)
+                        required: ["variantsTracker"],
+                        properties: {
+                            variantsTracker: {
+                                not: {
+                                    properties: { enabled: { const: false } },
+                                    required: ["enabled"]
+                                }
+                            }
+                        }
+                    },                    
+                    {
+                        // Cache exists and is enabled (or enabled is not explicitly set to false)
+                        required: ["cache"],
+                        properties: {
+                            cache: {
+                                not: {
+                                    properties: { enabled: { const: false } },
+                                    required: ["enabled"]
+                                }
+                            }
+                        }
+                    },
+                    {
+                        // OAuth2 exists and is enabled (or enabled is not explicitly set to false)
+                        required: ["oauth2"],
+                        properties: {
+                            oauth2: {
+                                not: {
+                                    properties: { enabled: { const: false } },
+                                    required: ["enabled"]
+                                }
+                            }
+                        }
+                    }
                 ]
             },
             then: { required: ["redis"] },
@@ -175,6 +210,7 @@ export function initOriginConfigValidator(ajv) {
                     additionalProperties: false,
                     required: ["transformations"],
                     properties: {
+                        enabled: { type: "boolean", default: true },
                         actionsLibraries: {
                             type: "object"
                         },
@@ -224,6 +260,7 @@ export function initOriginConfigValidator(ajv) {
                     additionalProperties: false,
                     required: ["urlPatterns"],
                     properties: {
+                        enabled: { type: "boolean", default: true },
                         urlPatterns: {
                             type: "array",
                             minItems: 1,
@@ -249,22 +286,8 @@ export function initOriginConfigValidator(ajv) {
                         }
                     ],
                     properties: {
+                        enabled: { type: "boolean", default: true },
                         purgePath: { type: "string", default: "/purge" },
-                        cacheables: {
-                            type: "array",
-                            minItems: 1,
-                            items: {
-                                type: "object",
-                                minProperties: 1,
-                                maxProperties: 3,
-                                required: ["urlPattern"],
-                                properties: {
-                                    urlPattern: { type: "string" },
-                                    perUser: { type: "boolean", default: false },
-                                    ttl: { type: "integer", default: -1 }
-                                }
-                            }
-                        },
                         includeOriginIdInUrlKey: { type: "boolean", default: true },
                         ignoredQueryParams: {
                             type: "array",
@@ -285,6 +308,80 @@ export function initOriginConfigValidator(ajv) {
                                 retryCount: { type: "integer" },
                                 retryDelay: { type: "integer" },
                                 retryJitter: { type: "integer" }
+                            }
+                        },
+                        authentication: {
+                            type: "object",
+                            additionalProperties: false,
+                            allOf: [
+                                {
+                                    if: {
+                                        properties: { scheme: { const: "Bearer" } },
+                                        required: ["scheme"]
+                                    },
+                                    then: {
+                                        required: ["bearer"]
+                                    }
+                                }
+                            ],
+                            properties: {
+                                enabled: { type: "boolean", default: true },
+                                scheme: { type: "string", enum: ["Basic", "Bearer"], default: "Basic" },
+                                bearer: {
+                                    type: "object",
+                                    additionalProperties: false,
+                                    allOf: [
+                                        {
+                                            if: {
+                                                not: {
+                                                    properties: { verifyJwtSignature: { const: false } },
+                                                    required: ["verifyJwtSignature"]
+                                                }
+                                            },
+                                            then: {
+                                                required: ["jwksUri"]
+                                            }
+                                        }
+                                    ],
+                                    properties: {
+                                        claim: { type: "string", default: "sub" },
+                                        allowUnsigned: { type: "boolean", default: false },
+                                        verifyJwtSignature: { type: "boolean", default: true },
+                                        jwksUri: { type: "string" }
+                                    }
+                                },
+                                idTransformation: {
+                                    type: "object",
+                                    additionalProperties: false,
+                                    properties: {
+                                        prefix: { type: "string", default: "" },
+                                        suffix: { type: "string", default: "" },
+                                        hash: {
+                                            type: "object",
+                                            additionalProperties: false,
+                                            properties: {
+                                                enabled: { type: "boolean", default: true },
+                                                algorithm: { type: "string", default: "sha256" },
+                                                hex: { type: "boolean", default: true }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        cacheables: {
+                            type: "array",
+                            minItems: 1,
+                            items: {
+                                type: "object",
+                                minProperties: 1,
+                                maxProperties: 3,
+                                required: ["urlPattern"],
+                                properties: {
+                                    urlPattern: { type: "string" },
+                                    private: { type: "boolean", default: false },
+                                    ttl: { type: "integer", default: -1 }
+                                }
                             }
                         }
                     }
@@ -326,6 +423,7 @@ export function initOriginConfigValidator(ajv) {
                         }
                     ],
                     properties: {
+                        enabled: { type: "boolean", default: true },
                         id: { type: "string" },
                         prefix: { type: "string", default: "/oauth2" },
                         logLevel: {
