@@ -1,6 +1,5 @@
-import { decodeProtectedHeader, jwtVerify, jwtDecrypt, createRemoteJWKSet } from 'jose'
+import { decodeProtectedHeader, jwtVerify, compactDecrypt, createRemoteJWKSet } from 'jose'
 import { createHash } from 'crypto'
-import { errorHandler } from './error.js'
 
 /**
  * Initialize authentication module for extracting user identifiers from requests.
@@ -101,7 +100,7 @@ async function extractUserIdFromBearer(server, opts, token) {
     let parts = workingToken.split('.')
     if (parts.length === 5) {
         if (opts.origin.authentication.bearer.decryptionKey) {
-            const { plaintext } = await jwtDecrypt(
+            const { plaintext } = await compactDecrypt(
                 workingToken,
                 opts.origin.authentication.bearer.decryptionKey
             )
