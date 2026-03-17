@@ -311,7 +311,7 @@ export async function _get(server, opts, request) {
     } else {
         requestOptions.headers = {}
     }
-        
+
     const forwardedHeaders = getForwardedHeaders(
         request.headers,
         opts.origin.headersToForward,
@@ -327,7 +327,7 @@ export async function _get(server, opts, request) {
     // the received URL the prefix that was used to route the request
     // to this instance of the plugin
     requestOptions.path = request.path
-    
+
     // Check if there is an entry stored in the cache.
     let cachedResponse = null
     try {
@@ -499,7 +499,7 @@ export async function _get(server, opts, request) {
         if (opts.cache.distributedRequestsCoalescing && locked)
             await _releaseLock(server, opts, lockKey, lockValue)
 
-        if (amITheFetcher && opts.cache.localRequestsCoalescing) 
+        if (amITheFetcher && opts.cache.localRequestsCoalescing)
             server.ongoingFetch.delete(request.urlKey)
 
         delete requestOptions.agent
@@ -608,7 +608,7 @@ export async function _get(server, opts, request) {
                 server.redisBreaker
                     ? await server.redisBreaker.fire('json.merge', [request.urlKey, '$', payload])
                     : await server.redis.json.merge(request.urlKey, '$', payload)
-                    
+
                 // Set the TTL for the cache entry           
                 if (Number.isFinite(ttl) && ttl > 0) {
                     server.redisBreaker
@@ -850,10 +850,7 @@ export async function purge(server, opts, request, reply) {
             })) {
                 // https://redis.io/docs/latest/develop/clients/nodejs/transpipe/#execute-a-pipeline
                 if (Array.isArray(keys) && keys.length) {
-                    const unlinks = [];
-                    for (let key of keys) unlinks.push(server.redis.unlink(key))
-                    const batchResult = await Promise.all(unlinks)
-                    result += batchResult.reduce((acc, val) => acc + val, 0)
+                    result += await server.redis.unlink(keys)
                 }
             }
         } else {
@@ -871,5 +868,5 @@ export async function purge(server, opts, request, reply) {
         server.log.error(error, msg)
         return errorHandler(reply, 500, msg, opts.exposeErrors, error)
     }
-    
+
 }

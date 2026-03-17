@@ -1,4 +1,4 @@
-import { decodeProtectedHeader, jwtVerify, jwtDecrypt, createRemoteJWKSet } from 'jose';
+import { decodeProtectedHeader, jwtVerify, jwtDecrypt, createRemoteJWKSet } from 'jose'
 import { createHash } from 'crypto'
 import { errorHandler } from './error.js'
 
@@ -146,7 +146,7 @@ async function extractUserIdFromBearer(server, opts, token) {
         if (!Object.prototype.hasOwnProperty.call(payload, opts.origin.authentication.bearer.claim)) {
             throw new Error(`Claim '${opts.origin.authentication.bearer.claim}' not found in JWT payload.`)
         } else {
-            return payload[opts.origin.authentication.bearer.claim]    
+            return payload[opts.origin.authentication.bearer.claim]
         }
     } else {
         throw new Error('Invalid JWT format.')
@@ -162,7 +162,7 @@ function transformUserId(userId, config) {
     if (config.hash && config.hash.enabled) {
         const hash = createHash(config.hash.algorithm)
         hash.update(userId)
-        transformed = hash.digest(config.hash.hex ? 'hex' : 'base64' )
+        transformed = hash.digest(config.hash.hex ? 'hex' : 'base64')
     }
     return config.prefix + transformed + config.suffix
 }

@@ -64,7 +64,7 @@ function getValidHttp2Session(server, opts) {
         server.http2Session.closed
     ) {
         if (server.http2Session) {
-            try { server.http2Session.close() } catch {}
+            try { server.http2Session.close() } catch { }
         }
         server.http2Session = http2.connect(opts.origin.http2Options.authority)
 
@@ -82,29 +82,6 @@ function getValidHttp2Session(server, opts) {
     }
 
     return server.http2Session
-
-}
-
-
-function setupHttp2Session(server, opts) {
-
-    const http2Session = 
-
-    http2Session.on('error', (error) => {
-        server.log.error(error, `Origin: ${opts.id}. HTTP2 session lost.`)
-    })
-
-    http2Session.on('close', async () => {
-        server.log.info(`Origin: ${opts.id}. HTTP2 session closed.`)
-    })
-
-    http2Session.on('goaway', () => {
-        server.log.info(`Origin: ${opts.id}. HTTP2 server go away.`)
-        // The server does not want to accept any more streams.
-        // http2Session.close()
-    })
-
-    return http2Session
 
 }
 
@@ -166,26 +143,26 @@ export function generateUrlKey(opts, request, fieldNames = utils.parseVaryHeader
  */
 export function getForwardedHeaders(headers, headersToForward, headersToExclude) {
 
-  const lowerCaseHeaders = Object.fromEntries(
-    Object.entries(headers).map(([k, v]) => [k.toLowerCase(), v])
-  )
+    const lowerCaseHeaders = Object.fromEntries(
+        Object.entries(headers).map(([k, v]) => [k.toLowerCase(), v])
+    )
 
-  if (headersToExclude.includes('*')) return {}
-  const forwarded = new Set(
-    headersToForward.includes('*')
-      ? Object.keys(lowerCaseHeaders)
-      : headersToForward.map(h => h.toLowerCase())
-  )
+    if (headersToExclude.includes('*')) return {}
+    const forwarded = new Set(
+        headersToForward.includes('*')
+            ? Object.keys(lowerCaseHeaders)
+            : headersToForward.map(h => h.toLowerCase())
+    )
 
-  const excluded = new Set(headersToExclude.map(h => h.toLowerCase()))
+    const excluded = new Set(headersToExclude.map(h => h.toLowerCase()))
 
-  const result = {}
-  for (const [key, value] of Object.entries(lowerCaseHeaders)) {
-    if (forwarded.has(key) && !excluded.has(key)) {
-      result[key] = value
+    const result = {}
+    for (const [key, value] of Object.entries(lowerCaseHeaders)) {
+        if (forwarded.has(key) && !excluded.has(key)) {
+            result[key] = value
+        }
     }
-  }
-  return result
+    return result
 
 }
 
@@ -207,7 +184,7 @@ export async function proxy(server, opts, request) {
 
     const finalHeaders = { ...forwardedHeaders, ...requestOptions.headers }
     requestOptions.headers = finalHeaders
-    
+
     // To make the request to the origin server, we remove from 
     // the received URL the prefix that was used to route the request
     // to this instance of the plugin
@@ -218,7 +195,7 @@ export async function proxy(server, opts, request) {
         requestOptions.headers['authorization'] = `Bearer ${request.session.access_token}`
     }
     */
-   
+
     // We set the method to the one used in the original request.
     requestOptions.method = request.method
 
@@ -266,7 +243,7 @@ function _fetchHttp1x(originOptions, requestOptions, body) {
         // In other cases, we has to manage the timeout in the request.
         let signal, timeoutId = null
         // if (originOptions.origin.originTimeout && !requestOptions.signal) {
-        if (originOptions.origin.originTimeout && !originOptions.origin.originBreaker){
+        if (originOptions.origin.originTimeout && !originOptions.origin.originBreaker) {
             const abortController = new AbortController()
             timeoutId = setTimeout(() => {
                 abortController.abort()
@@ -340,7 +317,7 @@ export function transformHeadersForHttp2(headers, options = {}) {
     if (options.method) result[http2.constants.HTTP2_HEADER_METHOD] = options.method
     if (options.path) result[http2.constants.HTTP2_HEADER_PATH] = options.path
     if (options.scheme) result[http2.constants.HTTP2_HEADER_SCHEME] = options.scheme
-    if (options.authority && !result[http2.constants.HTTP2_HEADER_AUTHORITY]) 
+    if (options.authority && !result[http2.constants.HTTP2_HEADER_AUTHORITY])
         result[http2.constants.HTTP2_HEADER_AUTHORITY] = options.authority
 
     return result
@@ -349,6 +326,8 @@ export function transformHeadersForHttp2(headers, options = {}) {
 function _fetchHttp2(server, originOptions, requestOptions, body) {
 
     return new Promise((resolve, reject) => {
+
+        let timeoutId = null
 
         const headers = transformHeadersForHttp2(requestOptions.headers, {
             method: requestOptions.method,
@@ -388,7 +367,6 @@ function _fetchHttp2(server, originOptions, requestOptions, body) {
         if (body) clientHttp2Stream.write(body)
         clientHttp2Stream.end()
 
-        let timeoutId = null
         if (originOptions.origin.originTimeout && !originOptions.origin.originBreaker) {
             timeoutId = setTimeout(() => {
                 clientHttp2Stream.close(http2.constants.NGHTTP2_CANCEL)

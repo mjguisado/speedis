@@ -14,7 +14,7 @@ export function deleteHeaders(target, params) {
 }
 
 export function setLastModifiedAndDateHeaders(target, params) {
-    let now = new Date().toUTCString();
+    let now = new Date().toUTCString()
     target.headers["last-modified"] = now
     target.headers["date"] = now
 }

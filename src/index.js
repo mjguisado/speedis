@@ -6,8 +6,8 @@ import fastify from 'fastify'
 import { app } from './app.js'
 import { register, collectDefaultMetrics, AggregatorRegistry } from 'prom-client'
 import Ajv from "ajv"
-import { open } from 'inspector';
-import { createClient } from 'redis';
+import { open } from 'inspector'
+import { createClient } from 'redis'
 
 /*
 Speedis also uses Redis as both a cache and as a background job queue via node-resque.
@@ -62,7 +62,7 @@ if (process.env.USE_REDIS_CONFIG) {
     } finally {
         try {
             if (configdb) await configdb.close()
-        } catch (_) {}
+        } catch (_) { }
     }
 
 } else {
@@ -94,9 +94,9 @@ const validateSpeedis = ajv.compile({
             type: "object",
             additionalProperties: true,
             properties: {
-                http:  { type: "object", nullable: true, default: null },
+                http: { type: "object", nullable: true, default: null },
                 http2: { type: "boolean", default: false },
-                https: { type: "object", nullable: true, default: null},
+                https: { type: "object", nullable: true, default: null },
                 connectionTimeout: { type: "integer", default: 0 },
                 keepAliveTimeout: { type: "integer", default: 72000 },
                 // forceCloseConnections: {},
@@ -109,7 +109,7 @@ const validateSpeedis = ajv.compile({
                 // loggerInstance: {
                 // serverFactory: {},
                 requestIdHeader: { type: "boolean", default: false },
-                requestIdLogLabel: { type: "string", default: "reqId" },               
+                requestIdLogLabel: { type: "string", default: "reqId" },
                 // genReqId: {},
                 // trustProxy: { default: false },
                 pluginTimeout: { type: "integer", default: 10000 },
@@ -152,7 +152,7 @@ const validateSpeedis = ajv.compile({
             enum: ["fatal", "error", "warn", "info", "debug", "trace"],
             default: "info"
         },
-        localOriginsConfigs:  { type: "string", nullable: true, default: null },
+        localOriginsConfigs: { type: "string", nullable: true, default: null },
         originsConfigsKeys: {
             type: "array",
             items: { type: "string" },
@@ -192,7 +192,7 @@ if (cluster.isPrimary) {
     const metricsServer = fastify({
         logger: { level: config.metricServerLogLevel }
     })
-    
+
     metricsServer.get('/metrics', async (req, res) => {
         try {
             res.type(aggregatorRegistry.contentType)
@@ -204,7 +204,7 @@ if (cluster.isPrimary) {
 
     if (process.env.NODE_ENV === 'development') {
         // Enable remote DEBUG
-        // open(9229, '0.0.0.0');
+        // open(9229, '0.0.0.0')
     }
 
     metricsServer.listen(
@@ -222,11 +222,11 @@ if (cluster.isPrimary) {
 
     if (process.env.NODE_ENV === 'development') {
         // Enable remote DEBUG
-        open(9229 + cluster.worker.id, '0.0.0.0');
+        open(9229 + cluster.worker.id, '0.0.0.0')
     }
 
     // See: https://fastify.dev/docs/latest/Guides/Testing/#separating-concerns-makes-testing-easy
-    const server = await app (
+    const server = await app(
         config.fastify,
         ajv,
         config.localOriginsConfigs,
