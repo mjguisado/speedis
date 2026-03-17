@@ -69,10 +69,17 @@ export function initCache(server, opts) {
             } catch (error) {
                 // Build WWW-Authenticate header value according to RFC 9110
                 let wwwAuthenticateHeader = opts.origin.authentication.scheme
+                const params = []
+
                 if (opts.origin.authentication.realm) {
-                    wwwAuthenticateHeader += ` realm="${opts.origin.authentication.realm}"`
+                    params.push(`realm="${opts.origin.authentication.realm}"`)
                 }
-                wwwAuthenticateHeader += `, error="invalid_token", error_description="${error.message}"`
+                params.push(`error="invalid_token"`)
+                params.push(`error_description="${error.message}"`)
+
+                if (params.length > 0) {
+                    wwwAuthenticateHeader += ' ' + params.join(', ')
+                }
                 reply.header('WWW-Authenticate', wwwAuthenticateHeader)
 
                 const msg = `Origin: ${opts.id}. This resource ${request.raw.url} is cacheable per user, but the user could not be determined.`
