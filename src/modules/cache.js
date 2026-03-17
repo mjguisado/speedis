@@ -67,13 +67,20 @@ export function initCache(server, opts) {
             try {
                 request.userId = await getUserId(server, opts, request)
             } catch (error) {
+                // Build WWW-Authenticate header value according to RFC 9110
+                let wwwAuthenticateHeader = opts.origin.authentication.scheme
+                if (opts.origin.authentication.realm) {
+                    wwwAuthenticateHeader += ` realm="${opts.origin.authentication.realm}"`
+                }
+                wwwAuthenticateHeader += `, error="invalid_token", error_description="${error.message}"`
+                reply.header('WWW-Authenticate', wwwAuthenticateHeader)
+
                 const msg = `Origin: ${opts.id}. This resource ${request.raw.url} is cacheable per user, but the user could not be determined.`
                 server.log.error(msg)
                 return errorHandler(reply, 401, msg, opts.exposeErrors)
             }
         }
     })
-
 }
 
 // This function checks whether the request corresponds to a cache purge operation.
