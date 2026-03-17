@@ -25,7 +25,7 @@ export default async function (server, opts) {
         user-agent back once access is granted (or denied).
         */
         const parameters = {
-            ...opts.authorizationRequest,
+            ...opts.authorizationRequestParameters,
         }
 
         if (opts.pkceEnabled) {
@@ -124,12 +124,13 @@ export default async function (server, opts) {
                 throw error
             }
         }
-        if (request.id_session) {
-            const sessionKey = SESSION_PREFIX + request.id_session
+        const id_session = getSessionIdFromCookie(request.headers, opts.sessionIdCookieName)
+        if (id_session) {
+            const sessionKey = SESSION_PREFIX + id_session
             try {
                 server.redisBreaker
                     ? await server.redisBreaker.fire('unlink', [sessionKey])
-                    : await server.redis.unlink(sessionKey)            
+                    : await server.redis.unlink(sessionKey)
             } catch (error) {
                 server.log.error(error,
                     `Error while unlinking the session ${sessionKey}. Origin: ${opts.id}.`)
@@ -174,7 +175,7 @@ export default async function (server, opts) {
                     SESSION_INDEX_NAME,
                     `@sub:{\"${sub}\"}`,
                     {
-                        SORTBY: { BY: 'iat', DIRECTION: 'DESC'},
+                        SORTBY: { BY: 'iat', DIRECTION: 'DESC' },
                         RETURN: ['id'],
                         DIALECT: 2
                     }
@@ -183,7 +184,7 @@ export default async function (server, opts) {
                     SESSION_INDEX_NAME,
                     `@sub:{\"${sub}\"}`,
                     {
-                        SORTBY: { BY: 'iat', DIRECTION: 'DESC'},
+                        SORTBY: { BY: 'iat', DIRECTION: 'DESC' },
                         RETURN: ['id'],
                         DIALECT: 2
                     }
@@ -240,4 +241,20 @@ export default async function (server, opts) {
             : await server.redis.unlink(sessionKey)
     }
 
+}
+
+export function getSessionIdFromCookie(headers, sessionIdCookieName) {
+    // Parse the Cookie header
+    if (!headers?.cookie) return null
+
+    const cookies = headers?.cookie
+        .split(';')
+        .map(cookie => cookie.trim().split('='))
+        .reduce((acc, [key, value]) => {
+            acc[key] = decodeURIComponent(value)
+            return acc
+        }, {})
+
+    return cookies[sessionIdCookieName] ?
+        cookies[sessionIdCookieName] : null
 }

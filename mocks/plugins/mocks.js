@@ -224,8 +224,8 @@ export default async function (server, opts) {
     // ========================================
     // RUTAS CON SCOPE: basic
     // ========================================
-    server.all('/basic/settings', async (request, reply) => {
-        const authError = validateAuthorization(request, reply, ['basic'])
+    server.all('/restricted/settings', async (request, reply) => {
+        const authError = validateAuthorization(request, reply, ['restricted'])
         if (authError) return authError
 
         await common(request, reply)
@@ -235,9 +235,9 @@ export default async function (server, opts) {
                 language: 'en',
                 notifications: true
             },
-            scope: 'basic',
+            scope: 'restricted',
             user_id: request.tokenPayload.sub,
-            message: 'This endpoint requires scope: basic'
+            message: 'This endpoint requires scope: restricted'
         })
     })
 
@@ -256,23 +256,6 @@ export default async function (server, opts) {
                 ssn: '***-**-1234'
             },
             scope: 'private',
-            user_id: request.tokenPayload.sub
-        })
-    })
-
-    // ========================================
-    // RUTAS CON SCOPE: signed
-    // ========================================
-    server.all('/transaction/signed', async (request, reply) => {
-        const authError = validateAuthorization(request, reply, ['signed'])
-        if (authError) return authError
-        await common(request, reply)
-        return reply.send({
-            result: 'executed',
-            operation: request.body?.operation || 'unknown',
-            signature: 'SHA256:xyz789...',
-            executed_at: new Date().toISOString(),
-            scope: 'signed',
             user_id: request.tokenPayload.sub
         })
     })

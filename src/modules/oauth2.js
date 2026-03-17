@@ -1,13 +1,13 @@
-import { jwtVerify, createRemoteJWKSet } from 'jose'
+import { createRemoteJWKSet } from 'jose'
 import { jwtDecode } from "jwt-decode"
 import * as openIdClient from 'openid-client'
-import { SESSION_PREFIX } from '../plugins/oauth2.js'
+import { SESSION_PREFIX, getSessionIdFromCookie } from '../plugins/oauth2.js'
 import { errorHandler } from './error.js'
 
 export async function initOAuth2(server, opts) {
 
     // Configuration is an abstraction over the OAuth 2.0
-  
+
     // Authorization Server metadata and OAuth 2.0 Client metadata
     let authServerConfiguration = null
 
@@ -30,6 +30,7 @@ export async function initOAuth2(server, opts) {
             opts.oauth2.authorizationServerMetadata, opts.oauth2.clientId, opts.oauth2.clientSecret
         )
     }
+
     server.decorate("authServerConfiguration", authServerConfiguration)
 
     // The JSON Web Key Set (JWKS) is a set of keys containing the public keys
@@ -53,7 +54,7 @@ export async function initOAuth2(server, opts) {
                     authorizationCodeGrantTypeFound = true
                 }
             } catch (error) {
-                server.log.fatal(error, 
+                server.log.fatal(error,
                     `Origin: ${opts.id}. urlPattern ${pattern} in authStrategies is not a valid regular expression.`)
                 throw new Error(`Origin: ${opts.id}. The OAuth2 authStrategies configuration is invalid.`, { cause: error })
             }
@@ -62,160 +63,13 @@ export async function initOAuth2(server, opts) {
 
     // If client_credentials grant type is used, we need to store the token.
     if (clientCredentialsGrantTypeFound) {
-        server.decorate('clientCredentialsResponse')
-        server.decorate('clientCredentialsResponsePromise')
+        server.decorate('clientCredentials')
+        server.decorate('clientCredentialsPromise')
     }
     // If authorization_code grant type is used, we need to add the session to the request.
-    if (clientCredentialsGrantTypeFound || 
+    if (clientCredentialsGrantTypeFound ||
         authorizationCodeGrantTypeFound) {
-        server.decorateRequest('session')
-    }
-
-    async function decorateRequestWithSessionData(request, tokens) {
-
-        if ((tokens.token_type || '').toLowerCase() !== 'bearer') {
-            throw new Error(`Origin: ${opts.id}. Unsupported token_type ${tokens.token_type}.`)
-        }
-
-        const session = {}
-        // Checks whether we have a id_token (OpenID).
-        if (tokens.id_token) {
-            const { payload } = await jwtVerify(
-                tokens.id_token,
-                jwks,
-                {
-                    issuer: authServerConfiguration.serverMetadata().issuer,
-                }
-            )
-            session.id_token = tokens.id_token
-            session.sub = payload.sub
-        }
-        // Checks the validity of the access token
-        const { payload } = await jwtVerify(
-            tokens.access_token,
-            jwks,
-            {
-                issuer: authServerConfiguration.serverMetadata().issuer,
-            }
-        )
-        // If valid, decorate the request with the access token
-        session.access_token = tokens.access_token
-        if (!session.sub) session.sub = payload.sub
-
-        request.session = session
-
-    }
-
-    async function manageClientCredentialsGrant(request, reply, authStrategy) {
-        
-        let clientCredentialsResponse = null
-
-        const bufferTime = 10 // 10 seconds of buffer time
-        const jitter = Math.floor(0.1 * Math.random() * bufferTime)
-        const now = Math.floor(Date.now() / 1000)
-        const minExp = now + bufferTime + jitter
-        
-        // If the token is still valid, use it
-        if (server?.clientCredentialsResponse?.decodedToken?.exp > minExp) {
-            clientCredentialsResponse = server.clientCredentialsResponse
-        } else {
-            // If the token is not valid, we need to get a new one.
-            // Only one thread will get a new token.            
-            let isTokenRefreshOwner = false
-            if (!server.clientCredentialsResponsePromise) {
-                server.clientCredentialsResponsePromise = openIdClient.clientCredentialsGrant(
-                    authServerConfiguration,
-                    {
-                        scope: authStrategy.scope
-                    }
-                )
-                isTokenRefreshOwner = true
-            }
-            // The other threads will wait for the token to be renewed.             
-            try {
-                clientCredentialsResponse = await server.clientCredentialsResponsePromise
-                try {
-                    clientCredentialsResponse.decodedToken = 
-                        jwtDecode(clientCredentialsResponse.access_token)
-                } catch (error) {
-                    server.log.error(error, `Origin: ${opts.id}. Error decoding new client credentials token.`)
-                    return errorHandler(reply, 500, `Origin: ${opts.id}. Error decoding new client credentials token.`, opts.exposeErrors, error)
-                }
-            } catch (error) {              
-                server.log.error(error, `Origin: ${opts.id}. Error getting a new client credentials token.`)
-                return errorHandler(reply, 500, `Origin: ${opts.id}. Error getting a new client credentials token.`, opts.exposeErrors, error)
-            } finally {
-                if (isTokenRefreshOwner) {
-                    server.clientCredentialsResponse = clientCredentialsResponse
-                    server.clientCredentialsResponsePromise = null
-                }
-            }
-        }
-
-        await decorateRequestWithSessionData(request, clientCredentialsResponse)
-
-    }
-
-    async function manageAuthorizationCodeGrant(request, reply, authStrategy) {
-
-        let tokens = {}
-
-        if (request.headers?.cookie) {
-            // Parse the Cookie header
-            const cookies = request.headers?.cookie
-                .split(';')
-                .map(cookie => cookie.trim().split('='))
-                .reduce((acc, [key, value]) => {
-                    acc[key] = decodeURIComponent(value)
-                    return acc
-                }, {})
-            if (cookies[opts.oauth2.sessionIdCookieName]) {
-                // Retrieve session information from Redis
-                request.id_session = cookies[opts.oauth2.sessionIdCookieName]
-                const sessionKey = SESSION_PREFIX + request.id_session
-                try {
-                    tokens = server.redisBreaker
-                        ? await server.redisBreaker.fire('hGetAll', [sessionKey])
-                        : await server.redis.hGetAll(sessionKey)
-                } catch (error) {
-                    const msg = `Origin: ${opts.id}. An error occurred while retrieving the stored session ${request.id_session}.`
-                    server.log.error(error, msg)
-                    return errorHandler(reply, 500, msg, opts.exposeErrors, error)
-                }
-            }
-        }
-
-        if (Object.keys(tokens).length > 0) {
-            try {
-                await decorateRequestWithSessionData(request, tokens)
-            } catch (error) {
-                if (error.code === 'ERR_JWT_EXPIRED') {
-                    // If the access token has expired, attempt to renew it
-                    try {
-                        const freshTokens = await openIdClient.refreshTokenGrant(
-                            authServerConfiguration,
-                            tokens.refresh_token
-                        )
-                        await decorateRequestWithSessionData(request, freshTokens)
-                        try {
-                            await storeSession(server, freshTokens)
-                        } catch (error) {
-                            const msg = `Origin: ${opts.id}. An error occurred while storing the session.`
-                            server.log.error(error, msg)
-                            // return errorHandler(reply, 500, msg, opts.exposeErrors, error)
-                        }
-                    } catch (error) {
-                        const msg = `Origin: ${opts.id}. Error while refreshing the access token.`
-                        server.log.error(error, msg)
-                        return errorHandler(reply, 500, msg, opts.exposeErrors, error)
-                    }
-                } else {
-                    const msg = `Origin: ${opts.id}. Invalid stored session ${request.id_session}.`
-                    server.log.error(error, msg)
-                    return errorHandler(reply, 500, msg, opts.exposeErrors, error)
-                }
-            }
-        }
+        server.decorateRequest('tokens')
     }
 
     server.addHook('onRequest', async (request, reply) => {
@@ -233,10 +87,11 @@ export async function initOAuth2(server, opts) {
         }
 
         // If there is no strategy defined, deny access
+        let msg = null
         if (!authStrategy) {
-            const msg = `Origin: ${opts.id}. No authentication strategy defined for ${request.raw.url}.`
-            server.log.error(msg)
-            return errorHandler(reply, 403, msg, opts.exposeErrors)
+            msg = `Origin: ${opts.id}. No authentication strategy defined for ${request.raw.url}. Assuming none as the default strategy.`
+            server.log.warn(msg)
+            authStrategy = { grantType: 'none' }
         }
 
         switch (authStrategy?.grantType) {
@@ -247,18 +102,131 @@ export async function initOAuth2(server, opts) {
             case 'authorization_code':
                 return await manageAuthorizationCodeGrant(request, reply, authStrategy)
             default:
-                const msg = `Origin: ${opts.id}. Unsupported grant type ${authStrategy.grantType}.`
+                msg = `Origin: ${opts.id}. Unsupported grant type ${authStrategy.grantType}.`
                 server.log.error(msg)
                 return errorHandler(reply, 500, msg, opts.exposeErrors)
         }
 
     })
 
+    async function manageClientCredentialsGrant(request, reply, authStrategy) {
+
+        let clientCredentials = null
+
+        // If the token is still valid, use it
+        if (server?.clientCredentials) {
+            // expires_in is recommended but not required in the RFC 6749
+            // https://www.rfc-editor.org/rfc/rfc6749.html
+            let ttl = server.clientCredentials?.expires_in ?
+                server.clientCredentials.expires_in
+                : server.clientCredentials.decodedToken.exp - server.clientCredentials.decodedToken.iat
+            const bufferTime = Math.floor(ttl * 0.1)
+            const jitter = Math.floor(0.1 * Math.random() * bufferTime)
+            const now = Math.floor(Date.now() / 1000)
+            const minExp = now + bufferTime + jitter
+            if (server.clientCredentials.decodedToken.exp > minExp) {
+                clientCredentials = server.clientCredentials
+            }
+        }
+        
+        if (!clientCredentials) {
+            // If the token is not valid, we need to get a new one.
+            // Only one thread will get a new token.            
+            let isTokenRefreshOwner = false
+            if (!server.clientCredentialsPromise) {
+                server.clientCredentialsPromise = openIdClient.clientCredentialsGrant(
+                    authServerConfiguration,
+                    authStrategy.parameters
+                )
+                isTokenRefreshOwner = true
+            }
+            // The other threads will wait for the token to be renewed.             
+            try {
+                clientCredentials = await server.clientCredentialsPromise
+            } catch (error) {
+                server.log.error(error, `Origin: ${opts.id}. Error getting a new client credentials token.`)
+                return errorHandler(reply, 500, `Origin: ${opts.id}. Error getting a new client credentials token.`, opts.exposeErrors, error)
+            } finally {
+                if (isTokenRefreshOwner) {
+                    server.clientCredentialsPromise = null
+                    server.clientCredentials = clientCredentials
+                    try {
+                        clientCredentials.decodedToken =
+                            jwtDecode(clientCredentials.access_token)
+                    } catch (error) {
+                        server.log.error(error, `Origin: ${opts.id}. Error decoding new client credentials token. ${clientCredentials.access_token}`)
+                    }
+                }
+            }
+        }
+
+        await decorateRequestWithTokens(request, clientCredentials)
+
+    }
+
+    async function manageAuthorizationCodeGrant(request, reply, authStrategy) {
+
+        let tokens = {}
+        const id_session = getSessionIdFromCookie(request.headers, opts.oauth2.sessionIdCookieName)
+        if (id_session) {
+            const sessionKey = SESSION_PREFIX + id_session
+            try {
+                tokens = server.redisBreaker
+                    ? await server.redisBreaker.fire('hGetAll', [sessionKey])
+                    : await server.redis.hGetAll(sessionKey)
+            } catch (error) {
+                const msg = `Origin: ${opts.id}. An error occurred while retrieving the stored session ${id_session}.`
+                server.log.error(error, msg)
+                return errorHandler(reply, 500, msg, opts.exposeErrors, error)
+            }
+        }
+
+        if (Object.keys(tokens).length > 0) {
+            try {
+                await decorateRequestWithTokens(request, tokens)
+            } catch (error) {
+                if (error.code === 'ERR_JWT_EXPIRED') {
+                    // If the access token has expired, attempt to renew it
+                    try {
+                        const freshTokens = await openIdClient.refreshTokenGrant(
+                            authServerConfiguration,
+                            tokens.refresh_token,
+                            authStrategy.parameters
+                        )
+                        await decorateRequestWithTokens(request, freshTokens)
+                        try {
+                            await storeSession(server, freshTokens)
+                        } catch (error) {
+                            const msg = `Origin: ${opts.id}. An error occurred while storing the session.`
+                            server.log.error(error, msg)
+                            return errorHandler(reply, 500, msg, opts.exposeErrors, error)
+                        }
+                    } catch (error) {
+                        const msg = `Origin: ${opts.id}. Error while refreshing the access token.`
+                        server.log.error(error, msg)
+                        return errorHandler(reply, 500, msg, opts.exposeErrors, error)
+                    }
+                } else {
+                    const msg = `Origin: ${opts.id}. Invalid stored session ${id_session}.`
+                    server.log.error(error, msg)
+                    return errorHandler(reply, 500, msg, opts.exposeErrors, error)
+                }
+            }
+        }
+    }
+
+    async function decorateRequestWithTokens(request, tokens) {
+        if ((tokens.token_type || '').toLowerCase() !== 'bearer') {
+            throw new Error(`Origin: ${opts.id}. Unsupported token_type ${tokens.token_type}.`)
+        }
+        request.headers['authorization'] = `Bearer ${tokens.access_token}`
+    }
+
 }
 
 export async function storeSession(server, tokens) {
     try {
-        const accessToken  = jwtDecode(tokens.access_token)
+        const accessToken = jwtDecode(tokens.access_token)
         const refreshToken = jwtDecode(tokens.refresh_token)
         tokens.sub = refreshToken.sub
         tokens.iat = refreshToken.iat
@@ -267,7 +235,7 @@ export async function storeSession(server, tokens) {
             ? await server.redisBreaker.fire('hSet', [sessionKey, tokens])
             : await server.redis.hSet(sessionKey, tokens)
         server.redisBreaker
-            ? await server.redisBreaker.fire('expireAt', [sessionKey,refreshToken.exp])
+            ? await server.redisBreaker.fire('expireAt', [sessionKey, refreshToken.exp])
             : await server.redis.expireAt(sessionKey, refreshToken.exp)
         return refreshToken.sid
     } catch (error) {

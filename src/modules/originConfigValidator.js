@@ -671,7 +671,6 @@ export function initOriginConfigValidator(ajv) {
                 oauth2: {
                     type: "object",
                     additionalProperties: false,
-
                     allOf: [
                         {
                             /**
@@ -692,11 +691,9 @@ export function initOriginConfigValidator(ajv) {
                                 required: [
                                     "id",
                                     "baseUrl",
-                                    "clientId",
-                                    "clientSecret",
                                     "discoverySupported",
-                                    "postAuthRedirectUri",
-                                    "authStrategies"
+                                    "clientId",
+                                    "clientSecret"
                                 ]
                             }
                         },
@@ -745,8 +742,6 @@ export function initOriginConfigValidator(ajv) {
                             default: "info"
                         },
                         baseUrl: { type: "string" },
-                        clientId: { type: "string" },
-                        clientSecret: { type: "string" },
                         discoverySupported: { type: "boolean" },
                         authorizationServerMetadataLocation: { type: "string" },
                         authorizationServerMetadata: {
@@ -765,16 +760,36 @@ export function initOriginConfigValidator(ajv) {
                                 jwks_uri: { type: "string" }
                             }
                         },
-                        authorizationRequest: { type: "object", default: {} },
+                        clientId: { type: "string" },
+                        clientSecret: { type: "string" },
+                        sessionIdCookieName: { type: "string", default: "speedis_session" },
                         pkceEnabled: { type: "boolean", default: false },
                         authorizationCodeTtl: { type: "number", default: 300 },
-                        sessionIdCookieName: { type: "string", default: "speedis_session" },
+                        authorizationRequestParameters: { type: "object", default: {} },
                         postAuthRedirectUri: { type: "string" },
                         logoutRequest:  { type: "object", default: {} },
                         authStrategies: {
                             type: "array",
                             minItems: 1,
-                            default: [{ urlPatterns: [".*"], grantType: "none" }]
+                            items: {
+                                type: "object",
+                                additionalProperties: true,
+                                minProperties: 2,
+                                maxProperties: 3,
+                                required: ["urlPatterns", "grantType"],
+                                properties: {
+                                    urlPatterns: {
+                                        type: "array",
+                                        minItems: 1,
+                                        items: { type: "string" }
+                                    },
+                                    grantType: {
+                                        enum: ["none", "client_credentials", "authorization_code"]
+                                    },
+                                    parameters: { type: "object", default: {} }
+                                }
+                            },
+                            default: [{ urlPatterns: [".*"], grantType: "none", parameters: {} }]
                         }
                     }
                 },
