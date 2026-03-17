@@ -108,10 +108,10 @@ export default async function (server, opts) {
 
     server.get('/logout', async (request, reply) => {
         let postLogoutRedirectUri = opts.logoutRequest.post_logout_redirect_uri
-        if (request.session?.id_token) {
+        if (request?.tokens?.id_token) {
             const parameters = {
                 ...opts.logoutRequest,
-                id_token_hint: request.session.id_token,
+                id_token_hint: request.tokens.id_token,
             }
             try {
                 postLogoutRedirectUri = openidClient.buildEndSessionUrl(

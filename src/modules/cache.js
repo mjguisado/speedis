@@ -4,6 +4,7 @@ import * as crypto from 'crypto'
 import { _fetch, getForwardedHeaders } from './origin.js'
 import * as utils from '../utils/utils.js'
 import * as bff from './bff.js'
+import { getUserId } from './authentication.js'
 import { errorHandler } from './error.js'
 
 export function initCache(server, opts) {
@@ -60,11 +61,16 @@ export function initCache(server, opts) {
 
     // This hook verifies that cacheable per-user requests include the user’s ID.
     // This ID is set by a hook in the OAuth2 module.
+    server.decorateRequest('userId', null)
     server.addHook('preValidation', async (request, reply) => {
-        if (request.cacheable_private && !request.session?.sub) {
-            const msg = `Origin: ${opts.id}. This resource ${request.raw.url} is cacheable per user, but the user could not be determined.`
-            server.log.error(msg)
-            return errorHandler(reply, 401, msg, opts.exposeErrors)
+        if (request.cacheable && request.cacheable_private) {
+            try {
+                request.userId = await getUserId(server, opts, request)
+            } catch (error) {
+                const msg = `Origin: ${opts.id}. This resource ${request.raw.url} is cacheable per user, but the user could not be determined.`
+                server.log.error(msg)
+                return errorHandler(reply, 401, msg, opts.exposeErrors)
+            }
         }
     })
 
@@ -430,9 +436,12 @@ export async function _get(server, opts, request) {
                 return -1
             }
 
+            /*
             if (request.session?.access_token) {
                 requestOptions.headers['authorization'] = `Bearer ${request.session.access_token}`
             }
+            */
+
             // Apply transformations to the request before sending it to the origin
             if (opts?.bff?.enabled) bff.transform(opts, bff.ORIGIN_REQUEST, requestOptions)
 
@@ -610,7 +619,6 @@ export async function _get(server, opts, request) {
                 server.redisBreaker
                     ? await server.redisBreaker.fire('json.set', [request.urlKey, '$', cacheEntry])
                     : await server.redis.json.set(request.urlKey, '$', cacheEntry)
-
                 // Set the TTL for the cache entry           
                 if (Number.isFinite(ttl) && ttl > 0) {
                     server.redisBreaker

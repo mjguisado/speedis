@@ -138,6 +138,7 @@ The `bearer` object is only used when `scheme` is set to `Bearer`.
 |Field|Type|Mandatory|Default|Description|
 |-----|----|---------|-------|-----------|
 |`claim`|String|`false`|`sub`|The JWT claim used as the user identifier.|
+|`decryptionKey`|String|`false`||The key used to decrypt the JWT. Required for JWE tokens. Not needed for JWS tokens. The key must be a base64url encoded string. The algorithm used to encrypt the JWT must be supported by the `crypto` module of Node.js.|
 |`allowUnsigned`|Boolean|`false`|`false`|If `true`, unsigned JWTs are accepted.|
 |`verifyJwtSignature`|Boolean|`false`|`true`|If `true`, Speedis verifies the JWT signature against the JWKS endpoint. If `false`, the token is accepted without signature verification.|
 |`jwksUri`|String|`true` if verifyJwtSignature is `true`||The URL of the JSON Web Key Set (JWKS) used to validate the JWT signature. Required when `verifyJwtSignature` is `true` (the default).|

@@ -216,9 +216,7 @@ export async function initOAuth2(server, opts) {
     }
 
     async function decorateRequestWithTokens(request, tokens) {
-        if ((tokens.token_type || '').toLowerCase() !== 'bearer') {
-            throw new Error(`Origin: ${opts.id}. Unsupported token_type ${tokens.token_type}.`)
-        }
+        request.tokens = tokens
         request.headers['authorization'] = `Bearer ${tokens.access_token}`
     }
 

@@ -294,7 +294,6 @@ export function initOriginConfigValidator(ajv) {
                         { required: ["http2Options"] },
                         { required: ["http1xOptions"] }
                     ],
-
                     allOf: [
                         {
                             /**
@@ -403,7 +402,6 @@ export function initOriginConfigValidator(ajv) {
                                 bearer: {
                                     type: "object",
                                     additionalProperties: false,
-
                                     allOf: [
                                         {
                                             /**
@@ -425,9 +423,9 @@ export function initOriginConfigValidator(ajv) {
                                             }
                                         }
                                     ],
-
                                     properties: {
                                         claim: { type: "string", default: "sub" },
+                                        decryptionKey: { type: "string" },
                                         allowUnsigned: { type: "boolean", default: false },
                                         verifyJwtSignature: { type: "boolean", default: true },
                                         jwksUri: { type: "string" }
@@ -439,8 +437,6 @@ export function initOriginConfigValidator(ajv) {
                                  *
                                  * Defines how to transform the extracted user identifier before using it
                                  * in cache keys (e.g., adding prefix/suffix, hashing for privacy).
-                                 *
-                                 * Note: Currently defined in schema but not implemented in code.
                                  */
                                 idTransformation: {
                                     type: "object",

@@ -140,7 +140,7 @@ export function generateUrlKey(opts, request, fieldNames = utils.parseVaryHeader
         ? opts.id
         : ''
     if (request.cacheable_private) {
-        urlKey += (urlKey.length > 0 ? ':' : '') + request.session.sub
+        urlKey += (urlKey.length > 0 ? ':' : '') + request.userId
     }
     urlKey += path.replaceAll('/', ':')
     if (urlKey.startsWith(':')) urlKey = urlKey.slice(1)
@@ -213,10 +213,12 @@ export async function proxy(server, opts, request) {
     // to this instance of the plugin
     requestOptions.path = request.path
 
+    /*
     if (request.session?.access_token) {
         requestOptions.headers['authorization'] = `Bearer ${request.session.access_token}`
     }
-
+    */
+   
     // We set the method to the one used in the original request.
     requestOptions.method = request.method
 
