@@ -394,7 +394,7 @@ export function initOriginConfigValidator(ajv) {
                             properties: {
                                 enabled: { type: "boolean", default: true },
                                 scheme: { type: "string", enum: ["Basic", "Bearer"], default: "Basic" },
-
+                                realm: { type: "string" },
                                 /**
                                  * Bearer token validation settings
                                  * Used when scheme is "Bearer"
@@ -801,7 +801,6 @@ export function initOriginConfigValidator(ajv) {
                     type: "object",
                     additionalProperties: false,
                     required: ["redisOptions"],
-
                     allOf: [
                         {
                             /**

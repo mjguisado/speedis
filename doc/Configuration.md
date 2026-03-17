@@ -129,6 +129,7 @@ The following table describes the supported fields for the `origin.authenticatio
 |-----|----|---------|-------|-----------|
 |`enabled`|Boolean|`false`|`true`|Enables (`true`) or disables (`false`) authentication for this origin.|
 |`scheme`|String|`false`|`Basic`|[Authentication scheme](https://www.iana.org/assignments/http-authschemes/http-authschemes.xhtml) used to extract user identifiers. Supported values: `Basic`, `Bearer`.|
+|`realm`|String|`false`||It defines the protected area (or scope) of a resource and tells the client which credentials are applicable.|
 |`bearer`|Object|`true` if scheme is `Bearer`||Bearer token validation options. Required when `scheme` is `Bearer`. See below for details.|
 |`idTransformation`|Object|`false`||Defines how the user identifier is transformed before being used in cache keys (e.g. hashing). See below for details.|
 
