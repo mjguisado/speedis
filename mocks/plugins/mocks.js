@@ -91,8 +91,9 @@ export default async function (server, opts) {
         
         if ("HEAD" ===request.method || "GET" === request.method) {
             let headers = {}
-            if (request.query['cc']) headers['cache-control'] = request.query['cc']
-            if (request.params.uuid) headers['etag'] = `W/"${request.params.uuid}"`
+            if (request.query['cc'])   headers['cache-control'] = request.query['cc']
+            if (request.query['vary']) headers['vary'] = request.query['vary']
+            if (request.params.uuid)   headers['etag'] = `W/"${request.params.uuid}"`
             headers['x-mocks-custom-header-1'] = 'x-mocks-custom-header-1'
             headers['x-mocks-custom-header-2'] = 'x-mocks-custom-header-2'
             headers['x-mocks-custom-header-3'] = 'x-mocks-custom-header-3'

@@ -345,7 +345,6 @@ export async function _get(server, opts, request) {
     }
 
     const requestCacheDirectives = utils.parseCacheControlHeader(request)
-    const fieldNames = utils.parseVaryHeader(request)
     let cachedCacheDirectives = null
 
     if (cachedResponse) {
@@ -392,6 +391,7 @@ export async function _get(server, opts, request) {
         * already stored response.
         */
         cachedCacheDirectives = utils.parseCacheControlHeader(cachedResponse)
+        const fieldNames = utils.parseVaryHeader(cachedResponse)
         if (responseIsFresh
             && !Object.prototype.hasOwnProperty.call(requestCacheDirectives, 'no-cache')
             && (!Object.prototype.hasOwnProperty.call(cachedCacheDirectives, 'no-cache')
@@ -576,6 +576,8 @@ export async function _get(server, opts, request) {
         && !Object.prototype.hasOwnProperty.call(requestCacheDirectives, 'no-store')
         // See: https://www.rfc-editor.org/rfc/rfc9111.html#name-storing-responses-in-caches
         && isStorableResponse(originResponse, originCacheDirectives)
+        // Speedis limitation: Do not cache responses with Vary header
+        && !Object.prototype.hasOwnProperty.call(originResponse.headers, 'vary')        
 
     // We generate a cache entry from the response.
     const cacheEntry = utils.cloneAndTrimResponse(originResponse)
@@ -684,7 +686,7 @@ export async function _get(server, opts, request) {
     // See: https://www.rfc-editor.org/rfc/rfc9111.html#cache-request-directive.only-if-cached
     if (Object.prototype.hasOwnProperty.call(requestCacheDirectives, 'only-if-cached')
         && cachedResponse == null) {
-        return generatedResponse = {
+        return {
             statusCode: 504,
             headers: {
                 'date': new Date().toUTCString(),

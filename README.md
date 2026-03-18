@@ -125,6 +125,14 @@ You can find more information about Speedis configuration in [doc/Configuration.
 This repository includes examples of how to deploy Speedis using [Docker Compose](./doc/Docker.md) or in a [Kubernetes cluster](./doc/Kubernetes.md).
 To facilitate testing Speedis’ capabilities, some additional components are also included in the deployment.
 
+## Known Limitations and RFC 9111 Compliance
+
+Speedis aims to comply with [RFC 9111 (HTTP Caching)](https://www.rfc-editor.org/rfc/rfc9111.html) specifications. However, the following limitation exists in the current implementation:
+
+### Vary Header Not Supported
+
+Responses containing the `Vary` header are **not cached**. This means that content negotiation based on request headers (such as `Accept-Encoding`, `Accept-Language`, or `User-Agent`) is not supported by the cache. If the origin server sends a response with a `Vary` header, Speedis will forward the response to the client but will not store it in the cache. Subsequent requests for the same resource will always be forwarded to the origin server.
+
 ## Contributing.
 Contributions are welcome! Feel free to submit issues or pull requests.
 
