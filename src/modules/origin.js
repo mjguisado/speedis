@@ -117,12 +117,21 @@ export function generateUrlKey(opts, request, fieldNames = utils.parseVaryHeader
         }
     }
 
+    // If configured, include origin ID in cache key
     let urlKey = opts.cache?.includeOriginIdInUrlKey
         ? opts.id
         : ''
+
+    // If cacheable per-user, include user ID in cache key
     if (request.cacheSettings?.private) {
         urlKey += (urlKey.length > 0 ? ':' : '') + request.userId
     }
+    // Include HTTP method in cache key to separate HEAD and GET responses
+    // This prevents GET requests from being served with empty body from HEAD cache entries
+    // See: https://www.rfc-editor.org/rfc/rfc9111.html#name-head
+    urlKey += (urlKey.length > 0 ? ':' : '') + request.method
+
+    // Include path in cache key
     urlKey += path.replaceAll('/', ':')
     if (urlKey.startsWith(':')) urlKey = urlKey.slice(1)
 

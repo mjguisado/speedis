@@ -136,7 +136,7 @@ suite('RFC 9111 - HTTP Caching Extended Compliance', () => {
     })
 
     test('REQUEST no-store - can use already cached response', async (t) => {
-        t.plan(9)
+        t.plan(6)
 
         const url = '/mocks/mocks/public/items/' + crypto.randomUUID()
             + '?cc=' + encodeURIComponent('public,max-age=60')
@@ -496,7 +496,7 @@ suite('RFC 9111 - HTTP Caching Extended Compliance', () => {
     test('Status 404 Not Found - should be cacheable with explicit directives', async (t) => {
         t.plan(6)
 
-        const url = '/mocks/mocks/public/nonexistent/' + crypto.randomUUID()
+        const url = '/mocks/mocks/public/status/404/' + crypto.randomUUID()
             + '?cc=' + encodeURIComponent('public,max-age=60')
 
         let response = await server.inject({
@@ -515,8 +515,6 @@ suite('RFC 9111 - HTTP Caching Extended Compliance', () => {
         t.assert.match(response.headers['x-speedis-cache-status'], /^CACHE_HIT/)
         t.assert.ok(response.headers['age'])
     })
-
-    // Note: Tests for 301, 500 status codes removed - mock server doesn't support these endpoints
 
     // ========================================================================
     // RFC 9110 §9.3.2 - HEAD Method
@@ -548,7 +546,7 @@ suite('RFC 9111 - HTTP Caching Extended Compliance', () => {
         t.assert.ok(response.headers['age'])
         t.assert.strictEqual(response.body, '')
 
-        // GET request - should be separate cache entry
+        // GET request - should be separate cache entry (different method)
         response = await server.inject({
             method: 'GET',
             url: url
@@ -729,7 +727,7 @@ suite('RFC 9111 - HTTP Caching Extended Compliance', () => {
     // ========================================================================
 
     test('Stale response with max-stale - should include age greater than max-age', async (t) => {
-        t.plan(7)
+        t.plan(6)
 
         const maxage = 2
         const maxstale = 3

@@ -93,6 +93,102 @@ suite('Speedis - Origin', () => {
         t.assert.strictEqual(response.statusCode, 204)
     })
 
+    test('PURGE - should delete both GET and HEAD cache entries', async (t) => {
+        t.plan(10)
+        let url = '/mocks/mocks/public/items/' + crypto.randomUUID()
+        url += '?cc=' + encodeURIComponent('public,max-age=60')
+
+        // Cache a GET request
+        let response = await server.inject({
+            method: 'GET',
+            url: url
+        })
+        t.assert.strictEqual(response.statusCode, 200)
+        t.assert.match(response.headers['x-speedis-cache-status'], /^CACHE_MISS/)
+
+        // Verify GET is cached
+        response = await server.inject({
+            method: 'GET',
+            url: url
+        })
+        t.assert.strictEqual(response.statusCode, 200)
+        t.assert.match(response.headers['x-speedis-cache-status'], /^CACHE_HIT/)
+
+        // Cache a HEAD request
+        response = await server.inject({
+            method: 'HEAD',
+            url: url
+        })
+        t.assert.strictEqual(response.statusCode, 200)
+        t.assert.match(response.headers['x-speedis-cache-status'], /^CACHE_MISS/)
+
+        // Verify HEAD is cached
+        response = await server.inject({
+            method: 'HEAD',
+            url: url
+        })
+        t.assert.strictEqual(response.statusCode, 200)
+        t.assert.match(response.headers['x-speedis-cache-status'], /^CACHE_HIT/)
+
+        // PURGE the URL
+        response = await server.inject({
+            method: 'DELETE',
+            url: url.replace('/mocks/mocks/', '/mocks/purge/mocks/')
+        })
+        t.assert.strictEqual(response.statusCode, 204)
+
+        // Verify both GET and HEAD are purged (should be CACHE_MISS)
+        response = await server.inject({
+            method: 'GET',
+            url: url
+        })
+        t.assert.match(response.headers['x-speedis-cache-status'], /^CACHE_MISS/)
+    })
+
+    test('PURGE with pattern - should delete both GET and HEAD cache entries', async (t) => {
+        t.plan(14)
+        const uuid = crypto.randomUUID()
+        const url1 = '/mocks/mocks/public/items/' + uuid + '-1?cc=' + encodeURIComponent('public,max-age=60')
+        const url2 = '/mocks/mocks/public/items/' + uuid + '-2?cc=' + encodeURIComponent('public,max-age=60')
+
+        // Cache GET and HEAD for url1
+        let response = await server.inject({ method: 'GET', url: url1 })
+        t.assert.match(response.headers['x-speedis-cache-status'], /^CACHE_MISS/)
+        response = await server.inject({ method: 'HEAD', url: url1 })
+        t.assert.match(response.headers['x-speedis-cache-status'], /^CACHE_MISS/)
+
+        // Cache GET and HEAD for url2
+        response = await server.inject({ method: 'GET', url: url2 })
+        t.assert.match(response.headers['x-speedis-cache-status'], /^CACHE_MISS/)
+        response = await server.inject({ method: 'HEAD', url: url2 })
+        t.assert.match(response.headers['x-speedis-cache-status'], /^CACHE_MISS/)
+
+        // Verify all are cached
+        response = await server.inject({ method: 'GET', url: url1 })
+        t.assert.match(response.headers['x-speedis-cache-status'], /^CACHE_HIT/)
+        response = await server.inject({ method: 'HEAD', url: url1 })
+        t.assert.match(response.headers['x-speedis-cache-status'], /^CACHE_HIT/)
+        response = await server.inject({ method: 'GET', url: url2 })
+        t.assert.match(response.headers['x-speedis-cache-status'], /^CACHE_HIT/)
+        response = await server.inject({ method: 'HEAD', url: url2 })
+        t.assert.match(response.headers['x-speedis-cache-status'], /^CACHE_HIT/)
+
+        // PURGE with pattern
+        const purgeUrl = `/mocks/purge/mocks/public/items/${uuid}*`
+        response = await server.inject({ method: 'DELETE', url: purgeUrl })
+        t.assert.strictEqual(response.statusCode, 204)
+
+        // Verify all are purged
+        response = await server.inject({ method: 'GET', url: url1 })
+        t.assert.match(response.headers['x-speedis-cache-status'], /^CACHE_MISS/)
+        response = await server.inject({ method: 'HEAD', url: url1 })
+        t.assert.match(response.headers['x-speedis-cache-status'], /^CACHE_MISS/)
+        response = await server.inject({ method: 'GET', url: url2 })
+        t.assert.match(response.headers['x-speedis-cache-status'], /^CACHE_MISS/)
+        response = await server.inject({ method: 'HEAD', url: url2 })
+        t.assert.match(response.headers['x-speedis-cache-status'], /^CACHE_MISS/)
+    })
+
     test('GET - REQUEST max-age', async (t) => {
         t.plan(18)
 

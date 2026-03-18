@@ -62,6 +62,9 @@
                 }
             },
             {
+                "urlPattern": "/mocks/public/status/.*"
+            },
+            {
                 "urlPattern": "/mocks/items/.*",
                 "cacheSettings": {
                     "private": true

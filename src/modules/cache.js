@@ -841,12 +841,19 @@ function isStorableResponse(originResponse, originCacheDirectives) {
 export async function purge(server, opts, request, reply) {
 
     const toTrash = opts.cache.purgePath.slice(1) + ':'
-    const cacheEviction = request.urlKey.replace(toTrash, "")
+    let cacheEviction = request.urlKey.replace(toTrash, "")
+
+    // Since cache keys now include the HTTP method (GET, HEAD), we need to replace
+    // the DELETE method in the purge request with a wildcard to ensure we delete
+    // both GET and HEAD cache entries
+    cacheEviction = cacheEviction.replace('DELETE:', '*:')
+
     const now = new Date().toUTCString()
 
     try {
         let result = 0
         // See: https://antirez.com/news/93
+        // Always use scanIterator since we now use wildcard for method
         if (cacheEviction.indexOf('*') > -1) {
             // See: https://github.com/redis/node-redis/blob/master/docs/scan-iterators.md
             // See: https://github.com/redis/node-redis/blob/master/docs/v4-to-v5.md#scan-iterators

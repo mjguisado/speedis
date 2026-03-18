@@ -120,6 +120,54 @@ export default async function (server, opts) {
             name: `Item ${request.params.uuid}`
         })
     })
+
+    // Endpoint genérico para devolver cualquier código de estado
+    // Uso: /public/status/:statusCode/:uuid?cc=public,max-age=60
+    server.all('/public/status/:statusCode/:uuid', async (request, reply) => {
+        const statusCode = parseInt(request.params.statusCode)
+
+        // Validar que el statusCode sea un número válido
+        if (Number.isNaN(statusCode) || statusCode < 100 || statusCode > 599) {
+            reply.code(400)
+            return reply.send({
+                error: 'invalid_status_code',
+                error_description: 'Status code must be a number between 100 and 599'
+            })
+        }
+
+        // Ejecutar la lógica común (delay, headers, etc.)
+        await common(request, reply)
+
+        // Sobrescribir el código de estado
+        reply.code(statusCode)
+
+        // Devolver un body apropiado según el código de estado
+        if (statusCode >= 200 && statusCode < 300) {
+            return reply.send({
+                id: request.params.uuid,
+                statusCode: statusCode,
+                message: `Success response with status ${statusCode}`
+            })
+        } else if (statusCode >= 400 && statusCode < 500) {
+            return reply.send({
+                error: `error_${statusCode}`,
+                error_description: `Client error with status ${statusCode}`,
+                statusCode: statusCode
+            })
+        } else if (statusCode >= 500 && statusCode < 600) {
+            return reply.send({
+                error: `error_${statusCode}`,
+                error_description: `Server error with status ${statusCode}`,
+                statusCode: statusCode
+            })
+        } else {
+            return reply.send({
+                statusCode: statusCode,
+                message: `Response with status ${statusCode}`
+            })
+        }
+    })
+
     const users = [
         {
             "id": 1,
