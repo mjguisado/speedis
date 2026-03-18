@@ -80,6 +80,41 @@
     "bff": {
         "transformations": [
             {
+                "urlPattern": "/mocks/public/items/.*",
+                "actions": [
+                    {
+                        "phase": "OriginResponse",
+                        "uses": "headers:setCacheControlByStatusCode",
+                        "with": {
+                            "statusCodeRules": {
+                                "200": "public, max-age=1800",
+                                "404": "public, max-age=300",
+                                "403": "no-store",
+                                "5xx": "no-cache"
+                            }
+                        }
+                    }
+                ]
+            },
+            {
+                "urlPattern": "/mocks/items/.*",
+                "actions": [
+                    {
+                        "phase": "OriginResponse",
+                        "uses": "headers:setCacheControlByStatusCode",
+                        "with": {
+                            "statusCodeRules": {
+                                "200": "private, max-age=600",
+                                "404": "private, max-age=10",
+                                "403": "no-store",
+                                "401": "no-store",
+                                "5xx": "no-cache"
+                            }
+                        }
+                    }
+                ]
+            },
+            {
                 "urlPattern": "/mocks/public/users/1",
                 "actions": [
                     {
