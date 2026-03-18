@@ -230,15 +230,23 @@ The following table describes the supported fields in the variant tracker config
 The following table describes the supported fields in the cache configuration object.
 |Field|Type|Mandatory|Default|Description|
 |-----|----|---------|-------|-----------|
-|`enabled`|Boolean|`false`|`true`|Enables (`true`) or disables (`false`) the Cache.| 
+|`enabled`|Boolean|`false`|`true`|Enables (`true`) or disables (`false`) the Cache.|
 |`purgePath`|String|`false`|`/purge`|URL path prefix used to trigger cache purge requests. Any DELETE request whose path starts with this prefix will be interpreted as a cache purge operation.|
 |`includeOriginIdInUrlKey`|Boolean|`false`|`true`|This field determines whether the id of the origin is used to generate the url key for the entry (`true` or `false`).|
-|`ignoredQueryParams`|[String]|`false`||The url key is generated based on the URL requested from the origin. This field defines a list of query string parameters that will be ignored when forming the cache key for the entry.|
-|`sortQueryParams`|Boolean|`false`|`true`|The url key is generated based on the URL requested from the origin. This field determines whether the query string parameters should be sorted alphabetically before being used to generate the cache key for the entry (`true` or `false`). |
+|`defaultCacheSettings`|Object|`false`|See below|Default cache behavior for all cacheable entries. These defaults can be overridden per cacheable entry. Its format is detailed below.|
 |`localRequestsCoalescing`|Boolean|`false`|`true`|Enables (`true`) or disables (`false`) the request coalescing mechanism.|
 |`distributedRequestsCoalescing`|Boolean|`false`|`false`|Enables (`true`) or disables (`false`) the request coalescing functionality across multiple instances.|
 |`distributedRequestsCoalescingOptions`|Object|`true` if distributedRequestsCoalescing is `true`||Configure the distributed lock mechanism used to implements the requests coalescing functionality across multiple instances. Its format is detailed below.|
 |`cacheables`|[Object]|`true`||List of URL patterns that are considered cacheable. Only request with method GET or HEAD can be cached. Its format is detailed below.|
+
+### Default cache settings configuration object
+The following table describes the supported fields in the `defaultCacheSettings` configuration object. If not specified, the following defaults are used: `{ private: false, ttl: -1, sortQueryParams: true, ignoredQueryParams: [] }`.
+|Field|Type|Mandatory|Default|Description|
+|-----|----|---------|-------|-----------|
+|`private`|Boolean|`false`|`false`|Default value for whether responses should be cached separately for each authenticated user. Can be overridden per cacheable entry.|
+|`ttl`|Number|`false`|`-1`|Default time-to-live (in seconds) for cache entries. `-1` means use HTTP cache headers. Can be overridden per cacheable entry.|
+|`sortQueryParams`|Boolean|`false`|`true`|Default behavior for sorting query string parameters alphabetically when generating cache keys. Can be overridden per cacheable entry.|
+|`ignoredQueryParams`|[String]|`false`|`[]`|Default list of query string parameters to ignore when generating cache keys. Can be overridden per cacheable entry.|
 
 ### Lock configuration object
 The following table describes the supported fields in the lock configuration object.
@@ -250,12 +258,20 @@ The following table describes the supported fields in the lock configuration obj
 |`retryJitter`|Number|`true`||(Randomized delay variation): Introduces a random variation (in milliseconds) to the retry delay to reduce the likelihood of multiple processes retrying at the same time, which can help prevent contention spikes.|
 
 ### Cacheable configuration object
-The following table describes the supported fields in the cacheable configuration object.
+The following table describes the supported fields in the cacheable configuration object. Each cacheable entry has exactly two properties:
 |Field|Type|Mandatory|Default|Description|
 |-----|----|---------|-------|-----------|
-|`urlPattern`|String|`true`||URL patterns that are considered cacheable.|
+|`urlPattern`|String|`true`||Regular expression pattern to match URLs that should be cached.|
+|`cacheSettings`|Object|`false`|Inherits from `cache.defaultCacheSettings`|Cache behavior settings for this URL pattern. Any property not specified will inherit from `cache.defaultCacheSettings`. See the cache settings object format below.|
+
+### Cache settings object
+The following table describes the supported fields in the `cacheSettings` object (used both in `defaultCacheSettings` and within each `cacheable` entry):
+|Field|Type|Mandatory|Default|Description|
+|-----|----|---------|-------|-----------|
 |`private`|Boolean|`false`|`false`|Indicates whether the response for a given URL should be cached separately for each authenticated user. If `true`, `origin.authentication` must be configured.|
-|`ttl`|Number|`false`|`Infinity`|This parameter defines how long the response will be stored in the cache.|
+|`ttl`|Number|`false`|`-1`|Time-to-live (in seconds) for this cache entry. `-1` means use HTTP cache headers.|
+|`sortQueryParams`|Boolean|`false`|`true`|Whether to sort query string parameters alphabetically when generating the cache key.|
+|`ignoredQueryParams`|[String]|`false`|`[]`|List of query string parameters to ignore when generating the cache key.|
 
 ## OAuth2-based Access Control
 The following table describes the supported fields in the OAuth2-based Access Control configuration object.

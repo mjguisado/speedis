@@ -34,8 +34,6 @@ export default async function (server, opts) {
     if (opts?.origin?.authentication?.enabled) initAuthentication(server, opts)
     if (opts?.cache?.enabled) cache.initCache(server, opts)
     if (opts?.bff?.enabled) await bff.initBff(server, opts)
-    // Initialize passive authentication for extracting user identifiers from requests
-    // This must be initialized after cache module to ensure request.cacheable_private is set
     if (opts?.variantsTracker?.enabled) initVariantsTracker(server, opts)
 
     // In Fastify, you can’t explicitly define the execution order of hooks of 

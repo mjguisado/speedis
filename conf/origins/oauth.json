@@ -33,22 +33,31 @@
         }
     },
     "cache": {
+        "defaultCacheSettings": {
+            "private": false,
+            "ttl": -1,
+            "sortQueryParams": true,
+            "ignoredQueryParams": [
+                "cc",
+                "delay"
+            ]
+        },
         "cacheables": [
             {
                 "urlPattern": "/mocks/public/.*",
-                "ttl": 20
+                "cacheSettings": {
+                    "ttl": 20
+                }
             },
             {
                 "urlPattern": "/mocks/restricted/.*"
             },
             {
                 "urlPattern": "/mocks/private/.*",
-                "private": true
+                "cacheSettings": {
+                    "private": true
+                }
             }
-        ],
-        "ignoredQueryParams": [
-            "cc",
-            "delay"
         ],
         "localRequestsCoalescing": true,
         "distributedRequestsCoalescing": true,

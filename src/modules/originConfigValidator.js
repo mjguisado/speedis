@@ -221,6 +221,46 @@ export function initOriginConfigValidator(ajv) {
                         autoRenewAbortController: { type: "boolean", default: false }
                     }
                 },
+                /**
+                 * Cache settings definition
+                 *
+                 * Defines the structure for cache behavior configuration.
+                 * Used both for cache.defaults and individual cacheable entries.
+                 */
+                cacheSettings: {
+                    type: "object",
+                    additionalProperties: false,
+                    properties: {
+                        /**
+                         * Whether to cache responses separately per authenticated user
+                         * If true, origin.authentication must be configured
+                         */
+                        private: { type: "boolean" },
+
+                        /**
+                         * Time-to-live in seconds for cache entries
+                         * -1 means use HTTP cache headers to determine TTL
+                         */
+                        ttl: { type: "integer" },
+
+                        /**
+                         * Whether to sort query string parameters alphabetically
+                         * when generating the cache key
+                         */
+                        sortQueryParams: { type: "boolean" },
+
+                        /**
+                         * List of query string parameters to ignore when
+                         * generating the cache key
+                         */
+                        ignoredQueryParams: {
+                            type: "array",
+                            items: {
+                                type: "string"
+                            }
+                        }
+                    }
+                },
                 requestOptions: {
                     type: "object",
                     additionalProperties: false,
@@ -609,13 +649,6 @@ export function initOriginConfigValidator(ajv) {
                         enabled: { type: "boolean", default: true },
                         purgePath: { type: "string", default: "/purge" },
                         includeOriginIdInUrlKey: { type: "boolean", default: true },
-                        ignoredQueryParams: {
-                            type: "array",
-                            items: {
-                                type: "string"
-                            }
-                        },
-                        sortQueryParams: { type: "boolean", default: true },
                         localRequestsCoalescing: { type: "boolean", default: true },
                         distributedRequestsCoalescing: { type: "boolean", default: false },
                         distributedRequestsCoalescingOptions:
@@ -631,25 +664,36 @@ export function initOriginConfigValidator(ajv) {
                             }
                         },
                         /**
+                         * Default cache behavior for all cacheable entries
+                         *
+                         * These defaults can be overridden per cacheable entry.
+                         */
+                        defaultCacheSettings: {
+                            $ref: "#/definitions/cacheSettings",
+                            default: {
+                                private: false,
+                                ttl: -1,
+                                sortQueryParams: true,
+                                ignoredQueryParams: []
+                            }
+                        },
+                        /**
                          * Cacheables array - defines which URLs should be cached
                          *
-                         * Each entry specifies:
-                         * - urlPattern: regex pattern to match URLs
-                         * - private: if true, cache separately per user (requires origin.authentication)
-                         * - ttl: time-to-live in seconds (-1 means use HTTP cache headers)
+                         * Each entry has two properties:
+                         * - urlPattern: regex pattern to match URLs (required)
+                         * - cacheSettings: cache behavior for this URL pattern (optional, inherits from defaultCacheSettings)
                          */
                         cacheables: {
                             type: "array",
                             minItems: 1,
                             items: {
                                 type: "object",
-                                minProperties: 1,
-                                maxProperties: 3,
                                 required: ["urlPattern"],
+                                additionalProperties: false,
                                 properties: {
                                     urlPattern: { type: "string" },
-                                    private: { type: "boolean", default: false },
-                                    ttl: { type: "integer", default: -1 }
+                                    cacheSettings: { $ref: "#/definitions/cacheSettings" }
                                 }
                             }
                         }

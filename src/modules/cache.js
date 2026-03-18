@@ -12,7 +12,7 @@ export function initCache(server, opts) {
     let purgeUrlPrefix = path.join(opts.prefix, opts.cache.purgePath)
     server.decorate('purgeUrlPrefix', purgeUrlPrefix)
 
-    // When Local Requests Coalescing is enabled, this variable 
+    // When Local Requests Coalescing is enabled, this variable
     // stores the promises associated with ongoing origin server requests.
     const ongoingFetch = opts.cache.localRequestsCoalescing
         ? new Map()
@@ -22,8 +22,9 @@ export function initCache(server, opts) {
         if (server.ongoingFetch) server.ongoingFetch.clear()
     })
 
-    // To improve performance, we compile the regular 
+    // To improve performance, we compile the regular
     // expressions used to determine whether a URL is cacheable.
+    // Also apply defaults to each cacheable entry.
     opts.cache.cacheables.forEach(cacheable => {
         try {
             cacheable.re = new RegExp(cacheable.urlPattern)
@@ -32,27 +33,29 @@ export function initCache(server, opts) {
                 `Origin: ${opts.id}. urlPattern ${cacheable.urlPattern} is not a valid regular expresion.`)
             throw new Error(`Origin: ${opts.id}. The cache configuration is invalid.`, { cause: error })
         }
+
+        // Also merge default and cacheable settings
+        // If cacheSettings is not provided, use defaults
+        if (!cacheable.cacheSettings) { cacheable.cacheSettings = {} }
+        // Merge default and cacheable settings        
+        cacheable.cacheSettings = { ... opts.cache.defaultCacheSettings, ... cacheable.cacheSettings }
     })
 
-    // Each time a request is received, this hook checks whether it 
-    // is cacheable and, if so, whether the response should be cached 
-    // separately for each user.
+    // Each time a request is received, this hook checks whether it
+    // is cacheable and, if so, extracts the cache configuration for that URL.
     server.decorateRequest('cacheable')
-    server.decorateRequest('cacheable_private')
-    server.decorateRequest('cacheable_ttl')
+    server.decorateRequest('cacheSettings')
 
     server.addHook('onRequest', async (request, reply) => {
         request.cacheable = false
-        request.cacheable_private = false
-        request.cacheable_ttl = Infinity
+        request.cacheSettings = {}
         // Only the safe methods are cacheables
         // https://developer.mozilla.org/en-US/docs/Glossary/Safe/HTTP
         if (['GET', 'HEAD'].includes(request.method)) {
             for (const cacheable of opts.cache.cacheables) {
                 if (cacheable.re.test(request.raw.url)) {
                     request.cacheable = true
-                    request.cacheable_private = cacheable.private
-                    request.cacheable_ttl = cacheable.ttl
+                    request.cacheSettings = cacheable.cacheSettings
                     break
                 }
             }
@@ -63,7 +66,7 @@ export function initCache(server, opts) {
     // This ID is set by a hook in the OAuth2 module.
     server.decorateRequest('userId', null)
     server.addHook('preValidation', async (request, reply) => {
-        if (request.cacheable && request.cacheable_private) {
+        if (request.cacheable && request.cacheSettings.private) {
             try {
                 request.userId = await getUserId(server, opts, request)
             } catch (error) {
@@ -625,7 +628,7 @@ export async function _get(server, opts, request) {
     } else {
 
         if (writeCache) {
-            cacheEntry.ttl = request.cacheable_ttl
+            cacheEntry.ttl = request.cacheSettings.ttl
             // Apply transformations to the cache entry before storing it in the cache.
             if (opts?.bff?.enabled) bff.transform(opts, bff.CACHE_REQUEST, cacheEntry)
             const ttl = parseInt(cacheEntry.ttl)

@@ -95,11 +95,15 @@ export function generateUrlKey(opts, request, fieldNames = utils.parseVaryHeader
     const [base, queryString] = path.split("?")
     if (queryString) {
         const params = new URLSearchParams(queryString)
-        if (opts.cache?.ignoredQueryParams) {
-            opts.cache.ignoredQueryParams.forEach(param => params.delete(param))
+
+        // Use request-specific ignoredQueryParams (from matched cacheable rule)
+        if (request.cacheSettings?.ignoredQueryParams) {
+            request.cacheSettings.ignoredQueryParams.forEach(param => params.delete(param))
         }
+
         if (params.size > 0) {
-            if (opts.cache?.sortQueryParams) {
+            // Use request-specific sortQueryParams (from matched cacheable rule)
+            if (request.cacheSettings?.sortQueryParams) {
                 const sortedParams = [...params.entries()]
                     .sort(([a], [b]) => a.localeCompare(b))
                     .map(([key, value]) => `${key}=${value}`)
@@ -116,7 +120,7 @@ export function generateUrlKey(opts, request, fieldNames = utils.parseVaryHeader
     let urlKey = opts.cache?.includeOriginIdInUrlKey
         ? opts.id
         : ''
-    if (request.cacheable_private) {
+    if (request.cacheSettings?.private) {
         urlKey += (urlKey.length > 0 ? ':' : '') + request.userId
     }
     urlKey += path.replaceAll('/', ':')

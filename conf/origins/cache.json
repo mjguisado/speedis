@@ -45,20 +45,28 @@
         "disableOriginOnRedisOutage": true
     },
     "cache": {
+        "defaultCacheSettings": {
+            "private": false,
+            "ttl": 3600,
+            "sortQueryParams": true,
+            "ignoredQueryParams": [
+                "cc",
+                "delay"
+            ]
+        },
         "cacheables": [
             {
                 "urlPattern": "/mocks/public/items/.*",
-                "private": false,
-                "ttl": 20
+                "cacheSettings": {
+                    "ttl": 20
+                }
             },
             {
                 "urlPattern": "/mocks/items/.*",
-                "private": true
+                "cacheSettings": {
+                    "private": true
+                }
             }
-        ],
-        "ignoredQueryParams": [
-            "cc",
-            "delay"
         ],
         "localRequestsCoalescing": true,
         "distributedRequestsCoalescing": true,
