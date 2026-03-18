@@ -169,13 +169,39 @@ cache.json: ✅ Valid
 4. **✅ Testable**: Pure function with comprehensive tests
 5. **✅ Standards-compliant**: Uses standard HTTP Cache-Control directives
 6. **✅ Well-documented**: Inline JSDoc + separate documentation file
+7. **✅ Composable**: Can be combined with other transformations
 
 ## Integration with Existing System
 
 - **BFF Module**: Uses existing transformation infrastructure
 - **Cache Module**: Works seamlessly with cache settings
+- **Multiple Transformations**: All matching transformations are applied in order (last wins for conflicts)
 - **No Breaking Changes**: Purely additive feature
 - **Backward Compatible**: Existing configurations continue to work
+
+## Multiple Transformations Behavior
+
+**Important**: Speedis applies **all transformations** whose `urlPattern` matches the URL, in order.
+
+Example:
+```json
+"transformations": [
+  {
+    "urlPattern": "/api/products/.*",
+    "actions": [{"phase": "OriginResponse", "uses": "headers:setCacheControlByStatusCode", "with": {...}}]
+  },
+  {
+    "urlPattern": ".*",
+    "actions": [{"phase": "OriginResponse", "uses": "headers:setHeaders", "with": {"X-Powered-By": "Speedis"}}]
+  }
+]
+```
+
+For `/api/products/123`:
+- ✅ First transformation applies (sets Cache-Control based on status)
+- ✅ Second transformation applies (adds X-Powered-By header)
+
+See [BFF: Multiple Transformations](doc/bff-multiple-transformations.md) for details.
 
 ## Next Steps (Optional)
 

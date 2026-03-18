@@ -115,6 +115,20 @@
                 ]
             },
             {
+                "urlPattern": ".*",
+                "actions": [
+                    {
+                        "phase": "OriginResponse",
+                        "uses": "headers:setHeaders",
+                        "with": {
+                            "headers": {
+                                "X-Powered-By": "Speedis"
+                            }
+                        }
+                    }
+                ]
+            },
+            {
                 "urlPattern": "/mocks/public/users/1",
                 "actions": [
                     {

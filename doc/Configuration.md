@@ -170,6 +170,28 @@ The following table describes the supported fields in the Backend-For-Frontend c
 
 ### Transformations configuration
 Speedis allows transformations to be applied to requests and responses it handles at different phases of their lifecycle.
+
+#### How Transformations Are Applied
+
+**Important**: All transformations whose `urlPattern` matches the request URL are applied **in the order they appear** in the `transformations` array.
+
+- **Multiple matches**: If a URL matches multiple patterns, all matching transformations are applied sequentially
+- **Order matters**: Define specific patterns first, generic patterns last
+- **Last wins**: If multiple transformations modify the same property (e.g., a header), the last transformation wins
+- **Global transformations**: Use pattern `".*"` at the end to apply transformations to all URLs
+
+**Example**: For URL `/api/users/123`:
+```json
+"transformations": [
+  {"urlPattern": "/api/users/.*", "actions": [...]},  // ✅ Matches - Applied first
+  {"urlPattern": "/api/.*", "actions": [...]},        // ✅ Matches - Applied second
+  {"urlPattern": ".*", "actions": [...]}              // ✅ Matches - Applied last
+]
+```
+All three transformations are applied in order.
+
+#### Transformation Phases
+
 |Phase|Description|
 |-|-|
 |`ClientRequest`|Apply transformations to the request received by Speedis from the client.|
