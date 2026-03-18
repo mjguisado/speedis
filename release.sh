@@ -147,7 +147,7 @@ docker buildx build --pull \
     -f 'Dockerfile' \
     -t "mjguisado/speedis:${NEW_VERSION}" \
     -t "mjguisado/speedis:latest" \
-    --platform 'linux/amd64' \
+    --platform 'linux/amd64,linux/arm64' \
     --push '.'
 
 # Mocks
@@ -156,7 +156,7 @@ docker buildx build --pull \
     -f 'Dockerfile.mocks' \
     -t "mjguisado/mocks:${NEW_VERSION}" \
     -t "mjguisado/mocks:latest" \
-    --platform 'linux/amd64' \
+    --platform 'linux/amd64,linux/arm64' \
     --push '.'
 
 # Keycloak
@@ -165,7 +165,7 @@ docker buildx build --pull \
     -f 'Dockerfile.keycloak' \
     -t "mjguisado/keycloak:${NEW_VERSION}" \
     -t "mjguisado/keycloak:latest" \
-    --platform 'linux/amd64' \
+    --platform 'linux/amd64,linux/arm64' \
     --push '.'
 
 echo ""

@@ -50,7 +50,7 @@ docker buildx build --pull \
     -f 'Dockerfile' \
     -t "mjguisado/speedis:dev" \
     -t "mjguisado/speedis:${DEV_TAG}" \
-    --platform 'linux/amd64' \
+    --platform 'linux/amd64,linux/arm64' \
     --push '.'
 
 # Mocks
@@ -59,7 +59,7 @@ docker buildx build --pull \
     -f 'Dockerfile.mocks' \
     -t "mjguisado/mocks:dev" \
     -t "mjguisado/mocks:${DEV_TAG}" \
-    --platform 'linux/amd64' \
+    --platform 'linux/amd64,linux/arm64' \
     --push '.'
 
 # Keycloak
@@ -68,7 +68,7 @@ docker buildx build --pull \
     -f 'Dockerfile.keycloak' \
     -t "mjguisado/keycloak:dev" \
     -t "mjguisado/keycloak:${DEV_TAG}" \
-    --platform 'linux/amd64' \
+    --platform 'linux/amd64,linux/arm64' \
     --push '.'
 
 echo ""
