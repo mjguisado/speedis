@@ -1,6 +1,6 @@
 import { suite, test, before } from 'node:test'
 import assert from 'node:assert'
-import { getUserId, initAuthentication } from '../src/modules/authentication.js'
+import { getUserId, initAuthentication } from '../../src/modules/authentication.js'
 import { SignJWT, generateKeyPair } from 'jose'
 import { createHash } from 'crypto'
 

@@ -1,9 +1,9 @@
 import { suite, test, before, after } from 'node:test'
 import fastify from 'fastify'
-import speedisPlugin from '../src/plugins/speedis.js'
+import speedisPlugin from '../../src/plugins/speedis.js'
 import crypto from 'crypto'
 import Ajv from "ajv"
-import { initOriginConfigValidator } from '../src/modules/originConfigValidator.js'
+import { initOriginConfigValidator } from '../../src/modules/originConfigValidator.js'
 
 suite('Speedis - Origin', () => {
 
@@ -34,16 +34,19 @@ suite('Speedis - Origin', () => {
                 }
             },
             "cache": {
+                "defaultCacheSettings": {
+                    "private": false,
+                    "ttl": 20,
+                    "sortQueryParams": true,
+                    "ignoredQueryParams": [
+                        "cc",
+                        "delay"
+                    ]
+                },
                 "cacheables": [
                     {
-                        "urlPattern": "/mocks/public/items/.*",
-                        "private": false,
-                        "ttl": 20
+                        "urlPattern": "/mocks/public/items/.*"
                     }
-                ],
-                "ignoredQueryParams": [
-                    "cc",
-                    "delay"
                 ]
             },
             "redis": {

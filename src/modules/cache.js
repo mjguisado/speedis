@@ -49,17 +49,18 @@ export function initCache(server, opts) {
     server.addHook('onRequest', async (request, reply) => {
         request.cacheable = false
         request.cacheSettings = {}
-        // Only the safe methods are cacheables
         // https://developer.mozilla.org/en-US/docs/Glossary/Safe/HTTP
-        if (['GET', 'HEAD'].includes(request.method)) {
-            for (const cacheable of opts.cache.cacheables) {
-                if (cacheable.re.test(request.raw.url)) {
-                    request.cacheable = true
-                    request.cacheSettings = cacheable.cacheSettings
-                    break
-                }
+        for (const cacheable of opts.cache.cacheables) {
+            if (cacheable.re.test(request.raw.url)) {
+                // Only the safe methods are cacheables
+                request.cacheable = ['GET', 'HEAD'].includes(request.method)
+                // Merge default and cacheable settings
+                // This settings are used to generate the cache key, also for the purging operations
+                request.cacheSettings = cacheable.cacheSettings
+                break
             }
         }
+
     })
 
     // This hook verifies that cacheable per-user requests include the user’s ID.
