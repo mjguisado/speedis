@@ -76,7 +76,7 @@ suite('Speedis - Origin', () => {
         t.assert.strictEqual(response.statusCode, 404)
     })
    
-    test('PURGE - 204', async (t) => {
+    test('PURGE - GET - 204', async (t) => {
         t.plan(2)
         let url = '/mocks/mocks/public/items/' + crypto.randomUUID()
 
@@ -86,12 +86,34 @@ suite('Speedis - Origin', () => {
             url: url
         })
         t.assert.strictEqual(response.statusCode, 200)
+
         response = await server.inject({
             method: 'DELETE',
             url: url.replace('/mocks/mocks/', '/mocks/purge/mocks/')
         })
         t.assert.strictEqual(response.statusCode, 204)
+
     })
+
+    test('PURGE - HEAD - 204', async (t) => {
+        t.plan(2)
+        let url = '/mocks/mocks/public/items/' + crypto.randomUUID()
+
+        url += '?cc=' + encodeURIComponent('public,max-age=60')
+        let response = await server.inject({
+            method: 'HEAD',
+            url: url
+        })
+        t.assert.strictEqual(response.statusCode, 200)
+
+        response = await server.inject({
+            method: 'DELETE',
+            url: url.replace('/mocks/mocks/', '/mocks/purge/mocks/')
+        })
+        t.assert.strictEqual(response.statusCode, 204)
+
+    })
+
 
     test('PURGE - should delete both GET and HEAD cache entries', async (t) => {
         t.plan(10)

@@ -844,9 +844,20 @@ export async function purge(server, opts, request, reply) {
     let cacheEviction = request.urlKey.replace(toTrash, "")
 
     // Since cache keys now include the HTTP method (GET, HEAD), we need to replace
-    // the DELETE method in the purge request with a wildcard to ensure we delete
-    // both GET and HEAD cache entries
-    cacheEviction = cacheEviction.replace('DELETE:', '*:')
+    // the DELETE method in the purge request to ensure we delete both GET and HEAD
+    // related cache entries
+
+    // If the cacheEviction contains a wildcard, we replace the DELETE method with a wildcard   
+    if (cacheEviction.indexOf('*') > -1) {
+        cacheEviction = cacheEviction.replace('DELETE:', '*:')
+    } else {
+        // else we delete both GET and HEAD cache entries
+        const aux = cacheEviction
+        cacheEviction = [
+            aux.replace('DELETE:', 'GET:'),
+            aux.replace('DELETE:', 'HEAD:')
+        ]
+    }
 
     const now = new Date().toUTCString()
 
@@ -854,7 +865,9 @@ export async function purge(server, opts, request, reply) {
         let result = 0
         // See: https://antirez.com/news/93
         // Always use scanIterator since we now use wildcard for method
-        if (cacheEviction.indexOf('*') > -1) {
+        if (Array.isArray(cacheEviction)) {
+                result += await server.redis.unlink(cacheEviction)
+        } else {
             // See: https://github.com/redis/node-redis/blob/master/docs/scan-iterators.md
             // See: https://github.com/redis/node-redis/blob/master/docs/v4-to-v5.md#scan-iterators
             for await (const keys of server.redis.scanIterator({
@@ -866,8 +879,6 @@ export async function purge(server, opts, request, reply) {
                     result += await server.redis.unlink(keys)
                 }
             }
-        } else {
-            result = await server.redis.unlink(cacheEviction)
         }
         if (result) {
             return reply.code(204).headers({ date: now }).send()
