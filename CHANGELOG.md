@@ -8,20 +8,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- Describe new features here
 
 ### Changed
-- Describe changes here
 
 ### Fixed
-- Describe bug fixes here
 
-## [1.0.0] - 2024-01-01
+## [1.0.1] - 2026-03-19
 
-### Added
-- Initial release
-- HTTP cache based on Redis
-- Support for Basic and Bearer (JWT/JWE) authentication
-- Origin proxy functionality
-- Cache control directives support
+### Changed
+- Optimized cache PURGE operations: exact URLs now use direct UNLINK instead of SCAN iterator, improving performance
+
+### Fixed
+- PURGE now correctly deletes both GET and HEAD cache entries for the same URL
 
