@@ -43,13 +43,8 @@ The supported domains are: speedis, speedis.localhost, mocks, mocks.localhost, m
 ```sh
 ./3rparties/haproxy/generate_certificate.sh
 ```
-### Keycloak
-Keycloak requires TLS. 
-The supported domains are keycloak & keycloak.localhost.
-```sh
-./3rparties/keycloak/generate_certificate.sh
-```
-## **Start the environment**  
+
+## **Start the environment**
 Run the following command to start all services:  
 ```sh
 docker compose --profile develop up --watch --build
@@ -82,15 +77,13 @@ To access the different services deployed in Docker from the local environment, 
 127.0.0.1	redis.localhost
 127.0.0.1	prometheus.localhost
 127.0.0.1	grafana.localhost
-127.0.0.1	keycloak.localhost
 ```
 
 These URLs provide access to the consoles of certain tools and their associated metrics.
 - **HAProxy** → `http://haproxy.localhost:8405/metrics`
 - **Speedis (Metrics)** → `http://speedis.localhost:3003/metrics`
-- **Grafana** → `http://grafana.localhost:3000` (User: `admin`, Password: `grafana`)  
+- **Grafana** → `http://grafana.localhost:3000` (User: `admin`, Password: `grafana`)
 - **Prometheus** → `http://prometheus.localhost:9090`
-- **Keycloack**  → `https://keycloak.localhost:8443` (User: `admin`, Password: `admin`)  
 
 You can find examples of request to the different services in [./Requests.md](./Requests.md)
 ## **Load origin configuration**  
@@ -108,16 +101,8 @@ Start the rest of the service including Speedis
 ```sh
 docker compose --profile develop up --watch --build
 ```
-## **Configure Keycloak**  
-Keycloak, an Identity and Access Management (IAM) server, is included to support OAuth2 integration within Speedis.
-In the sample mocks configuration, Keycloak is used, and it must be properly configured before running Speedis.
-To configure it correctly, start Keycloak
-```sh
-docker compose up keycloak -d
-```
-and follow the steps detailed in [./Keycloak.md](./Keycloak.md)
-The configuration is stored in a persistent volume, so it only needs to be set up the first time — unless that volume is deleted.
-## **Stopping the environment**  
+
+## **Stopping the environment**
 To stop all containers, run:  
 ```sh
 docker compose down

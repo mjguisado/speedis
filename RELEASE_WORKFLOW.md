@@ -133,9 +133,6 @@ mjguisado/speedis:latest     # Última versión estable
 
 mjguisado/mocks:1.0.1
 mjguisado/mocks:latest
-
-mjguisado/keycloak:1.0.1
-mjguisado/keycloak:latest
 ```
 
 ## 🔖 Versionado Semántico

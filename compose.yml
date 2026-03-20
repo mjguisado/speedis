@@ -33,33 +33,6 @@ services:
       timeout: 2s
       interval: 5s
       retries: 5
-  keycloak:
-    image: mjguisado/keycloak:latest
-    pull_policy: build
-    build:
-      context: .
-      dockerfile: Dockerfile.keycloak
-    container_name: keycloak
-    command: start-dev
-    environment:
-      - KC_BOOTSTRAP_ADMIN_USERNAME=admin
-      - KC_BOOTSTRAP_ADMIN_PASSWORD=admin
-      - KC_HTTPS_CERTIFICATE_FILE=/opt/keycloak/conf/certs/keycloak.crt
-      - KC_HTTPS_CERTIFICATE_KEY_FILE=/opt/keycloak/conf/certs/keycloak.key
-      - KEYCLOAK_LOGLEVEL=DEBUG
-    volumes:
-      - ./3rparties/keycloak/certs:/opt/keycloak/conf/certs:ro
-      - ./3rparties/haproxy/certs/mocks.pem:/opt/keycloak/conf/truststores/mocks.pem:ro
-      - keycloak_data:/opt/keycloak/data
-    ports:
-      - 8080:8080
-      - 8443:8443
-    healthcheck:
-      test: ["CMD", "curl", "-kf", "https://localhost:8443/realms/master"]
-      start_period: 10s
-      timeout: 2s
-      interval: 5s
-      retries: 5      
   mocks:
     image: mjguisado/mocks:latest
     pull_policy: build
@@ -107,8 +80,6 @@ services:
         condition: service_started
       redis:
         condition: service_healthy
-      keycloak:
-        condition: service_healthy
   haproxy:
     image: haproxy:latest
     container_name: haproxy
@@ -124,4 +95,3 @@ services:
       - speedis
 volumes:
   prom_data:
-  keycloak_data:

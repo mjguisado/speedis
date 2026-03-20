@@ -1,5 +1,4 @@
-import { createClient, SCHEMA_FIELD_TYPE } from 'redis'
-import { SESSION_INDEX_NAME, SESSION_PREFIX } from '../plugins/oauth2.js'
+import { createClient } from 'redis'
 import CircuitBreaker from 'opossum'
 
 export async function initRedis(server, opts) {
@@ -22,37 +21,6 @@ export async function initRedis(server, opts) {
         server.log.info(`Origin: ${opts.id}. Redis connection established.`)
     } catch (error) {
         throw new Error(`Origin: ${opts.id}. Unable to connect to Redis during startup.`, { cause: error })
-    }
-
-    if (opts.oauth2) {
-        // The index creation process can take a considerable amount of time, 
-        // which is why it is created using the Redis client before setting 
-        // the per-operation timeouts.
-        try {
-            // https://redis.io/docs/latest/develop/clients/nodejs/queryjson/#add-the-index
-            await client.ft.create( SESSION_INDEX_NAME,
-                {
-                    'sub': {
-                        type: SCHEMA_FIELD_TYPE.TAG,
-                    },
-                    'iat': {
-                        type: SCHEMA_FIELD_TYPE.NUMERIC,
-                        SORTABLE: true,
-                    }
-                },
-                {
-                    ON: 'HASH',
-                    PREFIX: SESSION_PREFIX
-                }
-            )
-        } catch (error) {
-            if (error.message === 'Index already exists') {
-                server.log.info(`Origin: ${opts.id}. Index exists already, skipped creation.`)
-            } else {
-                // Something went wrong, perhaps RediSearch isn't installed...
-                throw new Error(`Origin: ${opts.id}. Session index creation failed.`, { cause: error })
-            }
-        }
     }
 
     /**

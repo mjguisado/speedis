@@ -3,11 +3,9 @@ import os from 'os'
 import * as bff from '../modules/bff.js'
 import * as cache from '../modules/cache.js'
 import * as utils from '../utils/utils.js'
-import oauth2Plugin from './oauth2.js'
 import { initRedis } from '../modules/redis.js'
 import { initOrigin, generateUrlKey, proxy, generatePath } from '../modules/origin.js'
 import { initAuthentication } from '../modules/authentication.js'
-import { initOAuth2 } from '../modules/oauth2.js'
 import { initVariantsTracker } from '../modules/variantTracker.js'
 import { initMetrics } from '../modules/metrics.js'
 import { errorHandler } from '../modules/error.js'
@@ -27,10 +25,6 @@ export default async function (server, opts) {
     // Module init
     await initOrigin(server, opts)
     if (opts.redis) await initRedis(server, opts)
-    if (opts?.oauth2?.enabled) {
-        await initOAuth2(server, opts)
-        await server.register(oauth2Plugin, opts.oauth2)
-    }
     if (opts?.origin?.authentication?.enabled) initAuthentication(server, opts)
     if (opts?.cache?.enabled) cache.initCache(server, opts)
     if (opts?.bff?.enabled) await bff.initBff(server, opts)

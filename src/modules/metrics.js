@@ -34,15 +34,9 @@ export function initMetrics(server, opts) {
         })
     }
 
-    const oauth2UrlPrefix = opts?.oauth2?.enabled
-        ? path.join(opts.prefix, opts.oauth2.prefix)
-        : false
-
     server.decorateRequest('target', null)
     server.addHook('onRequest', async (request, reply) => {
-        if (oauth2UrlPrefix && request.raw.url.startsWith(oauth2UrlPrefix)) {
-            request.target = 'oauth2'
-        } else if (isPurgeRequest(server, opts, request)) {
+        if (isPurgeRequest(server, opts, request)) {
             request.target = 'purge'
         } else if (request.cacheable) {
             request.target = 'cache'

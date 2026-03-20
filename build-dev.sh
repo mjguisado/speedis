@@ -62,15 +62,6 @@ docker buildx build --pull \
     --platform 'linux/amd64,linux/arm64' \
     --push '.'
 
-# Keycloak
-echo -e "${BLUE}Building keycloak:dev...${NC}"
-docker buildx build --pull \
-    -f 'Dockerfile.keycloak' \
-    -t "mjguisado/keycloak:dev" \
-    -t "mjguisado/keycloak:${DEV_TAG}" \
-    --platform 'linux/amd64,linux/arm64' \
-    --push '.'
-
 echo ""
 echo -e "${GREEN}════════════════════════════════════════════════${NC}"
 echo -e "${GREEN}✓ Imágenes de desarrollo publicadas${NC}"
@@ -81,8 +72,6 @@ echo "  - mjguisado/speedis:dev"
 echo "  - mjguisado/speedis:${DEV_TAG}"
 echo "  - mjguisado/mocks:dev"
 echo "  - mjguisado/mocks:${DEV_TAG}"
-echo "  - mjguisado/keycloak:dev"
-echo "  - mjguisado/keycloak:${DEV_TAG}"
 echo ""
 echo -e "${YELLOW}Nota:${NC} Estas son imágenes de desarrollo."
 echo "Para crear una release oficial, mergea a master y ejecuta:"

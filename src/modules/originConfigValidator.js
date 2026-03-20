@@ -25,7 +25,6 @@ export function initOriginConfigValidator(ajv) {
                      *
                      * Logic: Redis is REQUIRED if ANY of these modules are enabled:
                      * - cache
-                     * - oauth2
                      * - variantsTracker
                      *
                      * Implementation: Using double negation for clarity
@@ -73,28 +72,6 @@ export function initOriginConfigValidator(ajv) {
                                             type: "object",
                                             properties: {
                                                 cache: {
-                                                    type: "object",
-                                                    properties: { enabled: { const: false } },
-                                                    required: ["enabled"]
-                                                }
-                                            }
-                                        }
-                                    ]
-                                },
-                                {
-                                    // oauth2 is absent OR explicitly disabled (enabled: false)
-                                    anyOf: [
-                                        {
-                                            // Module is not present in configuration
-                                            not: {
-                                                required: ["oauth2"]
-                                            }
-                                        },
-                                        {
-                                            // Module is present but explicitly disabled
-                                            type: "object",
-                                            properties: {
-                                                oauth2: {
                                                     type: "object",
                                                     properties: { enabled: { const: false } },
                                                     required: ["enabled"]
@@ -405,8 +382,6 @@ export function initOriginConfigValidator(ajv) {
                          * Defines how to extract user identifiers from requests for private caching.
                          * This is PASSIVE authentication - it extracts user info but doesn't manage login flows.
                          *
-                         * Note: This is different from oauth2 module which ACTIVELY manages authentication flows.
-                         *
                          * Required when: cache module has private cacheables (see root-level conditional rule #2)
                          */
                         authentication: {
@@ -700,145 +675,11 @@ export function initOriginConfigValidator(ajv) {
                     }
                 },
                 /**
-                 * OAUTH2 MODULE
-                 *
-                 * Actively manages OAuth 2.0 authentication flows including login, token management,
-                 * and session handling. This is ACTIVE authentication (manages login flows).
-                 *
-                 * Note: This is different from origin.authentication which is PASSIVE
-                 * (only extracts user info from existing tokens for caching purposes).
-                 */
-                oauth2: {
-                    type: "object",
-                    additionalProperties: false,
-                    allOf: [
-                        {
-                            /**
-                             * CONDITIONAL: Core OAuth2 fields requirement
-                             *
-                             * If oauth2 module is enabled (enabled !== false), then all core
-                             * configuration fields are required.
-                             *
-                             * Logic: IF NOT (enabled === false) THEN these fields are required
-                             */
-                            if: {
-                                not: {
-                                    properties: { enabled: { const: false } },
-                                    required: ["enabled"]
-                                }
-                            },
-                            then: {
-                                required: [
-                                    "id",
-                                    "baseUrl",
-                                    "discoverySupported",
-                                    "clientId",
-                                    "clientSecret"
-                                ]
-                            }
-                        },
-                        {
-                            /**
-                             * CONDITIONAL: Discovery endpoint requirement
-                             *
-                             * If discoverySupported is true, then authorizationServerMetadataLocation
-                             * must be provided (URL to fetch OAuth server metadata dynamically).
-                             */
-                            if: {
-                                properties: {
-                                    discoverySupported: { const: true }
-                                },
-                                required: ["discoverySupported"]
-                            },
-                            then: {
-                                required: ["authorizationServerMetadataLocation"]
-                            }
-                        },
-                        {
-                            /**
-                             * CONDITIONAL: Static metadata requirement
-                             *
-                             * If discoverySupported is false, then authorizationServerMetadata
-                             * must be provided (static OAuth server configuration).
-                             */
-                            if: {
-                                properties: {
-                                    discoverySupported: { const: false }
-                                },
-                                required: ["discoverySupported"]
-                            },
-                            then: {
-                                required: ["authorizationServerMetadata"]
-                            }
-                        }
-                    ],
-
-                    properties: {
-                        enabled: { type: "boolean", default: true },
-                        id: { type: "string" },
-                        prefix: { type: "string", default: "/oauth2" },
-                        logLevel: {
-                            enum: ["fatal", "error", "warn", "info", "debug", "trace"],
-                            default: "info"
-                        },
-                        baseUrl: { type: "string" },
-                        discoverySupported: { type: "boolean" },
-                        authorizationServerMetadataLocation: { type: "string" },
-                        authorizationServerMetadata: {
-                            type: "object",
-                            additionalProperties: true,
-                            required: [
-                                "issuer",
-                                "authorization_endpoint",
-                                "token_endpoint",
-                                "jwks_uri"
-                            ],
-                            properties: {
-                                issuer: { type: "string" },
-                                authorization_endpoint: { type: "string" },
-                                token_endpoint: { type: "string" },
-                                jwks_uri: { type: "string" }
-                            }
-                        },
-                        clientId: { type: "string" },
-                        clientSecret: { type: "string" },
-                        sessionIdCookieName: { type: "string", default: "speedis_session" },
-                        pkceEnabled: { type: "boolean", default: false },
-                        authorizationCodeTtl: { type: "number", default: 300 },
-                        authorizationRequestParameters: { type: "object", default: {} },
-                        postAuthRedirectUri: { type: "string" },
-                        logoutRequest:  { type: "object", default: {} },
-                        authStrategies: {
-                            type: "array",
-                            minItems: 1,
-                            items: {
-                                type: "object",
-                                additionalProperties: true,
-                                minProperties: 2,
-                                maxProperties: 3,
-                                required: ["urlPatterns", "grantType"],
-                                properties: {
-                                    urlPatterns: {
-                                        type: "array",
-                                        minItems: 1,
-                                        items: { type: "string" }
-                                    },
-                                    grantType: {
-                                        enum: ["none", "client_credentials", "authorization_code"]
-                                    },
-                                    parameters: { type: "object", default: {} }
-                                }
-                            },
-                            default: [{ urlPatterns: [".*"], grantType: "none", parameters: {} }]
-                        }
-                    }
-                },
-                /**
                  * REDIS MODULE
                  *
-                 * Configures Redis connection for caching, session storage, and distributed locking.
+                 * Configures Redis connection for caching and distributed locking.
                  *
-                 * Required when: Any of cache, oauth2, or variantsTracker modules are enabled
+                 * Required when: Any of cache or variantsTracker modules are enabled
                  * (see root-level conditional rule #1)
                  */
                 redis: {

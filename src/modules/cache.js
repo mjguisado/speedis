@@ -64,7 +64,7 @@ export function initCache(server, opts) {
     })
 
     // This hook verifies that cacheable per-user requests include the user’s ID.
-    // This ID is set by a hook in the OAuth2 module.
+    // This ID is extracted from the Authorization header by the authentication module.
     server.decorateRequest('userId', null)
     server.addHook('preValidation', async (request, reply) => {
         if (request.cacheable && request.cacheSettings.private) {

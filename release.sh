@@ -159,15 +159,6 @@ docker buildx build --pull \
     --platform 'linux/amd64,linux/arm64' \
     --push '.'
 
-# Keycloak
-echo -e "${YELLOW}Building keycloak:${NEW_VERSION}...${NC}"
-docker buildx build --pull \
-    -f 'Dockerfile.keycloak' \
-    -t "mjguisado/keycloak:${NEW_VERSION}" \
-    -t "mjguisado/keycloak:latest" \
-    --platform 'linux/amd64,linux/arm64' \
-    --push '.'
-
 echo ""
 echo -e "${GREEN}✓ Imágenes publicadas exitosamente${NC}"
 echo ""
@@ -176,8 +167,6 @@ echo "  - mjguisado/speedis:${NEW_VERSION}"
 echo "  - mjguisado/speedis:latest"
 echo "  - mjguisado/mocks:${NEW_VERSION}"
 echo "  - mjguisado/mocks:latest"
-echo "  - mjguisado/keycloak:${NEW_VERSION}"
-echo "  - mjguisado/keycloak:latest"
 echo ""
 
 # Crear git tag y commit automáticamente

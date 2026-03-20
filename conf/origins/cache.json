@@ -19,9 +19,10 @@
         },
         "authentication": {
             "scheme": "Bearer",
-            "realm": "mocks api",
+            "realm": "mocks_api",
             "bearer": {
-                "jwksUri": "https://keycloak:8443/realms/speedis/protocol/openid-connect/certs"
+                "allowUnsigned": false,
+                "verifyJwtSignature": false
             },
             "idTransformation": {
                 "hash": {
