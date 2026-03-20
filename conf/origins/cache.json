@@ -52,7 +52,8 @@
             "sortQueryParams": true,
             "ignoredQueryParams": [
                 "cc",
-                "delay"
+                "delay",
+                "vary"
             ]
         },
         "cacheables": [

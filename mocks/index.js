@@ -61,7 +61,21 @@ mockServer.get('/metrics', async (request, reply) => {
 await mockServer.register(mocksPlugin, {
     id: "mocks",
     prefix: "/mocks",
-    logLevel: "warn"
+    logLevel: "warn",
+    authentication: {
+        bearer: {
+            // Si se debe verificar la firma del JWT
+            verifyJwtSignature: false,
+            // Si se permiten tokens sin firmar (alg: none)
+            allowUnsigned: true,
+            // URI del JWKS para verificar firmas (requerido si verifyJwtSignature = true)
+            jwksUri: null, // Ejemplo: 'https://your-auth-server.example.com/.well-known/jwks.json'
+            // Clave de descifrado para JWE (opcional)
+            decryptionKey: null,
+            // Claim del JWT que contiene el user ID
+            claim: 'sub'
+        }
+    }
 })
 
 try {
