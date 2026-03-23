@@ -13,11 +13,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-## [2.0.1] - 2026-03-23
+## [2.0.2] - 2026-03-23
 
 ### Fixed
 
-- BFF transformations now apply to all requests, including non-cacheable ones that go directly to the proxy
-  - ClientRequest, ClientResponse, OriginRequest, and OriginResponse phases work for both cacheable and non-cacheable requests
-  - CacheRequest and CacheResponse phases remain exclusive to cacheable requests
+- Fixed crash in distributed request coalescing when Redis circuit breaker is disabled
+  - The code in `cache.js` line 137 was accessing `server.redisBreaker.opened` without checking if the circuit breaker exists
+  - This caused a runtime error when `opts.redis.redisBreaker` was set to `false` in configuration
+  - Now uses optional chaining (`?.`) to safely check the circuit breaker state
 
