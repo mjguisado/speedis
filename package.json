@@ -1,6 +1,6 @@
 {
     "name": "speedis",
-    "version": "1.0.1",
+    "version": "2.0.0",
     "description": "An HTTP cache based on Redis",
     "main": "An HTTP cache based on Redis",
     "type": "module",
