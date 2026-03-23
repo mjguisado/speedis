@@ -173,7 +173,7 @@ echo ""
 echo ""
 echo -e "${BLUE}Creando commit y tag de release...${NC}"
 
-git add package.json CHANGELOG.md
+git add package.json package-lock.json CHANGELOG.md
 git commit -m "chore: release v${NEW_VERSION}
 
 Release notes:
