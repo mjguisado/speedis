@@ -67,7 +67,7 @@
                 "urlPattern": "/mocks/public/status/.*"
             },
             {
-                "urlPattern": "/mocks/items/.*",
+                "urlPattern": "/mocks/private/.*",
                 "cacheSettings": {
                     "private": true
                 }
@@ -92,27 +92,8 @@
                         "uses": "headers:setCacheControlByStatusCode",
                         "with": {
                             "statusCodeRules": {
-                                "200": "public, max-age=1800",
                                 "404": "public, max-age=300",
                                 "403": "no-store",
-                                "5xx": "no-cache"
-                            }
-                        }
-                    }
-                ]
-            },
-            {
-                "urlPattern": "/mocks/items/.*",
-                "actions": [
-                    {
-                        "phase": "OriginResponse",
-                        "uses": "headers:setCacheControlByStatusCode",
-                        "with": {
-                            "statusCodeRules": {
-                                "200": "private, max-age=600",
-                                "404": "private, max-age=10",
-                                "403": "no-store",
-                                "401": "no-store",
                                 "5xx": "no-cache"
                             }
                         }
@@ -167,7 +148,7 @@
     },
     "variantsTracker": {
         "urlPatterns": [
-            "/mocks/users/*"
+            "/mocks/public/users/*"
         ]
     }
 }

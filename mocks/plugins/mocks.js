@@ -29,7 +29,7 @@ export default async function (server, opts) {
         const mergedOptions = {
             requiredScopes: options.requiredScopes || [],
             bearer: {
-                ...authConfig.bearer,
+                ...opts.authentication.bearer,
                 ...(options.bearer || {})
             }
         }

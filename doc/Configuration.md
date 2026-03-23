@@ -98,8 +98,7 @@ The following table describes the supported fields.
 |`bff`|Object|`false`||This object defines all the details related to the Backend-For-Frontend (BFF). Its format is detailed below.|
 |`variantsTracker`|Object|`false`||This object defines all the details related to the Variant Tracker. Its format is detailed below.|
 |`cache`|Object|`false`||This object defines all the details related to the Cache. Its format is detailed below.|
-|`oauth2`|Object|`false`||This object defines all the details related to the OAuth2-based Access Control. Its format is detailed below.|
-|`redis`|Object|`true` if either variantsTracker, cache or oauth2 exists and is enabled.||This object defines all the details related to the redis database. Its format is detailed below.|
+|`redis`|Object|`true` if either variantsTracker or cache exists and is enabled.||This object defines all the details related to the redis database. Its format is detailed below.|
 
 ## Origin configuration object
 The following table describes the supported fields in the origin configuration object.
@@ -120,9 +119,6 @@ The agentOptions parameter is only valid when http1xOptions is used.
 ### Origin authentication
 When cache entries are configured as private (per-user caching), the user identifier becomes part of the cache key.
 To extract the user identifier, Speedis supports several standard [HTTP authentication](https://www.rfc-editor.org/rfc/rfc7235.html) [schemes](https://www.iana.org/assignments/http-authschemes/http-authschemes.xhtml).
-
-**Important distinction:** `origin.authentication` is for **passive** user identification (extracting user IDs from existing credentials for caching purposes). This is different from the `oauth2` module which **actively** manages authentication flows.
-
 The following table describes the supported fields for the `origin.authentication` configuration object.
 
 |Field|Type|Mandatory|Default|Description|
@@ -386,37 +382,6 @@ The following table describes the supported fields in the `cacheSettings` object
 |`ttl`|Number|`false`|`-1`|Time-to-live (in seconds) for this cache entry. `-1` means use HTTP cache headers.|
 |`sortQueryParams`|Boolean|`false`|`true`|Whether to sort query string parameters alphabetically when generating the cache key.|
 |`ignoredQueryParams`|[String]|`false`|`[]`|List of query string parameters to ignore when generating the cache key.|
-
-## OAuth2-based Access Control
-The following table describes the supported fields in the OAuth2-based Access Control configuration object.
-|Field|Type|Mandatory|Default|Description|
-|-----|----|---------|-------|-----------|
-|`enabled`|Boolean|`false`|`true`|Enables (`true`) or disables (`false`) the OAuth2-based Access Control.| 
-|`id`|String|`true`||Identifier for the OAuth2 plugin.|
-|`prefix`|String|`false`|`/oauth2`|URL path prefix used to route incoming requests to the OAuth2 plugin.|
-|`logLevel`|String|`false`|`info`|Logging level for the OAuth2 (`trace`, `debug`, `info`, `warn`, `error`, `fatal`).|
-|`baseUrl`|String|`true`||Base URL for the OAuth2 plugin.|
-|`discoverySupported`|Boolean|`true`||If `true`, this indicates that the Authorization Server exposes a metadata document, allowing the client to automatically retrieve endpoint URLs and other configuration details. If `false`, all necessary endpoints and settings must be provided manually.|
-|`authorizationServerMetadataLocation`|String|`true` if discoverySupported is `true`||Specifies the absolute URL to the Authorization Server’s metadata JSON document|
-|`authorizationServerMetadata`|Object|`true` if discoverySupported is `false`||An object that defines all the necessary endpoint URLs and configuration parameters of the Authorization Server. Its format is defined in [ServerMetadata](https://github.com/panva/openid-client/blob/main/docs/interfaces/ServerMetadata.md). For further details, refer to [RFC 8414](https://www.rfc-editor.org/rfc/rfc8414.html#section-2). Speedis specifically requires the issuer, authorization_endpoint, token_endpoint and jwks_uri.|
-|`clientId`|String|`true`||The client identifier issued to the client during the registration process|
-|`clientSecret`|String|`true`||The client secret.|
-|`sessionIdCookieName`|String|`false`|`speedis_session`|Specifies the name of the cookie that the client uses to communicate the value of the ID token to the User-Agent.|
-|`pkceEnabled`|Boolean|`false`|`false`|Indicates whether PKCE (Proof Key for Code Exchange) is enabled. Although the client is considered Confidential, enabling PKCE provides an additional layer of security during the token exchange process.|
-|`authorizationCodeTtl`|Number|`false`|`300`|Defines the time-to-live (TTL) for the authorization code, indicating how long the code remains valid before it expires. This value is typically set to a short duration (e.g., 5-10 minutes) to ensure that the code is used promptly after issuance.|
-|`authorizationRequestParameters`|Object|`false`|{}|Allows the definition of values for the parameters that will be included in the query component of the authorization endpoint URI, used in the client’s [request to the Authorization Server](https://www.rfc-editor.org/rfc/rfc6749#section-4.1.1) during the OAuth2 authorization flow.|
-|`postAuthRedirectUri`|String|`false`||Specifies the URL to which the user will be redirected after successfully completing the authentication flow with the authorization server and the establishment of the authentication cookie. This page is typically a landing page or the main entry point to the application, ensuring that the user is directed to the appropriate location after login.|
-|`logoutRequest`|Object|`false`|{}|Allows the definition of values for the parameters that will be included in the query component of the [OpenID Provider's Logout Endpoint](https://openid.net/specs/openid-connect-rpinitiated-1_0.html).|
-|`authStrategies`|Array|`true` (when enabled)|`[{ urlPatterns: [".*"], grantType: "none", parameters: {} }]`|Array of authentication strategy objects that define which OAuth2 grant type to apply based on URL patterns. Strategies are evaluated in order; the first matching pattern is used. See details below.|
-
-### Auth Strategy Configuration Object
-Each object in the `authStrategies` array defines how authentication is handled for specific URL patterns.
-
-|Field|Type|Mandatory|Default|Description|
-|-----|----|---------|-------|-----------|
-|`urlPatterns`|Array of Strings|`true`|N/A|Array of regular expression patterns to match against incoming request paths. The first matching pattern determines which strategy is applied.|
-|`grantType`|String|`true`|N/A|OAuth2 grant type to use for URLs matching this strategy. Supported values: `none` (no authentication), `client_credentials` (machine-to-machine), `authorization_code` (user authentication).|
-|`parameters`|Object|`false`|`{}`|Additional OAuth2 parameters specific to this strategy (e.g., `{"scope": "read:users"}` for client_credentials grant).|
 
 ## Redis configuration object
 The following table describes the supported fields in the redis configuration object.
