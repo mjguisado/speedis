@@ -6,5 +6,5 @@
   },
   "metricServerPort": 3003,
   "metricServerLogLevel": "warn",
-  "originsConfigsKeys": ["speedis:config:origins:mocks", "speedis:config:origins:mocks2"]
+  "originsConfigsKeys": ["speedis:config:origins:mocks"]
 }

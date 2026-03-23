@@ -134,7 +134,7 @@ export async function getCacheable(server, opts, request) {
         // should exist, with all its attributes being mandatory.   
         while (remoteResponse === -1
             && tries < opts.cache.distributedRequestsCoalescingOptions.retryCount
-            && !server.redisBreaker.opened) {
+            && !server.redisBreaker?.opened) {
             let delay = opts.cache.distributedRequestsCoalescingOptions.retryDelay +
                 Math.round(Math.random() * opts.cache.distributedRequestsCoalescingOptions.retryJitter)
             await new Promise(resolve => setTimeout(resolve, delay))
