@@ -5,7 +5,7 @@ metadata:
   name: nginx-ingress
   annotations:
     nginx.ingress.kubernetes.io/use-regex: "true"
-    nginx.ingress.kubernetes.io/rewrite-target: /mocks/$1
+    nginx.ingress.kubernetes.io/rewrite-target: /cache/$1
     nginx.ingress.kubernetes.io/enable-rewrite-log: "true"
 spec:
   ingressClassName: nginx
