@@ -5,23 +5,24 @@ config:
     fields:
       - 'uuid'
   http:
-    # pool: 10240
-    # timeout: 30
+    pool: 2048
+    timeout: 10
     keepAlive: true
     cacheDns: true      
-  target: https://127.0.0.1
-  tls:
-    rejectUnauthorized: false
+  target: http://127.0.0.1
+# target: https://127.0.0.1
+# tls:
+#   rejectUnauthorized: false
   phases:
     - name: 'warmup'
       duration: 1m
-      arrivalRate: 1024
+      arrivalRate: 500
     - name: 'rampup'
       duration: 1m
-      arrivalRate: 2048
+      arrivalRate: 1000
     - name: 'load'
-      duration: 1m
-      arrivalRate: 4096
+      duration: 10m
+      arrivalRate: 2000
 scenarios:
   - name: '304'
     flow:
@@ -32,7 +33,7 @@ scenarios:
         capture:
           - header: 'last-modified'
             as: 'lastModified'
-    - think: '{{ $randomNumber(1,60) }}s'
+    - think: '{{ $randomNumber(1,30) }}s'
     - get:
         url: '/mocks/public/items/public-{{ uuid }}?cc=public,max-age={{ $randomNumber(1,60) }}'
         headers:
