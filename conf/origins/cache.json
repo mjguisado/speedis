@@ -114,9 +114,7 @@
                         "phase": "OriginResponse",
                         "uses": "headers:setHeaders",
                         "with": {
-                            "headers": {
-                                "X-Powered-By": "Speedis"
-                            }
+                            "X-Powered-By": "Speedis"
                         }
                     }
                 ]
