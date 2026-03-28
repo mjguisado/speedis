@@ -47,6 +47,7 @@
     },
     "cache": {
         "defaultCacheSettings": {
+            "methods": [ "GET", "HEAD"],
             "private": false,
             "ttl": 3600,
             "sortQueryParams": true,
@@ -65,6 +66,12 @@
             },
             {
                 "urlPattern": "/mocks/public/status/.*"
+            },
+            {
+                "urlPattern": "/mocks/public/soap/.*",
+                "cacheSettings": {
+                    "methods": [ "POST" ]
+                }
             },
             {
                 "urlPattern": "/mocks/private/.*",

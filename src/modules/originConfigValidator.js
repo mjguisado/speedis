@@ -208,6 +208,10 @@ export function initOriginConfigValidator(ajv) {
                     type: "object",
                     additionalProperties: false,
                     properties: {
+                        methods: {
+                            type: "array",
+                            items: { enum: ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "TRACE" ] }
+                        },
                         /**
                          * Whether to cache responses separately per authenticated user
                          * If true, origin.authentication must be configured
@@ -646,6 +650,7 @@ export function initOriginConfigValidator(ajv) {
                         defaultCacheSettings: {
                             $ref: "#/definitions/cacheSettings",
                             default: {
+                                methods: ["GET", "HEAD"],
                                 private: false,
                                 ttl: -1,
                                 sortQueryParams: true,

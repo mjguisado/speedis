@@ -12,14 +12,40 @@ import { errorHandler } from '../modules/error.js'
 
 export default async function (server, opts) {
 
+    // We disable all default Fastify content-type parsers and register a catch-all
+    // parser that returns the request body as a raw Buffer.
+    //
+    // Rationale:
+    // This service acts as an HTTP cache/proxy layer. We do not need Fastify to
+    // parse the body (e.g. JSON → object) because:
+    //   - The body is only required to be forwarded to the origin on cache MISS.
+    //   - For cache key extraction (e.g. SOAP/XML, GraphQL), we perform our own
+    //     parsing directly from the raw buffer (e.g. SAX, JSON.parse when needed).
+    //
+    // Benefits:
+    //   - Preserves the original payload without re-serialization issues.
+    //   - Avoids unnecessary parsing work and allocations.
+    //   - Ensures we can forward the exact request body to the upstream service.
+    //
+    // Trade-offs:
+    //   - request.body is always a Buffer (no automatic JSON parsing).
+    //   - Built-in validation based on parsed bodies is not used.
+    //
+    // This is intentional and aligned with the proxy/cache nature of this service.
+    server.removeAllContentTypeParsers()
+    server.addContentTypeParser('*', { parseAs: 'buffer' }, (req, body, done) => {
+        done(null, body)
+    })
+
     // This parameter determines whether descriptive error 
     // messages are included in the response body
     server.decorate('exposeErrors', opts.exposeErrors)
-   
+
     // The path of the request without the prefix
     server.decorateRequest("path", null)
-    server.addHook('onRequest', (request, reply) => {    
+    server.addHook('onRequest', (request, reply, done) => {
         request.path = generatePath(request)
+        done()
     })
 
     // Module init
@@ -69,7 +95,7 @@ export default async function (server, opts) {
             const msg = `Origin: ${opts.id}. Failed to retrieve the requested resource. ` +
                 `RID: ${request.id}. Method: ${request.method}. URL: ${request.raw.url}`
             server.log.error(error, msg)
-            return errorHandler(reply, "ETIMEDOUT"===error.code?504:500, msg, opts.exposeErrors, error)
+            return errorHandler(reply, "ETIMEDOUT" === error.code ? 504 : 500, msg, opts.exposeErrors, error)
         }
 
     })

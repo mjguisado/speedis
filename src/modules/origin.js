@@ -42,12 +42,6 @@ export async function initOrigin(server, opts) {
 
     }
 
-    // This plugin will add the request.rawBody.
-    // It will get the data using the preParsing hook.
-    await server.register(import('fastify-raw-body'), {
-        encoding: false
-    })
-
     const originBreaker = opts.origin.originBreaker
         ? initOriginBreaker(server, opts)
         : null
@@ -222,8 +216,8 @@ export async function proxy(server, opts, request) {
     if (opts?.bff?.enabled) transform(opts, ORIGIN_REQUEST, requestOptions)
 
     const fetch = server.originBreaker
-        ? server.originBreaker.fire(server, opts, requestOptions, request.rawBody)
-        : _fetch(server, opts, requestOptions, request.rawBody)
+        ? server.originBreaker.fire(server, opts, requestOptions, request.body)
+        : _fetch(server, opts, requestOptions, request.body)
 
     // Fecth
     const response = await fetch

@@ -53,7 +53,7 @@ export function initCache(server, opts) {
         for (const cacheable of opts.cache.cacheables) {
             if (cacheable.re.test(request.raw.url)) {
                 // Only the safe methods are cacheables
-                request.cacheable = ['GET', 'HEAD'].includes(request.method)
+                request.cacheable = cacheable.cacheSettings.methods.includes(request.method)
                 // Merge default and cacheable settings
                 // This settings are used to generate the cache key, also for the purging operations
                 request.cacheSettings = cacheable.cacheSettings

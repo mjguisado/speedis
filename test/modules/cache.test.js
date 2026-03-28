@@ -35,6 +35,7 @@ suite('Speedis - Origin', () => {
             },
             "cache": {
                 "defaultCacheSettings": {
+                    "methods": [ "GET", "HEAD"],
                     "private": false,
                     "ttl": 20,
                     "sortQueryParams": true,

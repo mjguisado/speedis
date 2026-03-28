@@ -8,7 +8,9 @@ export const ORIGIN_REQUEST = "OriginRequest"
 export const ORIGIN_RESPONSE = "OriginResponse"
 export const CACHE_REQUEST = "CacheRequest"
 export const CACHE_RESPONSE = "CacheResponse"
+
 export const VARIANTS_TRACKER = "VariantsTracker"
+export const CACHE_KEY_GENERATION = 'CacheKeyGeneration'
 
 // Actions libraries
 const bffActionsRepository = {}
