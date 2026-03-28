@@ -148,7 +148,7 @@ The following table describes the supported fields for the `origin.authenticatio
 |`prefix`|String|`false`|`""`|Prefix to prepend to the user identifier.|
 |`suffix`|String|`false`|`""`|Suffix to append to the user identifier.|
 |`hash.enabled`|Boolean|`false`|`true`|When caching responses per user, it is often useful to transform the user identifier before it becomes part of the cache key, in order to prevent exposing raw user IDs and to safeguard Personally Identifiable Information (PII). If `true`, the user identifier is hashed before being used in the cache key.|
-|`hash.algorithm`|String|`false`|`sha256`|Hash algorithm to use. Must be supported by Node.js `crypto.getHashes()`.|
+|`hash.algorithm`|String|`false`|`md5`|Hash algorithm to use. Must be supported by Node.js `crypto.getHashes()`.|
 |`hash.hex`|Boolean|`false`|`true`|If `true`, the hash output is encoded as a hexadecimal string (default). Otherwise it will use a binary/base64 encoding.|
 
 **Note:** When `hash.enabled` is set to `true`, the prefix and suffix are applied to the hashed value of the user identifier. If hashing is disabled, they are applied to the raw user identifier instead.

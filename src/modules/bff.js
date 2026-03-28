@@ -51,6 +51,7 @@ export async function initBff(server, opts) {
 
     // Init the transformations
     // If BFF is true, then at least one transformation is enforced.
+    let hasCacheKeyGenerationAction = false
     opts.bff.transformations.forEach(transformation => {
         try {
             transformation.re = new RegExp(transformation.urlPattern)
@@ -59,6 +60,9 @@ export async function initBff(server, opts) {
             throw new Error(`Origin: ${opts.id}. The transformation configuration is invalid.`, { cause: error })
         }
         transformation.actions.forEach(action => {
+            if (CACHE_KEY_GENERATION === action.phase) {
+                hasCacheKeyGenerationAction = true
+            }
             const tokens = action.uses.split(':')
             let library = null
             let func = null
@@ -78,6 +82,11 @@ export async function initBff(server, opts) {
             }
         })
     })
+
+    // If there is a cache key generation action, we need to store the body fingerprint.
+    if (hasCacheKeyGenerationAction) {
+        server.decorateRequest('bodyFingerprint', null)
+    }
 
 }
 

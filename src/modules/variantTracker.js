@@ -16,7 +16,7 @@ export function initVariantsTracker(server, opts) {
         }
     })
 
-    server.decorateReply("fingerprint", null)
+    server.decorateReply("variantId", null)
 
     // https://fastify.dev/docs/latest/Reference/Reply/#senddata
     server.addHook('onSend', async (request, reply, payload) => {
@@ -56,8 +56,8 @@ export function initVariantsTracker(server, opts) {
                             `Origin: ${opts.id}. URL ${request.raw.url}. An error occurred while normalizing the JSON ${mockResponse.body}.`)
                     }
                 }
-                reply.fingerprint = crypto.createHash("md5").update(mockResponse.body).digest("hex")
-                reply.header("etag", 'W/"' + reply.fingerprint + '"')
+                reply.variantId = crypto.createHash("md5").update(mockResponse.body).digest("hex")
+                reply.header("etag", 'W/"' + reply.variantId + '"')
             } else {
                 server.log.warn(`Origin: ${opts.id}. URL ${request.raw.url} has a not supported type of body ${typeOfBody}.`)
             }
@@ -69,14 +69,14 @@ export function initVariantsTracker(server, opts) {
     // It can however be useful for sending data to external services, 
     // for example, to gather statistics.
     server.addHook('onResponse', async (request, reply) => {
-        if (reply.fingerprint) {
+        if (reply.variantId) {
             const counters = 'vary:' + request.urlKey
             try {
                 server.redisBreaker
-                    ? await server.redisBreaker.fire('zIncrBy', [counters, 1, reply.fingerprint])
-                    : await server.redis.zIncrBy(counters, 1, reply.fingerprint)
+                    ? await server.redisBreaker.fire('zIncrBy', [counters, 1, reply.variantId])
+                    : await server.redis.zIncrBy(counters, 1, reply.variantId)
             } catch (error) {
-                const msg = `Origin: ${opts.id}. An error occurred while counting the variants ${counters} - ${reply.fingerprint}.`
+                const msg = `Origin: ${opts.id}. An error occurred while counting the variants ${counters} - ${reply.variantId}.`
                 server.log.warn(error, msg)
             }
         }
