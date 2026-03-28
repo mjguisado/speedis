@@ -18,7 +18,7 @@ export default async function (server, opts) {
    
     // The path of the request without the prefix
     server.decorateRequest("path", null)
-    server.addHook('onRequest', async (request, reply) => {    
+    server.addHook('onRequest', (request, reply) => {    
         request.path = generatePath(request)
     })
 

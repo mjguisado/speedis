@@ -55,11 +55,12 @@ export function initMetrics(server, opts) {
     server.addHook('onResponse', async (request, reply) => {
 
         let origin = 'Unknown'
-        server.plugins.forEach((prefix, id) => {
+        for (const [prefix, id] of server.plugins) {
             if (request.url.startsWith(prefix)) {
                 origin = id
+                break
             }
-        })
+        }
 
         let statusCode = 'Unknown'
         if (typeof reply.statusCode === 'number' && !Number.isNaN(reply.statusCode)) {

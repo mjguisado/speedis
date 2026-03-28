@@ -91,9 +91,12 @@ export function generatePath(request) {
 }
 
 export function generateUrlKey(opts, request, fieldNames = utils.parseVaryHeader(request)) {
+
     let path = request.path
     const [base, queryString] = path.split("?")
+
     if (queryString) {
+    
         const params = new URLSearchParams(queryString)
 
         // Use request-specific ignoredQueryParams (from matched cacheable rule)
@@ -115,6 +118,7 @@ export function generateUrlKey(opts, request, fieldNames = utils.parseVaryHeader
         } else {
             path = base
         }
+
     }
 
     // If configured, include origin ID in cache key
@@ -126,13 +130,14 @@ export function generateUrlKey(opts, request, fieldNames = utils.parseVaryHeader
     if (request.cacheSettings?.private) {
         urlKey += (urlKey.length > 0 ? ':' : '') + request.userId
     }
+
     // Include HTTP method in cache key to separate HEAD and GET responses
     // This prevents GET requests from being served with empty body from HEAD cache entries
     // See: https://www.rfc-editor.org/rfc/rfc9111.html#name-head
     urlKey += (urlKey.length > 0 ? ':' : '') + request.method
 
     // Include path in cache key
-    urlKey += path.replaceAll('/', ':')
+    urlKey += path.replaceAll('/', ':')    
     if (urlKey.startsWith(':')) urlKey = urlKey.slice(1)
 
     // See: https://www.rfc-editor.org/rfc/rfc9111.html#name-calculating-cache-keys-with
@@ -143,7 +148,9 @@ export function generateUrlKey(opts, request, fieldNames = utils.parseVaryHeader
                 + ':' + ((request.headers[fieldName]) ? request.headers[fieldName] : '')
         }
     })
+
     request.urlKey = urlKey
+
 }
 
 /**
