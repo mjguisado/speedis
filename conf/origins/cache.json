@@ -68,7 +68,7 @@
                 "urlPattern": "/mocks/public/status/.*"
             },
             {
-                "urlPattern": "/mocks/public/soap/.*",
+                "urlPattern": "/mocks/public/soap",
                 "cacheSettings": {
                     "methods": [ "POST" ]
                 }

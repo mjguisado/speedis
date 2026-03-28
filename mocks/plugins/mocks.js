@@ -2,6 +2,14 @@ import { decodeProtectedHeader, jwtVerify, compactDecrypt, createRemoteJWKSet } 
 
 export default async function (server, opts) {
 
+    // Register a content type parser for XML/SOAP content types so Fastify
+    // doesn't throw FST_ERR_CTP_INVALID_MEDIA_TYPE for these requests.
+    server.addContentTypeParser(
+        /^(text\/xml|application\/xml|application\/soap\+xml)(\s*;.*)?$/,
+        { parseAs: 'buffer' },
+        (req, body, done) => done(null, body)
+    )
+
     // Inicializar JWKS si se requiere verificación de firma
     if (opts?.authentication.bearer?.verifyJwtSignature && opts?.authentication.bearer?.jwksUri) {
         try {
@@ -14,16 +22,16 @@ export default async function (server, opts) {
         }
     }
 
-   /**
-     * Valida el token de autorización y los scopes requeridos
-     * Soporta esquemas: Basic y Bearer
-     * @param {Object} request - Fastify request object
-     * @param {Object} reply - Fastify reply object
-     * @param {Object} options - Opciones de autenticación (opcional)
-     * @param {Array} options.requiredScopes - Scopes requeridos para Bearer tokens
-     * @param {Object} options.bearer - Configuración específica para Bearer tokens
-     * @returns {Object|null} Error object o null si es exitoso
-     */
+    /**
+      * Valida el token de autorización y los scopes requeridos
+      * Soporta esquemas: Basic y Bearer
+      * @param {Object} request - Fastify request object
+      * @param {Object} reply - Fastify reply object
+      * @param {Object} options - Opciones de autenticación (opcional)
+      * @param {Array} options.requiredScopes - Scopes requeridos para Bearer tokens
+      * @param {Object} options.bearer - Configuración específica para Bearer tokens
+      * @returns {Object|null} Error object o null si es exitoso
+      */
     async function validateAuthorization(request, reply, options = {}) {
         // Merge de opciones: las pasadas por parámetro sobrescriben las del plugin
         const mergedOptions = {
@@ -243,32 +251,29 @@ export default async function (server, opts) {
         }
 
         reply.code(200)
-        
-        if ("HEAD" ===request.method || "GET" === request.method) {
-            
-            let headers = {}
-            
-            if (request.query['cc'])   headers['cache-control'] = request.query['cc']
-            if (request.params.uuid)   headers['etag'] = `W/"${request.params.uuid}"`
-            if (request.query['vary']) headers['vary'] = request.query['vary']
 
-            headers['x-mocks-custom-header-1'] = 'x-mocks-custom-header-1'
-            headers['x-mocks-custom-header-2'] = 'x-mocks-custom-header-2'
-            headers['x-mocks-custom-header-3'] = 'x-mocks-custom-header-3'
-            
-            if (request.headers) {
-                for (const [key, value] of Object.entries(request.headers)) {
-                    if (key.startsWith('x-mocks-')) {
-                        headers[key.replace('x-mocks-', '')] = value
-                    }
+        let headers = {}
+
+        if (request.query['cc']) headers['cache-control'] = request.query['cc']
+        if (request.params.uuid) headers['etag'] = `W/"${request.params.uuid}"`
+        if (request.query['vary']) headers['vary'] = request.query['vary']
+
+        headers['x-mocks-custom-header-1'] = 'x-mocks-custom-header-1'
+        headers['x-mocks-custom-header-2'] = 'x-mocks-custom-header-2'
+        headers['x-mocks-custom-header-3'] = 'x-mocks-custom-header-3'
+
+        if (request.headers) {
+            for (const [key, value] of Object.entries(request.headers)) {
+                if (key.startsWith('x-mocks-')) {
+                    headers[key.replace('x-mocks-', '')] = value
                 }
             }
-
-            headers['last-modified'] = new Date().toUTCString()
-
-            reply.headers(headers)
-
         }
+
+        headers['last-modified'] = new Date().toUTCString()
+
+        reply.headers(headers)
+
 
     }
 
@@ -442,6 +447,32 @@ export default async function (server, opts) {
     server.all('/public/users/*', async (request, reply) => {
         await common(request, reply)
         return reply.send(users)
+    })
+
+    // ----------------------------------------
+    // SOAP echo endpoint
+    // Accepts POST requests with text/xml (or similar) and returns the
+    // received body as-is, so callers can verify the body was forwarded
+    // correctly by the proxy.
+    // ----------------------------------------
+    server.post('/public/soap', async (request, reply) => {
+        await common(request, reply)
+        const body = request.body
+        if (!body) {
+            return reply
+                .code(400)
+                .type('application/xml')
+                .send('<error>Empty body</error>')
+        }
+
+        const contentType = request.headers['content-type'] || 'text/xml'
+        // Strip parameters (e.g. "; charset=utf-8") for the reply type
+        const mimeType = contentType.split(';')[0].trim()
+
+        return reply
+            .code(200)
+            .type(mimeType)
+            .send(body)
     })
 
     // ========================================

@@ -50,3 +50,42 @@ curl -vXDELETE --resolve speedis.localhost:3001:127.0.0.1 'http://speedis.localh
 ```sh
 curl -vkXDELETE --resolve mocks.localhost:443:127.0.0.1 'https://mocks.localhost/purge/*'
 ```
+
+```sh
+curl -vk --http2 -X POST \
+--resolve mocks.localhost:3030:127.0.0.1 'https://mocks.localhost:3030/mocks/public/soap?delay=300&cc=public,max-age=10' \
+  -H "Content-Type: text/xml; charset=utf-8" \
+  -H "SOAPAction: \"getUser\"" \
+  --data-binary @- <<'EOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+  <soap:Header/>
+  <soap:Body>
+    <getUser>
+      <id>123</id>
+      <tenant>acme</tenant>
+    </getUser>
+  </soap:Body>
+</soap:Envelope>
+EOF
+```
+
+
+```sh
+curl -vk -X POST \
+--resolve mocks.localhost:443:127.0.0.1 'https://mocks.localhost/mocks/public/soap?delay=300&cc=public,max-age=10' \
+  -H "Content-Type: text/xml; charset=utf-8" \
+  -H "SOAPAction: \"getUser\"" \
+  --data-binary @- <<'EOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+  <soap:Header/>
+  <soap:Body>
+    <getUser>
+      <id>123</id>
+      <tenant>acme</tenant>
+    </getUser>
+  </soap:Body>
+</soap:Envelope>
+EOF
+```
