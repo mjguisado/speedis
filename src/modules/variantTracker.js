@@ -70,7 +70,7 @@ export function initVariantsTracker(server, opts) {
     // for example, to gather statistics.
     server.addHook('onResponse', async (request, reply) => {
         if (reply.variantId) {
-            const counters = 'vary:' + request.urlKey
+            const counters = 'vary:' + request.cacheKey
             try {
                 server.redisBreaker
                     ? await server.redisBreaker.fire('zIncrBy', [counters, 1, reply.variantId])

@@ -342,7 +342,7 @@ The following table describes the supported fields in the cache configuration ob
 |-----|----|---------|-------|-----------|
 |`enabled`|Boolean|`false`|`true`|Enables (`true`) or disables (`false`) the Cache.|
 |`purgePath`|String|`false`|`/purge`|URL path prefix used to trigger cache purge requests. Any DELETE request whose path starts with this prefix will be interpreted as a cache purge operation.|
-|`includeOriginIdInUrlKey`|Boolean|`false`|`true`|This field determines whether the id of the origin is used to generate the url key for the entry (`true` or `false`).|
+|`includeOriginIdInCacheKey`|Boolean|`false`|`true`|This field determines whether the id of the origin is used to generate the url key for the entry (`true` or `false`).|
 |`defaultCacheSettings`|Object|`false`|See below|Default cache behavior for all cacheable entries. These defaults can be overridden per cacheable entry. Its format is detailed below.|
 |`localRequestsCoalescing`|Boolean|`false`|`true`|Enables (`true`) or disables (`false`) the request coalescing mechanism.|
 |`distributedRequestsCoalescing`|Boolean|`false`|`false`|Enables (`true`) or disables (`false`) the request coalescing functionality across multiple instances.|

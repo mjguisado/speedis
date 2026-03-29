@@ -34,8 +34,9 @@ suite('Speedis - Origin', () => {
                 }
             },
             "cache": {
+                "enabled": true,
                 "defaultCacheSettings": {
-                    "methods": [ "GET", "HEAD"],
+                    "methods": ["GET", "HEAD"],
                     "private": false,
                     "ttl": 20,
                     "sortQueryParams": true,
@@ -76,7 +77,7 @@ suite('Speedis - Origin', () => {
         })
         t.assert.strictEqual(response.statusCode, 404)
     })
-   
+
     test('PURGE - GET - 204', async (t) => {
         t.plan(2)
         let url = '/mocks/mocks/public/items/' + crypto.randomUUID()

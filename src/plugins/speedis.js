@@ -4,7 +4,7 @@ import * as bff from '../modules/bff.js'
 import * as cache from '../modules/cache.js'
 import * as utils from '../utils/utils.js'
 import { initRedis } from '../modules/redis.js'
-import { initOrigin, generateUrlKey, proxy, generatePath } from '../modules/origin.js'
+import { initOrigin, proxy, generatePath } from '../modules/origin.js'
 import { initAuthentication } from '../modules/authentication.js'
 import { initVariantsTracker } from '../modules/variantTracker.js'
 import { initMetrics } from '../modules/metrics.js'
@@ -63,6 +63,7 @@ export default async function (server, opts) {
     // their hooks are executed last for each event.
     if (opts.metrics) initMetrics(server, opts)
 
+
     server.all('/*', async (request, reply) => {
 
         try {
@@ -71,14 +72,20 @@ export default async function (server, opts) {
                 bff.transform(opts, bff.CLIENT_REQUEST, request)
             }
 
-            generateUrlKey(opts, request)
+            let responsePromise = null
+            if (opts?.cache?.enabled) {
+                cache.generateCacheKey(opts, request)
+                if (cache.isPurgeRequest(server, opts, request))
+                    return cache.purge(server, opts, request, reply)
+                if (request.cacheable) {
+                    responsePromise = cache.getCacheable(server, opts, request)
+                }
+            }
+            if (!responsePromise) {
+                responsePromise = proxy(server, opts, request)
+            }
 
-            if (cache.isPurgeRequest(server, opts, request))
-                return cache.purge(server, opts, request, reply)
-
-            let response = request.cacheable
-                ? await cache.getCacheable(server, opts, request)
-                : await proxy(server, opts, request)
+            const response = await responsePromise
             utils.ensureValidDateHeader(response, Date.now())
             if (!response.headers['x-speedis-cache-status']) {
                 response.headers['x-speedis-cache-status'] = 'CACHE_STATUS_UNDEFINED from ' + os.hostname()

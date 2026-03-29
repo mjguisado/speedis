@@ -1,11 +1,9 @@
 import http from 'http'
 import https from 'https'
 import http2 from 'node:http2'
-
 import os from 'os'
 import { initOriginBreaker } from '../modules/originBreaker.js'
 import { transform, ORIGIN_REQUEST, ORIGIN_RESPONSE } from './bff.js'
-import * as utils from '../utils/utils.js'
 
 export async function initOrigin(server, opts) {
 
@@ -47,8 +45,6 @@ export async function initOrigin(server, opts) {
         : null
     server.decorate('originBreaker', originBreaker)
 
-    server.decorateRequest("urlKey", null)
-
 }
 
 
@@ -82,69 +78,6 @@ function getValidHttp2Session(server, opts) {
 export function generatePath(request) {
     const prefix = request.routeOptions.url.replace("/*", "")
     return request.url.replace(prefix, "")
-}
-
-export function generateUrlKey(opts, request, fieldNames = utils.parseVaryHeader(request)) {
-
-    let path = request.path
-    const [base, queryString] = path.split("?")
-
-    if (queryString) {
-    
-        const params = new URLSearchParams(queryString)
-
-        // Use request-specific ignoredQueryParams (from matched cacheable rule)
-        if (request.cacheSettings?.ignoredQueryParams) {
-            request.cacheSettings.ignoredQueryParams.forEach(param => params.delete(param))
-        }
-
-        if (params.size > 0) {
-            // Use request-specific sortQueryParams (from matched cacheable rule)
-            if (request.cacheSettings?.sortQueryParams) {
-                const sortedParams = [...params.entries()]
-                    .sort(([a], [b]) => a.localeCompare(b))
-                    .map(([key, value]) => `${key}=${value}`)
-                    .join("&")
-                path = `${base}?${sortedParams.toString()}`
-            } else {
-                path = `${base}?${params.toString()}`
-            }
-        } else {
-            path = base
-        }
-
-    }
-
-    // If configured, include origin ID in cache key
-    let urlKey = opts.cache?.includeOriginIdInUrlKey
-        ? opts.id
-        : ''
-
-    // If cacheable per-user, include user ID in cache key
-    if (request.cacheSettings?.private) {
-        urlKey += (urlKey.length > 0 ? ':' : '') + request.userId
-    }
-
-    // Include HTTP method in cache key to separate HEAD and GET responses
-    // This prevents GET requests from being served with empty body from HEAD cache entries
-    // See: https://www.rfc-editor.org/rfc/rfc9111.html#name-head
-    urlKey += (urlKey.length > 0 ? ':' : '') + request.method
-
-    // Include path in cache key
-    urlKey += path.replaceAll('/', ':')    
-    if (urlKey.startsWith(':')) urlKey = urlKey.slice(1)
-
-    // See: https://www.rfc-editor.org/rfc/rfc9111.html#name-calculating-cache-keys-with
-    fieldNames.forEach(fieldName => {
-        if (fieldName === '*') urlKey += ':*'
-        else if (Object.prototype.hasOwnProperty.call(request.headers, fieldName)) {
-            urlKey += ':' + fieldName
-                + ':' + ((request.headers[fieldName]) ? request.headers[fieldName] : '')
-        }
-    })
-
-    request.urlKey = urlKey
-
 }
 
 /**

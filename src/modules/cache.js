@@ -8,6 +8,8 @@ import { getUserId } from './authentication.js'
 import { errorHandler } from './error.js'
 
 export function initCache(server, opts) {
+    // The cache key for the request
+    server.decorateRequest("cacheKey", null)
 
     let purgeUrlPrefix = path.join(opts.prefix, opts.cache.purgePath)
     server.decorate('purgeUrlPrefix', purgeUrlPrefix)
@@ -38,7 +40,7 @@ export function initCache(server, opts) {
         // If cacheSettings is not provided, use defaults
         if (!cacheable.cacheSettings) { cacheable.cacheSettings = {} }
         // Merge default and cacheable settings        
-        cacheable.cacheSettings = { ... opts.cache.defaultCacheSettings, ... cacheable.cacheSettings }
+        cacheable.cacheSettings = { ...opts.cache.defaultCacheSettings, ...cacheable.cacheSettings }
     })
 
     // Each time a request is received, this hook checks whether it
@@ -60,7 +62,6 @@ export function initCache(server, opts) {
                 break
             }
         }
-
     })
 
     // This hook verifies that cacheable per-user requests include the user’s ID.
@@ -100,6 +101,85 @@ export function isPurgeRequest(server, opts, request) {
         && request.method === "DELETE"
         && request.raw.url.startsWith(server.purgeUrlPrefix)
 }
+
+function generateUrlKey(opts, request, fieldNames = utils.parseVaryHeader(request)) {
+
+    let path = request.path
+
+    const [base, queryString] = path.split("?")
+
+    if (queryString) {
+
+        const params = new URLSearchParams(queryString)
+
+        // Use request-specific ignoredQueryParams (from matched cacheable rule)
+        if (request.cacheSettings?.ignoredQueryParams) {
+            request.cacheSettings.ignoredQueryParams.forEach(param => params.delete(param))
+        }
+
+        if (params.size > 0) {
+            // Use request-specific sortQueryParams (from matched cacheable rule)
+            if (request.cacheSettings?.sortQueryParams) {
+                const sortedParams = [...params.entries()]
+                    .sort(([a], [b]) => a.localeCompare(b))
+                    .map(([key, value]) => `${key}=${value}`)
+                    .join("&")
+                path = `${base}?${sortedParams.toString()}`
+            } else {
+                path = `${base}?${params.toString()}`
+            }
+        } else {
+            path = base
+        }
+
+    }
+
+    // Include path in cache key
+    let urlKey = path.replaceAll('/', ':')
+    if (urlKey.startsWith(':')) urlKey = urlKey.slice(1)
+
+    // See: https://www.rfc-editor.org/rfc/rfc9111.html#name-calculating-cache-keys-with
+    fieldNames.forEach(fieldName => {
+        if (fieldName === '*') urlKey += ':*'
+        else if (Object.prototype.hasOwnProperty.call(request.headers, fieldName)) {
+            urlKey += ':' + fieldName
+                + ':' + ((request.headers[fieldName]) ? request.headers[fieldName] : '')
+        }
+    })
+
+    return urlKey
+
+}
+
+export function generateCacheKey(opts, request) {
+
+    // If configured, include origin ID in cache key
+    let cacheKey = opts.cache?.includeOriginIdInCacheKey
+        ? opts.id
+        : ''
+
+    // If cacheable per-user, include user ID in cache key
+    if (request.cacheSettings?.private) {
+        cacheKey += (cacheKey.length > 0 ? ':' : '') + request.userId
+    }
+
+    // Include HTTP method in cache key to separate HEAD and GET responses
+    // This prevents GET requests from being served with empty body from HEAD cache entries
+    // See: https://www.rfc-editor.org/rfc/rfc9111.html#name-head
+    cacheKey += (cacheKey.length > 0 ? ':' : '') + request.method
+
+    // If body fingerprint is available, include it in cache key
+    if (request?.bodyFingerprint) {
+        cacheKey += (cacheKey.length > 0 ? ':' : '') + request.bodyFingerprint
+    }
+
+    cacheKey += (cacheKey.length > 0 ? ':' : '') + generateUrlKey(opts, request)
+
+    request.cacheKey = cacheKey
+
+}
+
+
 
 // See: https://developer.mozilla.org/en-US/docs/Web/HTTP/Resources_and_specifications
 export async function getCacheable(server, opts, request) {
@@ -336,12 +416,12 @@ export async function _get(server, opts, request) {
     let cachedResponse = null
     try {
         cachedResponse = server.redisBreaker
-            ? await server.redisBreaker.fire('json.get', [request.urlKey])
-            : await server.redis.json.get(request.urlKey)
+            ? await server.redisBreaker.fire('json.get', [request.cacheKey])
+            : await server.redis.json.get(request.cacheKey)
     } catch (error) {
         server.log.warn(error,
             `Origin: ${opts.id}. Error querying the cache entry in Redis. ` +
-            `RID: ${request.id}. URL Key: ${request.urlKey}.`)
+            `RID: ${request.id}. URL Key: ${request.cacheKey}.`)
     }
 
     const requestCacheDirectives = utils.parseCacheControlHeader(request)
@@ -434,14 +514,14 @@ export async function _get(server, opts, request) {
         // Verify if there is an ongoing fetch operation
         let fetch = null
         if (opts.cache.localRequestsCoalescing) {
-            fetch = server.ongoingFetch.get(request.urlKey)
+            fetch = server.ongoingFetch.get(request.cacheKey)
         }
 
         if (!fetch) {
 
             // https://redis.io/docs/latest/develop/use/patterns/distributed-locks/#correct-implementation-with-a-single-instance
             if (opts.cache.distributedRequestsCoalescing) {
-                lockKey = `${request.urlKey}.lock`
+                lockKey = `${request.cacheKey}.lock`
                 lockValue = `${process.pid}:${opts.id}:${request.id}:` + crypto.randomBytes(4).toString("hex")
                 locked = await _adquireLock(server, opts, lockKey, lockValue)
             }
@@ -468,7 +548,7 @@ export async function _get(server, opts, request) {
             } else {
                 fetch = _fetch(server, opts, requestOptions, request.body)
             }
-            if (opts.cache.localRequestsCoalescing) server.ongoingFetch.set(request.urlKey, fetch)
+            if (opts.cache.localRequestsCoalescing) server.ongoingFetch.set(request.cacheKey, fetch)
             amITheFetcher = true
         }
 
@@ -504,7 +584,7 @@ export async function _get(server, opts, request) {
             await _releaseLock(server, opts, lockKey, lockValue)
 
         if (amITheFetcher && opts.cache.localRequestsCoalescing)
-            server.ongoingFetch.delete(request.urlKey)
+            server.ongoingFetch.delete(request.cacheKey)
 
         delete requestOptions.agent
 
@@ -522,7 +602,7 @@ export async function _get(server, opts, request) {
             && !Object.prototype.hasOwnProperty.call(cachedCacheDirectives, 'proxy-revalidate')) {
             server.log.warn(
                 `Origin: ${opts.id}. Serving stale content from cache. ` +
-                `RID: ${request.id}. URL Key: ${request.urlKey}.`
+                `RID: ${request.id}. URL Key: ${request.cacheKey}.`
             )
             // There is a response stored in the cache, and we tried to refresh it  
             // using a conditional request to the origin, which failed.  
@@ -565,7 +645,7 @@ export async function _get(server, opts, request) {
     }
 
     if (amITheFetcher && opts.cache.localRequestsCoalescing) {
-        server.ongoingFetch.delete(request.urlKey)
+        server.ongoingFetch.delete(request.cacheKey)
     }
 
     // We parse the Cache-Control header to extract cache directives.
@@ -577,7 +657,7 @@ export async function _get(server, opts, request) {
         // See: https://www.rfc-editor.org/rfc/rfc9111.html#name-storing-responses-in-caches
         && isStorableResponse(originResponse, originCacheDirectives)
         // Speedis limitation: Do not cache responses with Vary header
-        && !Object.prototype.hasOwnProperty.call(originResponse.headers, 'vary')        
+        && !Object.prototype.hasOwnProperty.call(originResponse.headers, 'vary')
 
     // We generate a cache entry from the response.
     const cacheEntry = utils.cloneAndTrimResponse(originResponse)
@@ -612,19 +692,19 @@ export async function _get(server, opts, request) {
                     headers: cachedResponse.headers
                 }
                 server.redisBreaker
-                    ? await server.redisBreaker.fire('json.merge', [request.urlKey, '$', payload])
-                    : await server.redis.json.merge(request.urlKey, '$', payload)
+                    ? await server.redisBreaker.fire('json.merge', [request.cacheKey, '$', payload])
+                    : await server.redis.json.merge(request.cacheKey, '$', payload)
 
                 // Set the TTL for the cache entry           
                 if (Number.isFinite(ttl) && ttl > 0) {
                     server.redisBreaker
-                        ? await server.redisBreaker.fire('expire', [request.urlKey, ttl])
-                        : await server.redis.expire(request.urlKey, ttl)
+                        ? await server.redisBreaker.fire('expire', [request.cacheKey, ttl])
+                        : await server.redis.expire(request.cacheKey, ttl)
                 }
             } catch (error) {
                 server.log.warn(error,
                     `Origin: ${opts.id}. Error while updating the cache. ` +
-                    `RID: ${request.id}. URL Key: ${request.urlKey}.`)
+                    `RID: ${request.id}. URL Key: ${request.cacheKey}.`)
             }
         }
 
@@ -637,18 +717,18 @@ export async function _get(server, opts, request) {
             const ttl = parseInt(cacheEntry.ttl)
             try {
                 server.redisBreaker
-                    ? await server.redisBreaker.fire('json.set', [request.urlKey, '$', cacheEntry])
-                    : await server.redis.json.set(request.urlKey, '$', cacheEntry)
+                    ? await server.redisBreaker.fire('json.set', [request.cacheKey, '$', cacheEntry])
+                    : await server.redis.json.set(request.cacheKey, '$', cacheEntry)
                 // Set the TTL for the cache entry           
                 if (Number.isFinite(ttl) && ttl > 0) {
                     server.redisBreaker
-                        ? await server.redisBreaker.fire('expire', [request.urlKey, ttl])
-                        : await server.redis.expire(request.urlKey, ttl)
+                        ? await server.redisBreaker.fire('expire', [request.cacheKey, ttl])
+                        : await server.redis.expire(request.cacheKey, ttl)
                 }
             } catch (error) {
                 server.log.warn(error,
                     `Origin: ${opts.id}. Error while storing in the cache. ` +
-                    `RID: ${request.id}. URL Key: ${request.urlKey}.`)
+                    `RID: ${request.id}. URL Key: ${request.cacheKey}.`)
             }
         }
 
@@ -670,12 +750,12 @@ export async function _get(server, opts, request) {
             && originCacheDirectives['private'] === null)) {
         try {
             server.redisBreaker
-                ? await server.redisBreaker.fire('unlink', [request.urlKey])
-                : await server.redis.unlink(request.urlKey)
+                ? await server.redisBreaker.fire('unlink', [request.cacheKey])
+                : await server.redis.unlink(request.cacheKey)
         } catch (error) {
             server.log.warn(error,
                 `Origin: ${opts.id}. Error while removing private/no-store entry in the cache. ` +
-                `RID: ${request.id}. URL Key: ${request.urlKey}.`)
+                `RID: ${request.id}. URL Key: ${request.cacheKey}.`)
         }
     }
 
@@ -841,7 +921,7 @@ function isStorableResponse(originResponse, originCacheDirectives) {
 export async function purge(server, opts, request, reply) {
 
     const toTrash = opts.cache.purgePath.slice(1) + ':'
-    let cacheEviction = request.urlKey.replace(toTrash, "")
+    let cacheEviction = request.cacheKey.replace(toTrash, "")
 
     // Since cache keys now include the HTTP method (GET, HEAD), we need to replace
     // the DELETE method in the purge request to ensure we delete both GET and HEAD
@@ -866,7 +946,7 @@ export async function purge(server, opts, request, reply) {
         // See: https://antirez.com/news/93
         // Always use scanIterator since we now use wildcard for method
         if (Array.isArray(cacheEviction)) {
-                result += await server.redis.unlink(cacheEviction)
+            result += await server.redis.unlink(cacheEviction)
         } else {
             // See: https://github.com/redis/node-redis/blob/master/docs/scan-iterators.md
             // See: https://github.com/redis/node-redis/blob/master/docs/v4-to-v5.md#scan-iterators

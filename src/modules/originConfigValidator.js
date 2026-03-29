@@ -210,7 +210,7 @@ export function initOriginConfigValidator(ajv) {
                     properties: {
                         methods: {
                             type: "array",
-                            items: { enum: ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "TRACE" ] }
+                            items: { enum: ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "TRACE"] }
                         },
                         /**
                          * Whether to cache responses separately per authenticated user
@@ -627,7 +627,7 @@ export function initOriginConfigValidator(ajv) {
                     properties: {
                         enabled: { type: "boolean", default: true },
                         purgePath: { type: "string", default: "/purge" },
-                        includeOriginIdInUrlKey: { type: "boolean", default: true },
+                        includeOriginIdInCacheKey: { type: "boolean", default: true },
                         localRequestsCoalescing: { type: "boolean", default: true },
                         distributedRequestsCoalescing: { type: "boolean", default: false },
                         distributedRequestsCoalescingOptions:
