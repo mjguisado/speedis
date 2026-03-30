@@ -92,11 +92,14 @@ export async function initBff(server, opts) {
 
 export function transform(opts, type, target) {
     let cacheDirectives = parseCacheControlHeader(target)
-    if (cacheDirectives['no-transform']) {
+    if (bff.CACHE_KEY_GENERATION !== type &&
+        bff.VARIANTS_TRACKER !== type &&
+        cacheDirectives['no-transform']) {
         // The no-transform directive is present in the Cache-Control header.
         // No transformation is applied.
         return
     }
+    
     opts.bff.transformations.forEach(transformation => {
         if (transformation.re.test(target.path)) {
             transformation.actions.forEach(action => {

@@ -197,6 +197,7 @@ All three transformations are applied in order.
 |`CacheRequest`|Apply transformations to the request sent by Speedis to the cache (Redis).|
 |`CacheResponse`|Apply transformations to the response received by Speedis from the cache (Redis).|
 |`VariantsTracker`|Apply transformations to the response before calculating its fingerprinting. Theses transformations don't affect to the response sent to the client.|
+|`CacheKeyGeneration`|Apply transformations to the incoming request to compute the `bodyFingerprint` — a string derived from the request body that is included as part of the cache key. This enables caching of requests (e.g., POST-based SOAP or GraphQL) where the request body determines the response. Actions in this phase operate on the request object and must set `request.bodyFingerprint`.|
 
 Speedis includes a set of functions, called actions, that allow changes to be made.
 To simplify management, these functions are grouped into libraries.

@@ -539,7 +539,8 @@ export function initOriginConfigValidator(ajv) {
                                                         "OriginResponse",
                                                         "CacheRequest",
                                                         "CacheResponse",
-                                                        "VariantsTracker"
+                                                        "VariantsTracker",
+                                                        "CacheKeyGeneration"
                                                     ]
                                                 },
                                                 uses: { type: "string" },

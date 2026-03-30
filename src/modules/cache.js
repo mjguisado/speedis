@@ -169,6 +169,7 @@ export function generateCacheKey(opts, request) {
     cacheKey += (cacheKey.length > 0 ? ':' : '') + request.method
 
     // If body fingerprint is available, include it in cache key
+    if (opts?.bff?.enabled) bff.transform(opts, bff.CACHE_KEY_GENERATION, request)
     if (request?.bodyFingerprint) {
         cacheKey += (cacheKey.length > 0 ? ':' : '') + request.bodyFingerprint
     }
