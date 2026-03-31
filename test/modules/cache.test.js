@@ -1457,3 +1457,193 @@ suite('Speedis - Origin', () => {
     })
 
 })
+
+// ============================================================================
+// RFC 9110 §13 - Conditional Requests with POST (SOAP cache)
+// ============================================================================
+
+suite('Speedis - Conditional Requests with POST', () => {
+
+    let server
+
+    before(async () => {
+
+        server = fastify({
+            logger: { level: 'info' }
+        })
+
+        const ajv = new Ajv({ useDefaults: true })
+        const originConfigValidator = initOriginConfigValidator(ajv)
+        const origin = {
+            "id": "mocks",
+            "prefix": "/mocks",
+            "origin": {
+                "http2Options": {
+                    "authority": "https://mocks.localhost:3030",
+                    "options": {
+                        "rejectUnauthorized": false,
+                        "timeout": 1000
+                    }
+                }
+            },
+            "cache": {
+                "enabled": true,
+                "defaultCacheSettings": {
+                    "methods": ["GET", "HEAD"],
+                    "private": false,
+                    "ttl": 20,
+                    "sortQueryParams": true,
+                    "ignoredQueryParams": ["cc", "delay"]
+                },
+                "cacheables": [
+                    {
+                        "urlPattern": "mocks/public/soap/.*",
+                        "cacheSettings": {
+                            "methods": ["POST"]
+                        }
+                    }
+                ]
+            },
+            "redis": {
+                "redisOptions": {
+                    "url": "redis://redis:6379"
+                }
+            }
+        }
+        originConfigValidator(origin, ajv)
+        server.register(speedisPlugin, origin)
+
+        const plugins = new Map()
+        plugins.set(origin.id, origin.prefix)
+        server.decorate('plugins', plugins)
+
+        await server.ready()
+    })
+
+    // RFC 9110 §13.1.2 + §13.2:
+    // If-None-Match with "*" on a POST that is NOT yet cached:
+    // precondition passes (no current representation) → origin executes → 200
+    test('POST - if-none-match wildcard - resource not cached - 200', async (t) => {
+        t.plan(2)
+        const uuid = crypto.randomUUID()
+        const url = '/mocks/mocks/public/soap/' + uuid
+            + '?cc=' + encodeURIComponent('public,max-age=60')
+        const response = await server.inject({
+            method: 'POST',
+            url: url,
+            headers: {
+                'content-type': 'text/xml',
+                'if-none-match': '"*"'
+            },
+            body: `<request>${uuid}</request>`
+        })
+        t.assert.strictEqual(response.statusCode, 200)
+        t.assert.match(response.headers['x-speedis-cache-status'], /^CACHE_MISS/)
+    })
+
+    // RFC 9110 §13.1.2 + §13.2:
+    // If-None-Match with "*" on a POST that IS already cached:
+    // precondition fails (representation exists) → 412 Precondition Failed (not 304)
+    test('POST - if-none-match wildcard - resource cached - 412', async (t) => {
+        t.plan(3)
+        const uuid = crypto.randomUUID()
+        const url = '/mocks/mocks/public/soap/' + uuid
+            + '?cc=' + encodeURIComponent('public,max-age=60')
+        const body = `<request>${uuid}</request>`
+
+        // Populate the cache
+        let response = await server.inject({
+            method: 'POST',
+            url: url,
+            headers: { 'content-type': 'text/xml' },
+            body: body
+        })
+        t.assert.strictEqual(response.statusCode, 200)
+
+        // Conditional POST: resource already cached → 412
+        response = await server.inject({
+            method: 'POST',
+            url: url,
+            headers: {
+                'content-type': 'text/xml',
+                'if-none-match': '"*"'
+            },
+            body: body
+        })
+        t.assert.strictEqual(response.statusCode, 412)
+        t.assert.match(response.headers['x-speedis-cache-status'], /^CACHE_HIT/)
+    })
+
+    // RFC 9110 §13.1.2 + §13.2:
+    // If-None-Match with a specific ETag when the cached POST response has no ETag:
+    // comparison is not possible → condition passes → cached response returned (200, not 412).
+    test('POST - if-none-match specific etag - no etag in cached response - 200', async (t) => {
+        t.plan(3)
+        const uuid = crypto.randomUUID()
+        const url = '/mocks/mocks/public/soap/' + uuid
+            + '?cc=' + encodeURIComponent('public,max-age=60')
+        const body = `<request>${uuid}</request>`
+
+        // Populate the cache (SOAP endpoint does not return ETag)
+        let response = await server.inject({
+            method: 'POST',
+            url: url,
+            headers: { 'content-type': 'text/xml' },
+            body: body
+        })
+        t.assert.strictEqual(response.statusCode, 200)
+
+        // Conditional POST with a specific ETag: no ETag in cached response
+        // → condition cannot match → passes → cached response returned
+        response = await server.inject({
+            method: 'POST',
+            url: url,
+            headers: {
+                'content-type': 'text/xml',
+                'if-none-match': `W/"${uuid}"`
+            },
+            body: body
+        })
+        t.assert.strictEqual(response.statusCode, 200)
+        t.assert.match(response.headers['x-speedis-cache-status'], /^CACHE_HIT/)
+    })
+
+    // RFC 9110 §13.1.3:
+    // If-Modified-Since MUST be ignored for methods other than GET and HEAD.
+    // A cached POST with If-Modified-Since must return 200, not 304.
+    test('POST - if-modified-since - must be ignored - 200', async (t) => {
+        t.plan(3)
+        const uuid = crypto.randomUUID()
+        const url = '/mocks/mocks/public/soap/' + uuid
+            + '?cc=' + encodeURIComponent('public,max-age=60')
+        const body = `<request>${uuid}</request>`
+
+        // Populate the cache
+        let response = await server.inject({
+            method: 'POST',
+            url: url,
+            headers: { 'content-type': 'text/xml' },
+            body: body
+        })
+        t.assert.strictEqual(response.statusCode, 200)
+        const lastModified = response.headers['last-modified']
+
+        // POST with If-Modified-Since: header must be ignored → 200 from cache
+        response = await server.inject({
+            method: 'POST',
+            url: url,
+            headers: {
+                'content-type': 'text/xml',
+                'if-modified-since': lastModified
+            },
+            body: body
+        })
+        t.assert.strictEqual(response.statusCode, 200)
+        t.assert.match(response.headers['x-speedis-cache-status'], /^CACHE_HIT/)
+    })
+
+    after(async () => {
+        await server.close()
+    })
+
+})

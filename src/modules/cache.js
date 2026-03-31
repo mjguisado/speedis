@@ -345,16 +345,25 @@ export async function getCacheable(server, opts, request) {
     }
 
     if (!ifNoneMatchCondition) {
+        // https://www.rfc-editor.org/rfc/rfc9110.html#section-15.4.5
+        // 304 Not Modified is only meaningful for GET and HEAD requests.
+        // For other methods (e.g. POST), a failed precondition must result
+        // in 412 Precondition Failed (RFC 9110 §13.2).
+        if (request.method !== 'GET' && request.method !== 'HEAD') {
+            response.statusCode = 412
+            return response
+        }
         response.statusCode = 304
         return response
     }
 
-    // See: https://www.rfc-editor.org/rfc/rfc9110.html#section-13.1.3   
+    // See: https://www.rfc-editor.org/rfc/rfc9110.html#section-13.1.3
     // A recipient MUST ignore the If-Modified-Since header if the request includes
-    // an If-None-Match header. Note: ifModifiedSince is only set when the request 
+    // an If-None-Match header. Note: ifModifiedSince is only set when the request
     // does not include an If-None-Match header.
-    // ... or the request method is neither GET nor HEAD. ( checked before )
-    if (ifModifiedSince) {
+    // A recipient MUST also ignore the If-Modified-Since header if the request
+    // method is neither GET nor HEAD (RFC 9110 Section 13.1.3).
+    if (ifModifiedSince && (request.method === 'GET' || request.method === 'HEAD')) {
         // ...or its value is not a valid single HTTP-date (requestLMD will be set to null)
         // Note: it this last case requestlmd will be set to NaN
         const requestlmd = Date.parse(ifModifiedSince)
