@@ -449,16 +449,11 @@ export default async function (server, opts) {
         return reply.send(users)
     })
 
-    // ----------------------------------------
-    // SOAP echo endpoint
-    // Accepts POST requests with text/xml (or similar) and returns the
-    // received body as-is, so callers can verify the body was forwarded
-    // correctly by the proxy.
-    // ----------------------------------------
-    server.post('/public/soap', async (request, reply) => {
+    server.post('/public/soap/*', async (request, reply) =>{
+        
         await common(request, reply)
-        const body = request.body
-        if (!body) {
+
+        if (!request.body) {
             return reply
                 .code(400)
                 .type('application/xml')
@@ -472,7 +467,7 @@ export default async function (server, opts) {
         return reply
             .code(200)
             .type(mimeType)
-            .send(body)
+            .send(request.body)
     })
 
     // ========================================

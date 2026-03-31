@@ -1,6 +1,5 @@
 import path from 'path'
-import { parseCacheControlHeader} from '../utils/utils.js'
-
+import { parseCacheControlHeader } from '../utils/utils.js'
 
 export const CLIENT_REQUEST = "ClientRequest"
 export const CLIENT_RESPONSE = "ClientResponse"
@@ -19,8 +18,32 @@ export async function initBff(server, opts) {
 
     // Init the catalog of available actions.
     if (!opts.bff.actionsLibraries) { opts.bff.actionsLibraries = {} }
-    opts.bff.actionsLibraries['headers'] = path.resolve(process.cwd(), './src/actions/headers.js')
-    opts.bff.actionsLibraries['json'] = path.resolve(process.cwd(), './src/actions/json.js')
+
+    // Collect the library names that are actually referenced in the configured transformations.
+    const referencedLibraries = new Set()
+    opts.bff.transformations.forEach(transformation => {
+        transformation.actions.forEach(action => {
+            const tokens = action.uses.split(':')
+            if (tokens.length === 2) {
+                referencedLibraries.add(tokens[0])
+            }
+        })
+    })
+
+    // Register built-in libraries only if they are referenced by at least one action
+    // and the user has not already provided a custom path for them.
+    const builtinLibraries = {
+        'headers': path.resolve(process.cwd(), './src/actions/headers.js'),
+        'json':    path.resolve(process.cwd(), './src/actions/json.js'),
+        'xmlsax':  path.resolve(process.cwd(), './src/actions/xmlsax.js'),
+        'xmlxpath':path.resolve(process.cwd(), './src/actions/xmlxpath.js'),
+    }
+    for (const [key, libPath] of Object.entries(builtinLibraries)) {
+        if (referencedLibraries.has(key) && !opts.bff.actionsLibraries[key]) {
+            opts.bff.actionsLibraries[key] = libPath
+        }
+    }
+
     for (let actionsLibraryKey in opts.bff.actionsLibraries) {
         if (!path.isAbsolute(opts.bff.actionsLibraries[actionsLibraryKey])) {
             opts.bff.actionsLibraries[actionsLibraryKey] = path.resolve(
@@ -92,14 +115,14 @@ export async function initBff(server, opts) {
 
 export function transform(opts, type, target) {
     let cacheDirectives = parseCacheControlHeader(target)
-    if (bff.CACHE_KEY_GENERATION !== type &&
-        bff.VARIANTS_TRACKER !== type &&
+    if (CACHE_KEY_GENERATION !== type &&
+        VARIANTS_TRACKER !== type &&
         cacheDirectives['no-transform']) {
         // The no-transform directive is present in the Cache-Control header.
         // No transformation is applied.
         return
     }
-    
+
     opts.bff.transformations.forEach(transformation => {
         if (transformation.re.test(target.path)) {
             transformation.actions.forEach(action => {

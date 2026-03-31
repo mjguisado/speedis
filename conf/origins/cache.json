@@ -68,7 +68,7 @@
                 "urlPattern": "/mocks/public/status/.*"
             },
             {
-                "urlPattern": "/mocks/public/soap",
+                "urlPattern": "/mocks/public/soap/*",
                 "cacheSettings": {
                     "methods": [ "POST" ]
                 }
@@ -145,6 +145,40 @@
                                 "$[*].user.phones[*].type",
                                 "$[*].metadata"
                             ]
+                        }
+                    }
+                ]
+            },
+            {
+                "urlPattern": "/mocks/public/soap/sax",
+                "actions": [
+                    {
+                        "phase": "CacheKeyGeneration",
+                        "uses": "xmlsax:xmlBodyFingerprint",
+                        "with": {
+                            "elements": ["ns:id", "ns:category"],
+                            "algorithm": "md5",
+                            "encoding": "hex"
+                        }
+                    }
+                ]
+            },
+            {
+                "urlPattern": "/mocks/public/soap/xpath",
+                "actions": [
+                    {
+                        "phase": "CacheKeyGeneration",
+                        "uses": "xmlxpath:xpathBodyFingerprint",
+                        "with": {
+                            "xpaths": [
+                                "//ns:product/ns:id | //ns:product/ns:category"
+                            ],
+                            "namespaces": {
+                                "soap": "http://schemas.xmlsoap.org/soap/envelope/",
+                                "ns": "http://example.com/products"
+                            },
+                            "algorithm": "md5",
+                            "encoding": "hex"
                         }
                     }
                 ]

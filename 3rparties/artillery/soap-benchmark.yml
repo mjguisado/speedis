@@ -1,0 +1,118 @@
+# ---------------------------------------------------------------------------
+# Artillery SOAP benchmark – SAX vs XPath body-fingerprint performance
+#
+# Compares the throughput and latency of Speedis when generating POST cache
+# keys via the SAX parser (xmlsax:xmlBodyFingerprint) versus the DOM/XPath
+# parser (xmlxpath:xpathBodyFingerprint) under three payload sizes:
+#
+#   small  ~300 B   – single getProduct call
+#   medium ~2 KB    – getProductList, 15 items
+#   large  ~15 KB   – getProductList, 150 items
+#
+# Run a single scenario to get clean, isolated metrics:
+#   artillery run --scenario-name sax-small   ./soap-benchmark.yml
+#   artillery run --scenario-name xpath-large ./soap-benchmark.yml
+#
+# Run all scenarios together for a mixed-load comparison:
+#   artillery run ./soap-benchmark.yml
+#
+# Prerequisites:
+#   - Stack running (docker compose up)
+#   - uuids.csv present in this directory (used by the existing load tests)
+# ---------------------------------------------------------------------------
+
+config:
+  target: "http://127.0.0.1"
+  processor: "./soap-benchmark-processor.cjs"
+  payload:
+    # Reuses the UUIDs already present for the generic load tests.
+    # Each virtual user picks one UUID as the requestId embedded in the body,
+    # ensuring a realistic mix of cache hits and cache misses.
+    path: "uuids.csv"
+    fields:
+      - "requestId"
+    order: random
+  http:
+    pool: 2048
+    timeout: 10
+    keepAlive: true
+    cacheDns: true   
+  phases:
+    - name: "warmup"
+      duration: 30
+      arrivalRate: 50
+    - name: "load"
+      duration: 300
+      arrivalRate: 100
+
+scenarios:
+
+  # ── SAX ──────────────────────────────────────────────────────────────────
+
+  - name: "sax-small"
+    beforeScenario:
+      - "setSmallSoapBody"
+    flow:
+      - post:
+          url: "/mocks/public/soap/sax"
+          headers:
+            Host: "mocks"
+            Content-Type: "text/xml; charset=utf-8"
+          body: "{{ soapBody }}"
+
+  - name: "sax-medium"
+    beforeScenario:
+      - "setMediumSoapBody"
+    flow:
+      - post:
+          url: "/mocks/public/soap/sax"
+          headers:
+            Host: "mocks"
+            Content-Type: "text/xml; charset=utf-8"
+          body: "{{ soapBody }}"
+
+  - name: "sax-large"
+    beforeScenario:
+      - "setLargeSoapBody"
+    flow:
+      - post:
+          url: "/mocks/public/soap/sax"
+          headers:
+            Host: "mocks"
+            Content-Type: "text/xml; charset=utf-8"
+          body: "{{ soapBody }}"
+
+  # ── XPath ─────────────────────────────────────────────────────────────────
+
+  - name: "xpath-small"
+    beforeScenario:
+      - "setSmallSoapBody"
+    flow:
+      - post:
+          url: "/mocks/public/soap/xpath"
+          headers:
+            Host: "mocks"
+            Content-Type: "text/xml; charset=utf-8"
+          body: "{{ soapBody }}"
+
+  - name: "xpath-medium"
+    beforeScenario:
+      - "setMediumSoapBody"
+    flow:
+      - post:
+          url: "/mocks/public/soap/xpath"
+          headers:
+            Host: "mocks"
+            Content-Type: "text/xml; charset=utf-8"
+          body: "{{ soapBody }}"
+
+  - name: "xpath-large"
+    beforeScenario:
+      - "setLargeSoapBody"
+    flow:
+      - post:
+          url: "/mocks/public/soap/xpath"
+          headers:
+            Host: "mocks"
+            Content-Type: "text/xml; charset=utf-8"
+          body: "{{ soapBody }}"

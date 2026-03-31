@@ -53,38 +53,96 @@ curl -vkXDELETE --resolve mocks.localhost:443:127.0.0.1 'https://mocks.localhost
 
 ```sh
 curl -vk --http2 -X POST \
---resolve mocks.localhost:3030:127.0.0.1 'https://mocks.localhost:3030/mocks/public/soap?delay=300&cc=public,max-age=10' \
+--resolve mocks.localhost:3030:127.0.0.1 'https://mocks.localhost:3030/mocks/public/soap/sax?delay=300&cc=public,max-age=10' \
   -H "Content-Type: text/xml; charset=utf-8" \
   -H "SOAPAction: \"getUser\"" \
   --data-binary @- <<'EOF'
 <?xml version="1.0" encoding="UTF-8"?>
-<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
-  <soap:Header/>
+<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ns="http://example.com/products">
   <soap:Body>
-    <getUser>
-      <id>123</id>
-      <tenant>acme</tenant>
-    </getUser>
+    <ns:getProductList>
+      <ns:requestId>c2f52f07-be6e-46af-a5b6-27c1f68a9686</ns:requestId>
+      <ns:products>
+        <ns:product>
+          <ns:id>ITEM-001</ns:id>
+          <ns:name>Product 1</ns:name>
+          <ns:price>11.49</ns:price>
+          <ns:stock>51</ns:stock>
+          <ns:category>clothing</ns:category>
+        </ns:product>
+        <ns:product>
+          <ns:id>ITEM-002</ns:id>
+          <ns:name>Product 2</ns:name>
+          <ns:price>12.99</ns:price>
+          <ns:stock>52</ns:stock>
+          <ns:category>furniture</ns:category>
+        </ns:product>
+      </ns:products>
+    </ns:getProductList>
   </soap:Body>
 </soap:Envelope>
 EOF
 ```
-
-
 ```sh
-curl -vk -X POST \
---resolve mocks.localhost:443:127.0.0.1 'https://mocks.localhost/mocks/public/soap?delay=300&cc=public,max-age=10' \
+curl -vk --http2 -X POST \
+--resolve speedis.localhost:3001:127.0.0.1 'http://speedis.localhost:3001/cache/mocks/public/soap/sax?delay=300&cc=public,max-age=10' \
   -H "Content-Type: text/xml; charset=utf-8" \
   -H "SOAPAction: \"getUser\"" \
   --data-binary @- <<'EOF'
 <?xml version="1.0" encoding="UTF-8"?>
-<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
-  <soap:Header/>
+<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ns="http://example.com/products">
   <soap:Body>
-    <getUser>
-      <id>123</id>
-      <tenant>acme</tenant>
-    </getUser>
+    <ns:getProductList>
+      <ns:requestId>c2f52f07-be6e-46af-a5b6-27c1f68a9686</ns:requestId>
+      <ns:products>
+        <ns:product>
+          <ns:id>ITEM-001</ns:id>
+          <ns:name>Product 1</ns:name>
+          <ns:price>11.49</ns:price>
+          <ns:stock>51</ns:stock>
+          <ns:category>clothing</ns:category>
+        </ns:product>
+        <ns:product>
+          <ns:id>ITEM-002</ns:id>
+          <ns:name>Product 2</ns:name>
+          <ns:price>12.99</ns:price>
+          <ns:stock>52</ns:stock>
+          <ns:category>furniture</ns:category>
+        </ns:product>
+      </ns:products>
+    </ns:getProductList>
+  </soap:Body>
+</soap:Envelope>
+EOF
+```
+```sh
+curl -vk -X POST \
+--resolve mocks.localhost:443:127.0.0.1 'https://mocks.localhost/mocks/public/soap/sax?delay=300&cc=public,max-age=10' \
+  -H "Content-Type: text/xml; charset=utf-8" \
+  -H "SOAPAction: \"getUser\"" \
+  --data-binary @- <<'EOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ns="http://example.com/products">
+  <soap:Body>
+    <ns:getProductList>
+      <ns:requestId>c2f52f07-be6e-46af-a5b6-27c1f68a9686</ns:requestId>
+      <ns:products>
+        <ns:product>
+          <ns:id>ITEM-001</ns:id>
+          <ns:name>Product 1</ns:name>
+          <ns:price>11.49</ns:price>
+          <ns:stock>51</ns:stock>
+          <ns:category>clothing</ns:category>
+        </ns:product>
+        <ns:product>
+          <ns:id>ITEM-002</ns:id>
+          <ns:name>Product 2</ns:name>
+          <ns:price>12.99</ns:price>
+          <ns:stock>52</ns:stock>
+          <ns:category>furniture</ns:category>
+        </ns:product>
+      </ns:products>
+    </ns:getProductList>
   </soap:Body>
 </soap:Envelope>
 EOF
