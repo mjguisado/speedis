@@ -198,7 +198,7 @@ export function cleanUpHeader(entry, cacheDirectives) {
     headersToRemove.push('keep-alive')
     headersToRemove.push('te')
     headersToRemove.push('transfer-encoding')
-    headersToRemove.push('ppgrade')
+    headersToRemove.push('upgrade')
 
     // The qualified form of the no-cache response directive
     if (Object.prototype.hasOwnProperty.call(cacheDirectives, 'no-cache')

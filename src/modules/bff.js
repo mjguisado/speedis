@@ -67,7 +67,7 @@ export async function initBff(server, opts) {
                 throw new Error(`Origin: ${opts.id}. The transformation configuration is invalid.`, { cause: error })
             }
         } else {
-            server.log.fatal(error, `Origin: ${opts.id}. The file ${opts.bff.actionsLibraries[actionsLibraryKey]} containing the action library must have a .js extension.`)
+            server.log.fatal(`Origin: ${opts.id}. The file ${opts.bff.actionsLibraries[actionsLibraryKey]} containing the action library must have a .js extension.`)
             throw new Error(`Origin: ${opts.id}. The transformation configuration is invalid.`)
         }
     }
@@ -79,7 +79,7 @@ export async function initBff(server, opts) {
         try {
             transformation.re = new RegExp(transformation.urlPattern)
         } catch (error) {
-            server.log.fatal(error, `Origin: ${opts.id}. urlPattern ${transformation.urlPattern} is not a valid regular expresion.`)
+            server.log.fatal(error, `Origin: ${opts.id}. urlPattern ${transformation.urlPattern} is not a valid regular expression.`)
             throw new Error(`Origin: ${opts.id}. The transformation configuration is invalid.`, { cause: error })
         }
         transformation.actions.forEach(action => {

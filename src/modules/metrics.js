@@ -1,4 +1,3 @@
-import path from 'path'
 import { register, Counter, Histogram } from 'prom-client'
 import { isPurgeRequest } from './cache.js'
 
@@ -55,7 +54,7 @@ export function initMetrics(server, opts) {
     server.addHook('onResponse', async (request, reply) => {
 
         let origin = 'Unknown'
-        for (const [prefix, id] of server.plugins) {
+        for (const [id, prefix] of server.plugins) {
             if (request.url.startsWith(prefix)) {
                 origin = id
                 break

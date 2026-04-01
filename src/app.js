@@ -52,9 +52,8 @@ export async function app(
     // Load the origin's configuration.
     let originsConfigs = []  
     if (configdb) {
-        let client = null
         try {
-            client = await configdb.connect()
+            await configdb.connect()
             server.log.info(`Remote origins configuration database connection established.`)
         } catch (error) {           
             throw new Error(`Unable to connect to the remote origins configuration database.`, { cause: error })
@@ -71,7 +70,7 @@ export async function app(
                 server.log.error(error, 'Error loading the origin configuration key ' + originKey)
             }
         }
-        if (client) await client.close()
+        configdb.close()
     } else {
         const originsBasedir = (null === localOriginsConfigs)
             ? path.join(process.cwd(), 'conf', 'origins')

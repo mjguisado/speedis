@@ -32,7 +32,7 @@ export function initCache(server, opts) {
             cacheable.re = new RegExp(cacheable.urlPattern)
         } catch (error) {
             server.log.fatal(error,
-                `Origin: ${opts.id}. urlPattern ${cacheable.urlPattern} is not a valid regular expresion.`)
+                `Origin: ${opts.id}. urlPattern ${cacheable.urlPattern} is not a valid regular expression.`)
             throw new Error(`Origin: ${opts.id}. The cache configuration is invalid.`, { cause: error })
         }
 
@@ -533,7 +533,7 @@ export async function _get(server, opts, request) {
             if (opts.cache.distributedRequestsCoalescing) {
                 lockKey = `${request.cacheKey}.lock`
                 lockValue = `${process.pid}:${opts.id}:${request.id}:` + crypto.randomBytes(4).toString("hex")
-                locked = await _adquireLock(server, opts, lockKey, lockValue)
+                locked = await _acquireLock(server, opts, request, lockKey, lockValue)
             }
 
             if (opts.cache.distributedRequestsCoalescing && !locked) {
@@ -591,7 +591,7 @@ export async function _get(server, opts, request) {
     } catch (error) {
 
         if (opts.cache.distributedRequestsCoalescing && locked)
-            await _releaseLock(server, opts, lockKey, lockValue)
+            await _releaseLock(server, opts, request, lockKey, lockValue)
 
         if (amITheFetcher && opts.cache.localRequestsCoalescing)
             server.ongoingFetch.delete(request.cacheKey)
@@ -642,8 +642,8 @@ export async function _get(server, opts, request) {
                     break
                 case 'EOPENBREAKER':
                     generatedResponse.statusCode = 503
-                    if (originBreaker.options.resetTimeout) {
-                        generatedResponse.headers['retry-after'] = originBreaker.retryAfter
+                    if (server.originBreaker.options.resetTimeout) {
+                        generatedResponse.headers['retry-after'] = server.originBreaker.retryAfter
                     }
                     break
                 default:
@@ -771,7 +771,7 @@ export async function _get(server, opts, request) {
 
     // In this point the Cache Entry has been updated or deleted in Redis.
     if (opts.cache.distributedRequestsCoalescing && locked)
-        await _releaseLock(server, opts, lockKey, lockValue)
+        await _releaseLock(server, opts, request, lockKey, lockValue)
 
     // See: https://www.rfc-editor.org/rfc/rfc9111.html#cache-request-directive.only-if-cached
     if (Object.prototype.hasOwnProperty.call(requestCacheDirectives, 'only-if-cached')
@@ -807,7 +807,7 @@ export async function _get(server, opts, request) {
 /**
  * Acquire a lock to make a request to the origin server.
  */
-async function _adquireLock(server, opts, lockKey, lockValue) {
+async function _acquireLock(server, opts, request, lockKey, lockValue) {
     let lockTTL
     // In JavaScript, when comparing a number with undefined, 
     // the engine converts undefined to NaN (Not a Number)
@@ -849,7 +849,7 @@ const releaseLockScriptSHA1 = crypto.createHash('sha1').update(releaseLockScript
 /**
  * Releases the lock acquired to make a request to the origin server.
  */
-async function _releaseLock(server, opts, lockKey, lockValue) {
+async function _releaseLock(server, opts, request, lockKey, lockValue) {
     try {
         const exists = server.redisBreaker
             ? await server.redisBreaker.fire('script exists', [releaseLockScriptSHA1])
@@ -900,7 +900,7 @@ function isStorableResponse(originResponse, originCacheDirectives) {
         // This cache understands 304 Not Modified
         // && originResponse.statusCode !== 304
 
-        // TODOD: Implements support for the must-understand cache directive
+        // TODO: Implements support for the must-understand cache directive
         // In this context, a cache has "understood" a request method or a
         // response status code if it recognizes it and implements all
         // specified caching-related behavior.

@@ -1,4 +1,3 @@
-import path from 'path'
 import * as crypto from 'crypto'
 import { isPurgeRequest } from './cache.js'
 import { transform, VARIANTS_TRACKER } from './bff.js'

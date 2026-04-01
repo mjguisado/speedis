@@ -61,7 +61,7 @@ if (process.env.USE_REDIS_CONFIG) {
         console.error('Error loading Speedis configuration from Redis:', error.message)
     } finally {
         try {
-            if (configdb) await configdb.close()
+            if (configdb) configdb.close()
         } catch (_) { }
     }
 
@@ -202,11 +202,13 @@ if (cluster.isPrimary) {
         }
     })
 
+    /*
     if (process.env.NODE_ENV === 'development') {
         // Enable remote DEBUG
-        // open(9229, '0.0.0.0')
+        open(9229, '0.0.0.0')
     }
-
+    */
+   
     metricsServer.listen(
         { host: '::', port: config.metricServerPort },
         (error, address) => {
