@@ -566,7 +566,7 @@ export async function _get(server, opts, request) {
         // request resulting in the stored response was made.
         requestTime = Date.now() / 1000 | 0
 
-        // Fecth
+        // Fetch
         originResponse = await fetch
 
         // The current value of the clock at the host at the time the

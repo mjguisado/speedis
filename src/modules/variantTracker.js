@@ -4,13 +4,13 @@ import { transform, VARIANTS_TRACKER } from './bff.js'
 
 export function initVariantsTracker(server, opts) {
 
-    const trakedUrlPatterns = []
-    opts.variantsTracker.urlPatterns.forEach(trakedUrlPattern => {
+    const trackedUrlPatterns = []
+    opts.variantsTracker.urlPatterns.forEach(trackedUrlPattern => {
         try {
-            trakedUrlPatterns.push(new RegExp(trakedUrlPattern))
+            trackedUrlPatterns.push(new RegExp(trackedUrlPattern))
         } catch (error) {
             server.log.fatal(error,
-                `Origin: ${opts.id}. urlPattern ${trakedUrlPattern} is not a valid regular expresion.`)
+                `Origin: ${opts.id}. urlPattern ${trackedUrlPattern} is not a valid regular expression.`)
             throw new Error(`Origin: ${opts.id}. The variant tracker configuration is invalid.`, { cause: error })
         }
     })
@@ -23,7 +23,7 @@ export function initVariantsTracker(server, opts) {
         if (isPurgeRequest(server, opts, request)) return
 
         let urlTracked = false
-        for (const urlPattern of trakedUrlPatterns) {
+        for (const urlPattern of trackedUrlPatterns) {
             if (urlPattern.test(request.raw.url)) {
                 urlTracked = true
                 break

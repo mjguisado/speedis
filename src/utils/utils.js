@@ -226,8 +226,3 @@ export function cleanUpHeader(entry, cacheDirectives) {
 
 }
 
-const originRE = /^\/([^/]+)/
-export function getOrigin(server, request) {
-    const matches = request.originalUrl.match(originRE)
-    return matches ? matches[1] : null
-}

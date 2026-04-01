@@ -37,10 +37,6 @@ export default async function (server, opts) {
         done(null, body)
     })
 
-    // This parameter determines whether descriptive error 
-    // messages are included in the response body
-    server.decorate('exposeErrors', opts.exposeErrors)
-
     // The path of the request without the prefix
     server.decorateRequest("path", null)
     server.addHook('onRequest', (request, reply, done) => {

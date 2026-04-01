@@ -7,8 +7,7 @@ import {
     calculateAge,
     cleanUpHeader,
     ensureValidDateHeader,
-    cloneAndTrimResponse,
-    getOrigin
+    cloneAndTrimResponse
 } from '../../src/utils/utils.js'
 
 suite('Utils Module', () => {
@@ -397,40 +396,5 @@ suite('Utils Module', () => {
         })
     })
 
-    suite('getOrigin', () => {
-
-        test('should extract origin from URL', (t) => {
-            const mockServer = {}
-            const request = {
-                originalUrl: '/myorigin/path/to/resource'
-            }
-
-            const result = getOrigin(mockServer, request)
-
-            assert.strictEqual(result, 'myorigin')
-        })
-
-        test('should return null for invalid URL', (t) => {
-            const mockServer = {}
-            const request = {
-                originalUrl: '/'
-            }
-
-            const result = getOrigin(mockServer, request)
-
-            assert.strictEqual(result, null)
-        })
-
-        test('should extract origin from complex URL', (t) => {
-            const mockServer = {}
-            const request = {
-                originalUrl: '/api/v1/users/123?param=value'
-            }
-
-            const result = getOrigin(mockServer, request)
-
-            assert.strictEqual(result, 'api')
-        })
-    })
 })
 

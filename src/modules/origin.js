@@ -152,7 +152,7 @@ export async function proxy(server, opts, request) {
         ? server.originBreaker.fire(server, opts, requestOptions, request.body)
         : _fetch(server, opts, requestOptions, request.body)
 
-    // Fecth
+    // Fetch
     const response = await fetch
 
     // Unsure that we have a valid Date Header
@@ -220,7 +220,7 @@ function _fetchHttp1x(originOptions, requestOptions, body) {
             }
         })
 
-        // Enviar body si existe
+        // Send body if it exists
         if (body) request.write(body)
 
         request.end()
@@ -260,7 +260,7 @@ export function transformHeadersForHttp2(headers, options = {}) {
         result[lowerKey] = value
     }
 
-    // Add pseudo-headers if ther included in options
+    // Add pseudo-headers if they're included in options
     if (options.method) result[http2.constants.HTTP2_HEADER_METHOD] = options.method
     if (options.path) result[http2.constants.HTTP2_HEADER_PATH] = options.path
     if (options.scheme) result[http2.constants.HTTP2_HEADER_SCHEME] = options.scheme
