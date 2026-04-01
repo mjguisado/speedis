@@ -23,9 +23,21 @@ export async function initBff(server, opts) {
     const referencedLibraries = new Set()
     opts.bff.transformations.forEach(transformation => {
         transformation.actions.forEach(action => {
+            // The action.uses field contains the name of the library and 
+            // the name of the action separated by a colon.
+            // If the library name is not specified, the speedis library is assumed.
+            // To increse
             const tokens = action.uses.split(':')
-            if (tokens.length === 2) {
+            if (tokens.length === 1) {
+                action.library = 'speedis'
+                action.func = tokens[0]
+            } else if (tokens.length === 2) {
+                action.library = tokens[0]
+                action.func = tokens[1]
                 referencedLibraries.add(tokens[0])
+            } else {
+                server.log.fatal(`Origin: ${opts.id}. The name of the action ${action.uses} is not valid. The correct format is library:action.`)
+                throw new Error(`Origin: ${opts.id}. The transformation configuration is invalid.`)
             }
         })
     })
@@ -45,12 +57,14 @@ export async function initBff(server, opts) {
     }
 
     for (let actionsLibraryKey in opts.bff.actionsLibraries) {
+        // If the path is not absolute, we make it absolute.
         if (!path.isAbsolute(opts.bff.actionsLibraries[actionsLibraryKey])) {
             opts.bff.actionsLibraries[actionsLibraryKey] = path.resolve(
                 process.cwd(),
                 opts.bff.actionsLibraries[actionsLibraryKey]
             )
         }
+        // Import the library
         if (opts.bff.actionsLibraries[actionsLibraryKey].endsWith(".js")) {
             try {
                 const library = await import(`file://${opts.bff.actionsLibraries[actionsLibraryKey]}`)
@@ -86,20 +100,7 @@ export async function initBff(server, opts) {
             if (CACHE_KEY_GENERATION === action.phase) {
                 hasCacheKeyGenerationAction = true
             }
-            const tokens = action.uses.split(':')
-            let library = null
-            let func = null
-            if (tokens.length === 1) {
-                library = 'speedis'
-                func = tokens[0]
-            } else if (tokens.length === 2) {
-                library = tokens[0]
-                func = tokens[1]
-            } else {
-                server.log.fatal(`Origin: ${opts.id}. The name of the action ${action.uses} is not valid. The correct format is library:action.`)
-                throw new Error(`Origin: ${opts.id}. The transformation configuration is invalid.`)
-            }
-            if (!bffActionsRepository[library] || !bffActionsRepository[library][func]) {
+            if (!bffActionsRepository[action.library] || !bffActionsRepository[action.library][action.func]) {
                 server.log.fatal(`Origin: ${opts.id}. Function ${action.uses} was not found among the available actions.`)
                 throw new Error(`Origin: ${opts.id}. The transformation configuration is invalid.`)
             }
@@ -122,22 +123,11 @@ export function transform(opts, type, target) {
         // No transformation is applied.
         return
     }
-
     opts.bff.transformations.forEach(transformation => {
         if (transformation.re.test(target.path)) {
             transformation.actions.forEach(action => {
                 if (action.phase === type) {
-                    const tokens = action.uses.split(':')
-                    let library = null
-                    let func = null
-                    if (tokens.length === 1) {
-                        library = 'speedis'
-                        func = tokens[0]
-                    } else if (tokens.length === 2) {
-                        library = tokens[0]
-                        func = tokens[1]
-                    }
-                    bffActionsRepository[library][func](target, action.with ? action.with : null)
+                    bffActionsRepository[action.library][action.func](target, action.with ? action.with : null)
                 }
             })
         }

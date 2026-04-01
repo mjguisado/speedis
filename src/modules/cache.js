@@ -153,30 +153,32 @@ function generateUrlKey(opts, request, fieldNames = utils.parseVaryHeader(reques
 
 export function generateCacheKey(opts, request) {
 
+    const parts = []
+
     // If configured, include origin ID in cache key
-    let cacheKey = opts.cache?.includeOriginIdInCacheKey
-        ? opts.id
-        : ''
+    if (opts.cache?.includeOriginIdInCacheKey) {
+        parts.push(opts.id)
+    }
 
     // If cacheable per-user, include user ID in cache key
     if (request.cacheSettings?.private) {
-        cacheKey += (cacheKey.length > 0 ? ':' : '') + request.userId
+        parts.push(request.userId)
     }
 
     // Include HTTP method in cache key to separate HEAD and GET responses
     // This prevents GET requests from being served with empty body from HEAD cache entries
     // See: https://www.rfc-editor.org/rfc/rfc9111.html#name-head
-    cacheKey += (cacheKey.length > 0 ? ':' : '') + request.method
+    parts.push(request.method)
 
     // If body fingerprint is available, include it in cache key
     if (opts?.bff?.enabled) bff.transform(opts, bff.CACHE_KEY_GENERATION, request)
     if (request?.bodyFingerprint) {
-        cacheKey += (cacheKey.length > 0 ? ':' : '') + request.bodyFingerprint
+        parts.push(request.bodyFingerprint)
     }
 
-    cacheKey += (cacheKey.length > 0 ? ':' : '') + generateUrlKey(opts, request)
+    parts.push(generateUrlKey(opts, request))
 
-    request.cacheKey = cacheKey
+    request.cacheKey = parts.join(':')
 
 }
 

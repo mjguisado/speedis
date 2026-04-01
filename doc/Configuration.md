@@ -232,11 +232,13 @@ Note how the action name is composed of two parts separated by the `:` character
 The first part is the identifier given to the action library in the configuration, and the second part is the name of the action.
 This allows using the same action name in different libraries, avoiding collisions.
 
-Speedis includes out of the box two libraries:
+Speedis includes out of the box four libraries:
 |Library ID|Location|Description|
 |----------|--------|-----------|
 |headers|[./src/actions/headers.js](../src/actions/headers.js)|Actions to manipulate headers|
 |json|[./src/actions/json.js](../src/actions/json.js)|Actions to manipulate the body in JSON format|
+|xmlsax|[./src/actions/xmlsax.js](../src/actions/xmlsax.js)|Actions to extract XML content using SAX parsing for cache key generation|
+|xmlxpath|[./src/actions/xmlxpath.js](../src/actions/xmlxpath.js)|Actions to extract XML content using XPath expressions for cache key generation|
 
 ### Available Actions
 

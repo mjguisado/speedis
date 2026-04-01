@@ -16,7 +16,7 @@ suite('Speedis - Origin', () => {
     before(async () => {
 
         server = fastify({
-            logger: { level: 'info' }
+            logger: { level: 'error' }
         })
 
         const ajv = new Ajv({ useDefaults: true })
@@ -24,6 +24,7 @@ suite('Speedis - Origin', () => {
         const origin = {
             "id": "mocks",
             "prefix": "/mocks",
+            "logLevel": "error",
             "origin": {
                 "http2Options": {
                     "authority": "https://mocks.localhost:3030",
