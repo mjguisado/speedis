@@ -5,10 +5,6 @@
 # keys via the SAX parser (xmlsax:xmlBodyFingerprint) versus the DOM/XPath
 # parser (xmlxpath:xpathBodyFingerprint) under three payload sizes:
 #
-#   small  ~300 B   – single getProduct call
-#   medium ~2 KB    – getProductList, 15 items
-#   large  ~15 KB   – getProductList, 150 items
-#
 # Run a single scenario to get clean, isolated metrics:
 #
 # docker run --rm -it \
@@ -32,7 +28,8 @@
 #
 # Prerequisites:
 #   - Stack running (docker compose up)
-#   - uuids.csv present in this directory (used by the existing load tests)
+#   - soap-payloads-{small,medium,large}.csv present in this directory
+#     (generate with: node generate-soap-payloads.cjs)
 # ---------------------------------------------------------------------------
 
 config:
@@ -43,12 +40,16 @@ config:
     timeout: 10
     pool: 4096
     # extendedMetrics: true
-  processor: "./soap-benchmark-processor.cjs"
   payload:
-    path: "uuids.csv"
-    fields:
-      - "requestId"
-    order: random
+    - path: "soap-payloads-small.csv"
+      fields:
+        - "smallSoapBody"
+    - path: "soap-payloads-medium.csv"
+      fields:
+        - "mediumSoapBody"
+    - path: "soap-payloads-large.csv"
+      fields:
+        - "largeSoapBody"
   phases:
     - name: 'low-load'
       duration: 1m
@@ -62,63 +63,51 @@ config:
 scenarios:
   # ── SAX ──────────────────────────────────────────────────────────────────
   - name: "sax-small"
-    beforeScenario:
-      - "setSmallSoapBody"
     flow:
       - post:
           url: "/mocks/public/soap/sax?delay={{ $randomNumber(100,200) }}&cc=public,max-age=10"
           headers:
             Host: "mocks"
             Content-Type: "text/xml; charset=utf-8"
-          body: "{{ soapBody }}"
+          body: "{{ smallSoapBody }}"
   - name: "sax-medium"
-    beforeScenario:
-      - "setMediumSoapBody"
     flow:
       - post:
           url: "/mocks/public/soap/sax?delay={{ $randomNumber(100,200) }}&cc=public,max-age=10"
           headers:
             Host: "mocks"
             Content-Type: "text/xml; charset=utf-8"
-          body: "{{ soapBody }}"
+          body: "{{ mediumSoapBody }}"
   - name: "sax-large"
-    beforeScenario:
-      - "setLargeSoapBody"
     flow:
       - post:
           url: "/mocks/public/soap/sax?delay={{ $randomNumber(100,200) }}&cc=public,max-age=10"
           headers:
             Host: "mocks"
             Content-Type: "text/xml; charset=utf-8"
-          body: "{{ soapBody }}"
+          body: "{{ largeSoapBody }}"
   # ── XPath ─────────────────────────────────────────────────────────────────
   - name: "xpath-small"
-    beforeScenario:
-      - "setSmallSoapBody"
     flow:
       - post:
           url: "/mocks/public/soap/xpath?delay={{ $randomNumber(100,200) }}&cc=public,max-age=10"
           headers:
             Host: "mocks"
             Content-Type: "text/xml; charset=utf-8"
-          body: "{{ soapBody }}"
+          body: "{{ smallSoapBody }}"
   - name: "xpath-medium"
-    beforeScenario:
-      - "setMediumSoapBody"
     flow:
       - post:
           url: "/mocks/public/soap/xpath?delay={{ $randomNumber(100,200) }}&cc=public,max-age=10"
           headers:
             Host: "mocks"
             Content-Type: "text/xml; charset=utf-8"
-          body: "{{ soapBody }}"
+          body: "{{ mediumSoapBody }}"
   - name: "xpath-large"
-    beforeScenario:
-      - "setLargeSoapBody"
     flow:
       - post:
           url: "/mocks/public/soap/xpath?delay={{ $randomNumber(100,200) }}&cc=public,max-age=10"
           headers:
             Host: "mocks"
             Content-Type: "text/xml; charset=utf-8"
-          body: "{{ soapBody }}"
+          body: "{{ largeSoapBody }}"
