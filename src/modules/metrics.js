@@ -1,8 +1,29 @@
-import { register, Counter, Histogram } from 'prom-client'
+import { register, Counter, Histogram, Gauge } from 'prom-client'
 import { isPurgeRequest } from './cache.js'
+import cluster from "node:cluster"
 
 export function initMetrics(server, opts) {
    
+    let tcpConnectionsGauge = 
+        register.getSingleMetric('speedis_tcp_connections')
+    if (!tcpConnectionsGauge) {
+        tcpConnectionsGauge = new Gauge({
+            name: 'speedis_tcp_connections',
+            help: 'Number of active TCP connections',
+            labelNames: ['worker_id'],
+            async collect() {
+                if (cluster.isWorker && server?.server) {
+                    const count = await new Promise((resolve) => {
+                        server.server.getConnections((err, count) => {
+                            resolve(err ? 0 : count)
+                        })
+                    })
+                    this.set({ worker_id: cluster.worker.id }, count)
+                }
+            }
+        })
+    }    
+
     let speedisHttpRequestsTotal = 
         register.getSingleMetric('speedis_http_requests_total')
     if (!speedisHttpRequestsTotal) {

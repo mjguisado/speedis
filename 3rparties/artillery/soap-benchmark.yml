@@ -10,11 +10,25 @@
 #   large  ~15 KB   – getProductList, 150 items
 #
 # Run a single scenario to get clean, isolated metrics:
-#   artillery run --scenario-name sax-small   ./soap-benchmark.yml
-#   artillery run --scenario-name xpath-large ./soap-benchmark.yml
+#
+# docker run --rm -it \
+#   --network speedis_default \
+#   -v $(pwd)/3rparties/artillery:/scripts \
+#   artilleryio/artillery:latest \
+#   run --scenario-name sax-small /scripts/soap-benchmark.yml
+#
+# docker run --rm -it \
+#   --network speedis_default \
+#   -v $(pwd)/3rparties/artillery:/scripts \
+#   artilleryio/artillery:latest \
+#   run --scenario-name xpath-large /scripts/soap-benchmark.yml
 #
 # Run all scenarios together for a mixed-load comparison:
-#   artillery run ./soap-benchmark.yml
+# docker run --rm -it \
+#   --network speedis_default \
+#   -v $(pwd)/3rparties/artillery:/scripts \
+#   artilleryio/artillery:latest \
+#   run /scripts/soap-benchmark.yml
 #
 # Prerequisites:
 #   - Stack running (docker compose up)
@@ -22,96 +36,88 @@
 # ---------------------------------------------------------------------------
 
 config:
-  target: "http://127.0.0.1"
+  target: "https://haproxy"
+  tls:
+    rejectUnauthorized: false
+  http:
+    timeout: 10
+    pool: 4096
+    # extendedMetrics: true
   processor: "./soap-benchmark-processor.cjs"
   payload:
-    # Reuses the UUIDs already present for the generic load tests.
-    # Each virtual user picks one UUID as the requestId embedded in the body,
-    # ensuring a realistic mix of cache hits and cache misses.
     path: "uuids.csv"
     fields:
       - "requestId"
     order: random
-  http:
-    pool: 2048
-    timeout: 10
-    keepAlive: true
-    cacheDns: true   
   phases:
-    - name: "warmup"
-      duration: 30
-      arrivalRate: 50
-    - name: "load"
-      duration: 300
-      arrivalRate: 100
-
+    - name: 'low-load'
+      duration: 1m
+      arrivalRate: 1000
+    - name: 'medium-load'
+      duration: 1m
+      arrivalRate: 2000
+    - name: 'high-load'
+      duration: 15m
+      arrivalRate: 4000
 scenarios:
-
   # ── SAX ──────────────────────────────────────────────────────────────────
-
   - name: "sax-small"
     beforeScenario:
       - "setSmallSoapBody"
     flow:
       - post:
-          url: "/mocks/public/soap/sax"
+          url: "/mocks/public/soap/sax?delay={{ $randomNumber(100,200) }}&cc=public,max-age=10"
           headers:
             Host: "mocks"
             Content-Type: "text/xml; charset=utf-8"
           body: "{{ soapBody }}"
-
   - name: "sax-medium"
     beforeScenario:
       - "setMediumSoapBody"
     flow:
       - post:
-          url: "/mocks/public/soap/sax"
+          url: "/mocks/public/soap/sax?delay={{ $randomNumber(100,200) }}&cc=public,max-age=10"
           headers:
             Host: "mocks"
             Content-Type: "text/xml; charset=utf-8"
           body: "{{ soapBody }}"
-
   - name: "sax-large"
     beforeScenario:
       - "setLargeSoapBody"
     flow:
       - post:
-          url: "/mocks/public/soap/sax"
+          url: "/mocks/public/soap/sax?delay={{ $randomNumber(100,200) }}&cc=public,max-age=10"
           headers:
             Host: "mocks"
             Content-Type: "text/xml; charset=utf-8"
           body: "{{ soapBody }}"
-
   # ── XPath ─────────────────────────────────────────────────────────────────
-
   - name: "xpath-small"
     beforeScenario:
       - "setSmallSoapBody"
     flow:
       - post:
-          url: "/mocks/public/soap/xpath"
+          url: "/mocks/public/soap/xpath?delay={{ $randomNumber(100,200) }}&cc=public,max-age=10"
           headers:
             Host: "mocks"
             Content-Type: "text/xml; charset=utf-8"
           body: "{{ soapBody }}"
-
   - name: "xpath-medium"
     beforeScenario:
       - "setMediumSoapBody"
     flow:
       - post:
-          url: "/mocks/public/soap/xpath"
+          url: "/mocks/public/soap/xpath?delay={{ $randomNumber(100,200) }}&cc=public,max-age=10"
           headers:
             Host: "mocks"
             Content-Type: "text/xml; charset=utf-8"
           body: "{{ soapBody }}"
-
   - name: "xpath-large"
     beforeScenario:
       - "setLargeSoapBody"
     flow:
       - post:
-          url: "/mocks/public/soap/xpath"
+          url: "/mocks/public/soap/xpath?delay={{ $randomNumber(100,200) }}&cc=public,max-age=10"
           headers:
             Host: "mocks"
             Content-Type: "text/xml; charset=utf-8"

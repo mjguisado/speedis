@@ -80,7 +80,8 @@ To access the different services deployed in Docker from the local environment, 
 ```
 
 These URLs provide access to the consoles of certain tools and their associated metrics.
-- **HAProxy** → `http://haproxy.localhost:8405/metrics`
+- **HAProxy** → `http://haproxy.localhost:8404/stats` `http://haproxy.localhost:8405/metrics`
+
 - **Speedis (Metrics)** → `http://speedis.localhost:3003/metrics`
 - **Grafana** → `http://grafana.localhost:3000` (User: `admin`, Password: `grafana`)
 - **Prometheus** → `http://prometheus.localhost:9090`

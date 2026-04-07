@@ -21,6 +21,7 @@ spec:
         ports:
         - containerPort: 80
         - containerPort: 443
+        - containerPort: 8404
         - containerPort: 8405
         volumeMounts:
         - name: haproxy-cfg 

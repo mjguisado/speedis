@@ -19,8 +19,11 @@ For these tests, we use a scenario where the following flow is executed at a fre
 2. The system waits for a random number of seconds between 1 and 60.
 3. A conditional request (If-Modified-Since) is sent to the same resource (URL).
 ```sh
-artillery run --scenario-name '304' ./3rparties/artillery/load-test.yml
-
+docker run --rm -it \
+  --network speedis_default \
+  -v $(pwd)/3rparties/artillery:/scripts \
+  artilleryio/artillery:latest \
+  run --scenario-name 304 /scripts/load-test.yml
 ```
 After the initial minutes, the system shows behavior where the number of requests per second to Speedis varies between 200 and 800, to the origin between 50 and 150, and the response times for requests that need to go to the origin are below 25ms.
 <img src="./img/before_cb.png" />

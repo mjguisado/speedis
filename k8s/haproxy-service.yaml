@@ -16,6 +16,10 @@ spec:
       targetPort: 443
       name: https
     - protocol: TCP
+      port: 8404
+      targetPort: 8404
+      name: stats
+    - protocol: TCP
       port: 8405
       targetPort: 8405
       name: metrics

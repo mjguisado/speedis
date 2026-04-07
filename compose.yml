@@ -10,6 +10,8 @@ services:
     volumes:
       - ./3rparties/prometheus:/etc/prometheus
       - prom_data:/prometheus
+    cpus: 0.25
+    mem_limit: 256m
   grafana:
     image: grafana/grafana
     container_name: grafana
@@ -22,6 +24,8 @@ services:
       - ./3rparties/grafana:/etc/grafana/provisioning/datasources
     depends_on:
       - prometheus 
+    cpus: 0.25
+    mem_limit: 256m
   redis:
     image: redis
     container_name: redis
@@ -33,6 +37,8 @@ services:
       timeout: 2s
       interval: 5s
       retries: 5
+    cpus: 1      
+    mem_limit: 512m
   mocks:
     image: mjguisado/mocks:latest
     pull_policy: build
@@ -50,6 +56,8 @@ services:
           target: /usr/src/app/mocks
     ports:
       - 3030:3030
+    cpus: 0.25     
+    mem_limit: 128m
   speedis:
     image: mjguisado/speedis:latest
     pull_policy: build
@@ -80,6 +88,8 @@ services:
         condition: service_started
       redis:
         condition: service_healthy
+    cpus: 4
+    mem_limit: 2048m
   haproxy:
     image: haproxy:latest
     container_name: haproxy
@@ -87,10 +97,13 @@ services:
     ports:
       - 80:80
       - 443:443
+      - 8404:8404
       - 8405:8405
     volumes:
       - ./3rparties/haproxy/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg
       - ./3rparties/haproxy/certs:/usr/local/etc/haproxy/certs:ro
+    mem_limit: 512m
+    cpus: 2
     depends_on:
       - speedis
 volumes:

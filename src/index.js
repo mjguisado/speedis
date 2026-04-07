@@ -4,7 +4,7 @@ import fs from 'fs/promises'
 import cluster from "node:cluster"
 import fastify from 'fastify'
 import { app } from './app.js'
-import { register, collectDefaultMetrics, AggregatorRegistry } from 'prom-client'
+import { collectDefaultMetrics, AggregatorRegistry } from 'prom-client'
 import Ajv from "ajv"
 import { open } from 'inspector'
 import { createClient } from 'redis'

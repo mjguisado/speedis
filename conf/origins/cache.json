@@ -156,7 +156,7 @@
                         "phase": "CacheKeyGeneration",
                         "uses": "xmlsax:xmlBodyFingerprint",
                         "with": {
-                            "elements": ["ns:id", "ns:category"],
+                            "elements": ["ns:category", "ns:id"],
                             "algorithm": "md5",
                             "encoding": "hex"
                         }
@@ -171,7 +171,7 @@
                         "uses": "xmlxpath:xpathBodyFingerprint",
                         "with": {
                             "xpaths": [
-                                "//ns:product/ns:id | //ns:product/ns:category"
+                                "//ns:product/ns:category | //ns:product/ns:id"
                             ],
                             "namespaces": {
                                 "soap": "http://schemas.xmlsoap.org/soap/envelope/",

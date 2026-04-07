@@ -7,9 +7,9 @@
 // on the `requestId` variable (from uuids.csv).  Three sizes are provided
 // so the benchmark can compare SAX vs XPath parsing under different loads:
 //
-//   small  ~300 B  – single getProduct call
-//   medium ~2 KB   – getProductList with 15 items
-//   large  ~15 KB  – getProductList with 150 items
+//   small  - getProductList with 2 items
+//   medium – getProductList with 15 items
+//   large  – getProductList with 150 items
 // ---------------------------------------------------------------------------
 
 const SOAP_NS  = 'xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/"'
@@ -34,16 +34,17 @@ function productItem(index) {
 }
 
 function generateSmallSoap(requestId) {
+    const items = Array.from({ length: 2 }, (_, i) => productItem(i + 1)).join('')
     const body =
-        `<ns:getProduct>` +
+        `<ns:getProductList>` +
         `<ns:requestId>${requestId}</ns:requestId>` +
-        `<ns:productId>PROD-001</ns:productId>` +
-        `</ns:getProduct>`
+        `<ns:products>${items}</ns:products>` +
+        `</ns:getProductList>`
     return soapEnvelope(body)
 }
 
 function generateMediumSoap(requestId) {
-    const items = Array.from({ length: 15 }, (_, i) => productItem(i + 1)).join('')
+    const items = Array.from({ length: 16 }, (_, i) => productItem(i + 1)).join('')
     const body =
         `<ns:getProductList>` +
         `<ns:requestId>${requestId}</ns:requestId>` +
@@ -53,7 +54,7 @@ function generateMediumSoap(requestId) {
 }
 
 function generateLargeSoap(requestId) {
-    const items = Array.from({ length: 150 }, (_, i) => productItem(i + 1)).join('')
+    const items = Array.from({ length: 128 }, (_, i) => productItem(i + 1)).join('')
     const body =
         `<ns:getProductList>` +
         `<ns:requestId>${requestId}</ns:requestId>` +
