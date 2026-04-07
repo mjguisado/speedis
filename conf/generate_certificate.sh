@@ -14,6 +14,6 @@ openssl x509 -req -days 365 -sha256 \
     extendedKeyUsage=serverAuth
     subjectAltName=\
       DNS:speedis,\
-      DNS:speedis.localhost\
+      DNS:speedis.localhost
 EOF
 )
