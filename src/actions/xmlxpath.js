@@ -22,14 +22,18 @@ import { createHash } from 'crypto'
  * @param {object}   [params.namespaces]        - Prefix-to-URI map for namespace
  *                                                resolution, e.g.:
  *                                                { "soap": "http://schemas.xmlsoap.org/soap/envelope/" }
- * @param {string}   [params.algorithm="md5"]   - Hash algorithm (Node.js crypto).
- * @param {string}   [params.encoding="hex"]    - Hash output encoding ("hex"|"base64").
+ * @param {object}   [params.hash]                    - Hash configuration sub-object.
+ * @param {boolean}  [params.hash.enabled=true]       - Whether to apply the hash. When false
+ *                                                      the raw concatenated string is stored
+ *                                                      directly in target.bodyFingerprint.
+ * @param {string}   [params.hash.algorithm="md5"]    - Hash algorithm (any value accepted by
+ *                                                      Node.js crypto.createHash()).
+ * @param {string}   [params.hash.encoding="hex"]     - Hash output encoding: "hex" or "base64".
  */
 export function xpathBodyFingerprint(target, params) {
     if (!params?.xpaths?.length || !Buffer.isBuffer(target.body)) return
 
-    const algorithm = params.algorithm ?? 'md5'
-    const encoding  = params.encoding  ?? 'hex'
+    const { enabled = false, algorithm = 'md5', encoding = 'hex' } = params.hash ?? {}
 
     // Parse XML into a DOM tree, suppressing all parser errors silently.
     const parser = new DOMParser({ onError: () => {} })
@@ -78,9 +82,10 @@ export function xpathBodyFingerprint(target, params) {
 
     if (parts.length === 0) return
 
-    target.bodyFingerprint = createHash(algorithm)
-        .update(parts.join(''))
-        .digest(encoding)
+    const concatenated = parts.join('')
+    target.bodyFingerprint = enabled
+        ? createHash(algorithm).update(concatenated).digest(encoding)
+        : concatenated
 }
 
 // ---------------------------------------------------------------------------

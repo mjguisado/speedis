@@ -157,8 +157,11 @@
                         "uses": "xmlsax:xmlBodyFingerprint",
                         "with": {
                             "elements": ["ns:category", "ns:id"],
-                            "algorithm": "md5",
-                            "encoding": "hex"
+                            "hash": {
+                                "enabled": true,
+                                "algorithm": "md5",
+                                "encoding": "hex"
+                            }
                         }
                     }
                 ]
@@ -177,8 +180,11 @@
                                 "soap": "http://schemas.xmlsoap.org/soap/envelope/",
                                 "ns": "http://example.com/products"
                             },
-                            "algorithm": "md5",
-                            "encoding": "hex"
+                            "hash": {
+                                "enabled": true,
+                                "algorithm": "md5",
+                                "encoding": "hex"
+                            }
                         }
                     }
                 ]

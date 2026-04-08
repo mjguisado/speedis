@@ -18,8 +18,10 @@ The extracted texts are concatenated in the order the expressions are declared, 
 |---|---|---|---|---|
 | `xpaths` | `string[]` | ✅ | — | XPath 1.0 expressions to evaluate against the document. Results are concatenated in declaration order. |
 | `namespaces` | `object` | ❌ | `{}` | Prefix-to-URI map for namespace-aware evaluation, e.g. `{ "soap": "http://schemas.xmlsoap.org/soap/envelope/" }`. |
-| `algorithm` | `string` | ❌ | `"md5"` | Hash algorithm. Any value accepted by Node.js [`crypto.createHash()`](https://nodejs.org/api/crypto.html#cryptocreatehashalgorithm-options). |
-| `encoding` | `string` | ❌ | `"hex"` | Output encoding: `"hex"` or `"base64"`. |
+| `hash` | `object` | ❌ | `{}` | Hash configuration sub-object. |
+| `hash.enabled` | `boolean` | ❌ | `false` | Whether to apply the hash. When `false` (default), the raw concatenated string is stored directly in `request.bodyFingerprint`. |
+| `hash.algorithm` | `string` | ❌ | `"md5"` | Hash algorithm. Any value accepted by Node.js [`crypto.createHash()`](https://nodejs.org/api/crypto.html#cryptocreatehashalgorithm-options). |
+| `hash.encoding` | `string` | ❌ | `"hex"` | Output encoding: `"hex"` or `"base64"`. |
 
 ## Configuration Example
 
@@ -43,8 +45,11 @@ The extracted texts are concatenated in the order the expressions are declared, 
                 "soap": "http://schemas.xmlsoap.org/soap/envelope/",
                 "wsse": "http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd"
               },
-              "algorithm": "md5",
-              "encoding": "hex"
+              "hash": {
+                "enabled": true,
+                "algorithm": "md5",
+                "encoding": "hex"
+              }
             }
           }
         ]

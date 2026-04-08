@@ -13,16 +13,18 @@ import { createHash } from 'crypto'
  * @param {object} params  - Action parameters from the "with" field in config.
  * @param {string[]} params.elements  - Qualified names of the XML elements to
  *                                      extract (e.g. ["soap:Body", "wsse:UsernameToken"]).
- * @param {string}   [params.algorithm="md5"]  - Hash algorithm (any value
- *                                               supported by Node.js crypto).
- * @param {string}   [params.encoding="hex"]   - Hash output encoding ("hex" or "base64").
+ * @param {object}   [params.hash]                    - Hash configuration sub-object.
+ * @param {boolean}  [params.hash.enabled=true]       - Whether to apply the hash. When false
+ *                                                      the raw concatenated string is stored
+ *                                                      directly in target.bodyFingerprint.
+ * @param {string}   [params.hash.algorithm="md5"]    - Hash algorithm (any value accepted by
+ *                                                      Node.js crypto.createHash()).
+ * @param {string}   [params.hash.encoding="hex"]     - Hash output encoding: "hex" or "base64".
  */
 export function xmlBodyFingerprint(target, params) {
     if (!params?.elements?.length || !Buffer.isBuffer(target.body)) return
 
-    const elements = params.elements
-    const algorithm = params.algorithm ?? 'md5'
-    const encoding = params.encoding ?? 'hex'
+    const { enabled = false, algorithm = 'md5', encoding = 'hex' } = params.hash ?? {}
 
     // captureStack: array of { name: string, text: string }
     // Each entry represents an open target element currently being captured.
@@ -37,7 +39,7 @@ export function xmlBodyFingerprint(target, params) {
     )
 
     parser.onopentag = (node) => {
-        if (elements.includes(node.name)) {
+        if (params.elements.includes(node.name)) {
             captureStack.push({ name: node.name, text: '' })
         }
     }
@@ -58,7 +60,7 @@ export function xmlBodyFingerprint(target, params) {
     }
 
     parser.onclosetag = (name) => {
-        if (elements.includes(name)) {
+        if (params.elements.includes(name)) {
             // Find the most recent open capture entry for this element name.
             for (let i = captureStack.length - 1; i >= 0; i--) {
                 if (captureStack[i].name === name) {
@@ -86,7 +88,8 @@ export function xmlBodyFingerprint(target, params) {
 
     if (results.length === 0) return
 
-    target.bodyFingerprint = createHash(algorithm)
-        .update(results.join(''))
-        .digest(encoding)
+    const concatenated = results.join('')
+    target.bodyFingerprint = enabled
+        ? createHash(algorithm).update(concatenated).digest(encoding)
+        : concatenated
 }

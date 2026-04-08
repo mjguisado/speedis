@@ -49,7 +49,7 @@ suite('XML XPath Actions', () => {
                 xpaths: ['//soap:Body/text()'],
                 namespaces: SOAP_NS
             })
-            assert.strictEqual(target.bodyFingerprint, md5hex('getProducts'))
+            assert.strictEqual(target.bodyFingerprint, 'getProducts')
         })
 
         test('should concatenate results from multiple XPath expressions in declaration order', (t) => {
@@ -59,42 +59,42 @@ suite('XML XPath Actions', () => {
                 xpaths: ['//wsse:UsernameToken/text()', '//soap:Body/text()'],
                 namespaces: SOAP_NS
             })
-            assert.strictEqual(target.bodyFingerprint, md5hex('admingetProducts'))
+            assert.strictEqual(target.bodyFingerprint, 'admingetProducts')
         })
 
         test('should concatenate multiple nodes returned by a single expression', (t) => {
             const xml = `<root><item>foo</item><item>bar</item></root>`
             const target = makeTarget(xml)
             xpathBodyFingerprint(target, { xpaths: ['//item/text()'] })
-            assert.strictEqual(target.bodyFingerprint, md5hex('foobar'))
+            assert.strictEqual(target.bodyFingerprint, 'foobar')
         })
 
         test('should extract element text content including descendants', (t) => {
             const xml = `<root><wrapper><child>hello</child> world</wrapper></root>`
             const target = makeTarget(xml)
             xpathBodyFingerprint(target, { xpaths: ['//wrapper'] })
-            assert.strictEqual(target.bodyFingerprint, md5hex('hello world'))
+            assert.strictEqual(target.bodyFingerprint, 'hello world')
         })
 
         test('should extract attribute value', (t) => {
             const xml = `<root><item id="42">value</item></root>`
             const target = makeTarget(xml)
             xpathBodyFingerprint(target, { xpaths: ['//item/@id'] })
-            assert.strictEqual(target.bodyFingerprint, md5hex('42'))
+            assert.strictEqual(target.bodyFingerprint, '42')
         })
 
         test('should filter with XPath predicate on attribute value', (t) => {
             const xml = `<root><item type="basic">A</item><item type="premium">B</item></root>`
             const target = makeTarget(xml)
             xpathBodyFingerprint(target, { xpaths: ['//item[@type="premium"]/text()'] })
-            assert.strictEqual(target.bodyFingerprint, md5hex('B'))
+            assert.strictEqual(target.bodyFingerprint, 'B')
         })
 
         test('should select element by position', (t) => {
             const xml = `<root><param>first</param><param>second</param></root>`
             const target = makeTarget(xml)
             xpathBodyFingerprint(target, { xpaths: ['//param[2]/text()'] })
-            assert.strictEqual(target.bodyFingerprint, md5hex('second'))
+            assert.strictEqual(target.bodyFingerprint, 'second')
         })
 
         test('should match ignoring namespace prefix via local-name()', (t) => {
@@ -103,7 +103,7 @@ suite('XML XPath Actions', () => {
             xpathBodyFingerprint(target, {
                 xpaths: ['//*[local-name()="Body"]/text()']
             })
-            assert.strictEqual(target.bodyFingerprint, md5hex('getProducts'))
+            assert.strictEqual(target.bodyFingerprint, 'getProducts')
         })
 
         test('should accept a Buffer as target.body', (t) => {
@@ -116,25 +116,50 @@ suite('XML XPath Actions', () => {
             assert.ok(target.bodyFingerprint)
         })
 
-        test('should use md5/hex by default', (t) => {
+        test('should store raw string by default (no hash sub-object)', (t) => {
             const target = makeTarget(SOAP_XML)
             xpathBodyFingerprint(target, {
                 xpaths: ['//soap:Body/text()'],
                 namespaces: SOAP_NS
             })
-            assert.match(target.bodyFingerprint, /^[0-9a-f]{32}$/)
+            assert.strictEqual(target.bodyFingerprint, 'getProducts')
         })
 
-        test('should use custom algorithm and encoding', (t) => {
+        test('should use custom algorithm and encoding via hash sub-object', (t) => {
             const target = makeTarget(SOAP_XML)
             xpathBodyFingerprint(target, {
                 xpaths: ['//soap:Body/text()'],
                 namespaces: SOAP_NS,
-                algorithm: 'sha256',
-                encoding: 'base64'
+                hash: { enabled: true, algorithm: 'sha256', encoding: 'base64' }
             })
             const expected = createHash('sha256').update('getProducts').digest('base64')
             assert.strictEqual(target.bodyFingerprint, expected)
+        })
+
+        test('should store raw concatenated string when hash.enabled is false', (t) => {
+            const target = makeTarget(SOAP_XML)
+            xpathBodyFingerprint(target, {
+                xpaths: ['//wsse:UsernameToken/text()', '//soap:Body/text()'],
+                namespaces: SOAP_NS,
+                hash: { enabled: false }
+            })
+            assert.strictEqual(target.bodyFingerprint, 'admingetProducts')
+        })
+
+        test('should store raw string when hash sub-object is present but enabled is not set', (t) => {
+            const target = makeTarget(SOAP_XML)
+            xpathBodyFingerprint(target, { xpaths: ['//soap:Body/text()'], namespaces: SOAP_NS, hash: {} })
+            assert.strictEqual(target.bodyFingerprint, 'getProducts')
+        })
+
+        test('should apply hash when hash.enabled is true explicitly', (t) => {
+            const target = makeTarget(SOAP_XML)
+            xpathBodyFingerprint(target, {
+                xpaths: ['//soap:Body/text()'],
+                namespaces: SOAP_NS,
+                hash: { enabled: true }
+            })
+            assert.strictEqual(target.bodyFingerprint, md5hex('getProducts'))
         })
 
         test('should ignore XPath expressions that match nothing', (t) => {
@@ -148,7 +173,7 @@ suite('XML XPath Actions', () => {
             const target = makeTarget(xml)
             // '///invalid' is not valid XPath; the valid expression should still work
             xpathBodyFingerprint(target, { xpaths: ['///invalid', '//item/text()'] })
-            assert.strictEqual(target.bodyFingerprint, md5hex('text'))
+            assert.strictEqual(target.bodyFingerprint, 'text')
         })
 
         test('should ignore invalid XML silently and not set bodyFingerprint', (t) => {

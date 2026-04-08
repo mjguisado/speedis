@@ -45,10 +45,11 @@ export async function initBff(server, opts) {
     // Register built-in libraries only if they are referenced by at least one action
     // and the user has not already provided a custom path for them.
     const builtinLibraries = {
-        'headers': path.resolve(process.cwd(), './src/actions/headers.js'),
-        'json':    path.resolve(process.cwd(), './src/actions/json.js'),
-        'xmlsax':  path.resolve(process.cwd(), './src/actions/xmlsax.js'),
-        'xmlxpath':path.resolve(process.cwd(), './src/actions/xmlxpath.js'),
+        'headers':  path.resolve(process.cwd(), './src/actions/headers.js'),
+        'json':     path.resolve(process.cwd(), './src/actions/json.js'),
+        'jsonpath': path.resolve(process.cwd(), './src/actions/jsonpath.js'),
+        'xmlsax':   path.resolve(process.cwd(), './src/actions/xmlsax.js'),
+        'xmlxpath': path.resolve(process.cwd(), './src/actions/xmlxpath.js'),
     }
     for (const [key, libPath] of Object.entries(builtinLibraries)) {
         if (referencedLibraries.has(key) && !opts.bff.actionsLibraries[key]) {

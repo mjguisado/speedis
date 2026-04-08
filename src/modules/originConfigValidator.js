@@ -467,7 +467,7 @@ export function initOriginConfigValidator(ajv) {
                                             type: "object",
                                             additionalProperties: false,
                                             properties: {
-                                                enabled: { type: "boolean", default: true },
+                                                enabled: { type: "boolean", default: false },
                                                 algorithm: { type: "string", default: "md5" },
                                                 hex: { type: "boolean", default: true }
                                             }

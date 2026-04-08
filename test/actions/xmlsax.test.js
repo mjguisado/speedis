@@ -41,21 +41,21 @@ suite('XML Actions', () => {
         test('should set bodyFingerprint from a single element', (t) => {
             const target = makeTarget(SOAP_XML)
             xmlBodyFingerprint(target, { elements: ['soap:Body'] })
-            assert.strictEqual(target.bodyFingerprint, md5hex('getProducts'))
+            assert.strictEqual(target.bodyFingerprint, 'getProducts')
         })
 
         test('should set bodyFingerprint from multiple elements concatenated in document order', (t) => {
             const target = makeTarget(SOAP_XML)
             // wsse:UsernameToken appears before soap:Body in the document
             xmlBodyFingerprint(target, { elements: ['wsse:UsernameToken', 'soap:Body'] })
-            assert.strictEqual(target.bodyFingerprint, md5hex('admingetProducts'))
+            assert.strictEqual(target.bodyFingerprint, 'admingetProducts')
         })
 
         test('should concatenate multiple occurrences of the same element', (t) => {
             const xml = `<root><item>foo</item><item>bar</item></root>`
             const target = makeTarget(xml)
             xmlBodyFingerprint(target, { elements: ['item'] })
-            assert.strictEqual(target.bodyFingerprint, md5hex('foobar'))
+            assert.strictEqual(target.bodyFingerprint, 'foobar')
         })
 
         test('should accept a Buffer as target.body', (t) => {
@@ -65,25 +65,42 @@ suite('XML Actions', () => {
             assert.ok(target.bodyFingerprint)
         })
 
-        test('should use md5/hex by default', (t) => {
+        test('should store raw string by default (no hash sub-object)', (t) => {
             const target = makeTarget(SOAP_XML)
             xmlBodyFingerprint(target, { elements: ['soap:Body'] })
-            // md5 hex is always 32 hex characters
-            assert.match(target.bodyFingerprint, /^[0-9a-f]{32}$/)
+            assert.strictEqual(target.bodyFingerprint, 'getProducts')
         })
 
-        test('should use custom algorithm when specified', (t) => {
+        test('should use custom algorithm when specified via hash sub-object', (t) => {
             const target = makeTarget(SOAP_XML)
-            xmlBodyFingerprint(target, { elements: ['soap:Body'], algorithm: 'sha256', encoding: 'hex' })
+            xmlBodyFingerprint(target, { elements: ['soap:Body'], hash: { enabled: true, algorithm: 'sha256', encoding: 'hex' } })
             const expected = createHash('sha256').update('getProducts').digest('hex')
             assert.strictEqual(target.bodyFingerprint, expected)
         })
 
-        test('should use custom encoding when specified', (t) => {
+        test('should use custom encoding when specified via hash sub-object', (t) => {
             const target = makeTarget(SOAP_XML)
-            xmlBodyFingerprint(target, { elements: ['soap:Body'], algorithm: 'md5', encoding: 'base64' })
+            xmlBodyFingerprint(target, { elements: ['soap:Body'], hash: { enabled: true, algorithm: 'md5', encoding: 'base64' } })
             const expected = createHash('md5').update('getProducts').digest('base64')
             assert.strictEqual(target.bodyFingerprint, expected)
+        })
+
+        test('should store raw concatenated string when hash.enabled is false', (t) => {
+            const target = makeTarget(SOAP_XML)
+            xmlBodyFingerprint(target, { elements: ['wsse:UsernameToken', 'soap:Body'], hash: { enabled: false } })
+            assert.strictEqual(target.bodyFingerprint, 'admingetProducts')
+        })
+
+        test('should store raw string when hash sub-object is present but enabled is not set', (t) => {
+            const target = makeTarget(SOAP_XML)
+            xmlBodyFingerprint(target, { elements: ['soap:Body'], hash: {} })
+            assert.strictEqual(target.bodyFingerprint, 'getProducts')
+        })
+
+        test('should apply hash when hash.enabled is true explicitly', (t) => {
+            const target = makeTarget(SOAP_XML)
+            xmlBodyFingerprint(target, { elements: ['soap:Body'], hash: { enabled: true } })
+            assert.strictEqual(target.bodyFingerprint, md5hex('getProducts'))
         })
 
         test('should ignore elements not present in the XML', (t) => {
@@ -106,14 +123,14 @@ suite('XML Actions', () => {
             const target = makeTarget(xml)
             // 'wrapper' text = "hello" (from child) + " world" (direct text node)
             xmlBodyFingerprint(target, { elements: ['wrapper'] })
-            assert.strictEqual(target.bodyFingerprint, md5hex('hello world'))
+            assert.strictEqual(target.bodyFingerprint, 'hello world')
         })
 
         test('should handle CDATA sections', (t) => {
             const xml = `<root><data><![CDATA[raw & content]]></data></root>`
             const target = makeTarget(xml)
             xmlBodyFingerprint(target, { elements: ['data'] })
-            assert.strictEqual(target.bodyFingerprint, md5hex('raw & content'))
+            assert.strictEqual(target.bodyFingerprint, 'raw & content')
         })
 
         test('should ignore invalid XML silently and not set bodyFingerprint', (t) => {
@@ -147,7 +164,7 @@ suite('XML Actions', () => {
             const target = makeTarget(xml)
             xmlBodyFingerprint(target, { elements: ['section'] })
             // Inner: "inner", Outer: "outer inner"  → concat = "innerouter inner"
-            assert.strictEqual(target.bodyFingerprint, md5hex('innerouter inner'))
+            assert.strictEqual(target.bodyFingerprint, 'innerouter inner')
         })
     })
 })

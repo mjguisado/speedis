@@ -15,8 +15,10 @@ It extracts the text content of a set of XML elements, concatenates them in docu
 | Parameter | Type | Required | Default | Description |
 |---|---|---|---|---|
 | `elements` | `string[]` | ✅ | — | Qualified XML element names whose text content will be extracted (e.g. `"soap:Body"`, `"wsse:UsernameToken"`). Matching is **case-sensitive**. |
-| `algorithm` | `string` | ❌ | `"md5"` | Hash algorithm. Any value accepted by Node.js [`crypto.createHash()`](https://nodejs.org/api/crypto.html#cryptocreatehashalgorithm-options) is valid (e.g. `"sha256"`). |
-| `encoding` | `string` | ❌ | `"hex"` | Output encoding of the hash digest: `"hex"` or `"base64"`. |
+| `hash` | `object` | ❌ | `{}` | Hash configuration sub-object. |
+| `hash.enabled` | `boolean` | ❌ | `false` | Whether to apply the hash. When `false` (default), the raw concatenated string is stored directly in `request.bodyFingerprint`. |
+| `hash.algorithm` | `string` | ❌ | `"md5"` | Hash algorithm. Any value accepted by Node.js [`crypto.createHash()`](https://nodejs.org/api/crypto.html#cryptocreatehashalgorithm-options) is valid (e.g. `"sha256"`). |
+| `hash.encoding` | `string` | ❌ | `"hex"` | Output encoding of the hash digest: `"hex"` or `"base64"`. |
 
 ## Configuration Example
 
@@ -33,8 +35,11 @@ It extracts the text content of a set of XML elements, concatenates them in docu
             "uses": "xmlsax:xmlBodyFingerprint",
             "with": {
               "elements": ["wsse:UsernameToken", "soap:Body"],
-              "algorithm": "md5",
-              "encoding": "hex"
+              "hash": {
+                "enabled": true,
+                "algorithm": "md5",
+                "encoding": "hex"
+              }
             }
           }
         ]
