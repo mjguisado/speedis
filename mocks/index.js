@@ -21,12 +21,12 @@ const httpRequestsTotal = new Counter({
     help: 'Total number of HTTP requests to Speedis',
 })
 
-const speedisHttpResponsesTotal = new Counter({
+const httpResponsesTotal = new Counter({
     name: 'http_responses_total',
     help: 'Total number of HTTP responses',
 })
 
-const speedisHttpResponsesDuration = new Histogram({
+const httpResponsesDuration = new Histogram({
     name: 'http_responses_duration',
     help: 'Duration of HTTP responses',
     labelNames: ['statusCode']
@@ -42,9 +42,9 @@ mockServer.addHook('onRequest', async (request, reply) => {
 
 mockServer.addHook('onResponse', async (request, reply) => {
     if (request.originalUrl.startsWith('/mocks')) {
-        speedisHttpResponsesTotal.inc()
+        httpResponsesTotal.inc()
         if (reply.elapsedTime && !Number.isNaN(reply.elapsedTime)) {
-            speedisHttpResponsesDuration.labels({
+            httpResponsesDuration.labels({
                 statusCode: reply.statusCode,
             }).observe(reply.elapsedTime)
         } else {
