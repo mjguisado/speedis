@@ -47,7 +47,10 @@
     },
     "cache": {
         "defaultCacheSettings": {
-            "methods": [ "GET", "HEAD"],
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
             "private": false,
             "ttl": 3600,
             "sortQueryParams": true,
@@ -56,6 +59,14 @@
                 "delay",
                 "vary"
             ]
+        },
+        "localRequestsCoalescing": false,
+        "distributedRequestsCoalescing": false,
+        "distributedRequestsCoalescingOptions": {
+            "lockTTL": 750,
+            "retryCount": 3,
+            "retryDelay": 500,
+            "retryJitter": 250
         },
         "cacheables": [
             {
@@ -70,7 +81,9 @@
             {
                 "urlPattern": "/mocks/public/soap/*",
                 "cacheSettings": {
-                    "methods": [ "POST" ]
+                    "methods": [
+                        "POST"
+                    ]
                 }
             },
             {
@@ -79,15 +92,7 @@
                     "private": true
                 }
             }
-        ],
-        "localRequestsCoalescing": true,
-        "distributedRequestsCoalescing": true,
-        "distributedRequestsCoalescingOptions": {
-            "lockTTL": 750,
-            "retryCount": 3,
-            "retryDelay": 500,
-            "retryJitter": 250
-        }
+        ]
     },
     "bff": {
         "transformations": [
@@ -156,7 +161,10 @@
                         "phase": "CacheKeyGeneration",
                         "uses": "xmlsax:xmlBodyFingerprint",
                         "with": {
-                            "elements": ["ns:category", "ns:id"],
+                            "elements": [
+                                "ns:category",
+                                "ns:id"
+                            ],
                             "algorithm": "md5",
                             "encoding": "hex"
                         }

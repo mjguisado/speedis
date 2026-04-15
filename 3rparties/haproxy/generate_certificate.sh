@@ -17,6 +17,10 @@ openssl x509 -req -days 365 -sha256 \
       DNS:oauth.localhost,\
       DNS:mocks,\
       DNS:mocks.localhost,\
+      DNS:bank-mock,\
+      DNS:bank-mock.localhost,\
+      DNS:demo-ui,\
+      DNS:demo-ui.localhost,\
       DNS:speedis,\
       DNS:speedis.localhost
 EOF

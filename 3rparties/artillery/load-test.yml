@@ -15,13 +15,13 @@ config:
     order: random
   phases:
     - name: 'low-load'
-      duration: 1m
+      duration: 10m
       arrivalRate: 1000
     - name: 'medium-load'
-      duration: 1m
+      duration: 10m
       arrivalRate: 2000
     - name: 'high-load'
-      duration: 15m
+      duration: 20m
       arrivalRate: 4000
 scenarios:
   - name: '304'

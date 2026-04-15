@@ -1,0 +1,1 @@
+artillery run --scenario-name 'overflow' /Users/manuel.guisado/devbox/speedis/3rparties/artillery/load-test.yml

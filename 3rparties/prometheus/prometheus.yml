@@ -1,6 +1,6 @@
 global:
-  scrape_interval: 15s
-  scrape_timeout: 10s
+  scrape_interval: 5s
+  scrape_timeout: 2s
   evaluation_interval: 15s
 alerting:
   alertmanagers:
@@ -12,8 +12,8 @@ alerting:
 scrape_configs:
 - job_name: haproxy
   honor_timestamps: true
-  scrape_interval: 15s
-  scrape_timeout: 10s
+  scrape_interval: 5s
+  scrape_timeout: 2s
   metrics_path: /metrics
   scheme: http
   static_configs:
@@ -21,8 +21,8 @@ scrape_configs:
     - haproxy:8405
 - job_name: speedis
   honor_timestamps: true
-  scrape_interval: 15s
-  scrape_timeout: 10s
+  scrape_interval: 5s
+  scrape_timeout: 2s
   metrics_path: /metrics
   scheme: http
   static_configs:
@@ -30,8 +30,8 @@ scrape_configs:
     - speedis:3003
 - job_name: mocks
   honor_timestamps: true
-  scrape_interval: 15s
-  scrape_timeout: 10s
+  scrape_interval: 5s
+  scrape_timeout: 2s
   metrics_path: /metrics
   scheme: https
   tls_config:

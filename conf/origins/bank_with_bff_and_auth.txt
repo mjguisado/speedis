@@ -1,0 +1,72 @@
+{
+    "id": "bank",
+    "prefix": "/bank",
+    "logLevel": "info",
+    "exposeErrors": true,
+    "origin": {
+        "http1xOptions": {
+            "protocol": "http:",
+            "hostname": "bank-mock",
+            "port": 3040,
+            "headers": {}
+        },
+        "agentOptions": {
+            "keepAlive": true,
+            "maxSockets": 10
+        },
+        "originTimeout": 1000,
+        "originBreaker": true,
+        "originBreakerOptions": {
+            "errorThresholdPercentage": 25,
+            "resetTimeout": 2000
+        },
+        "authentication": {
+            "enabled": true,
+            "scheme": "Basic",
+            "idTransformation": {
+                "hash": {
+                    "enabled": false,
+                    "algorithm": "sha256",
+                    "hex": true
+                }
+            }
+        }
+    },
+    "redis": {
+        "redisOptions": {
+            "url": "redis://redis:6379"
+        },
+        "redisTimeout": 500,
+        "redisBreaker": false,
+        "disableOriginOnRedisOutage": false
+    },
+    "cache": {
+        "localRequestsCoalescing": false,
+        "distributedRequestsCoalescing": false,
+        "cacheables": [
+            {
+                "urlPattern": "/banking/accounts/.*/balance",
+                "cacheSettings": {
+                    "private": true,
+                    "ttl": 300
+                }
+            }
+        ]
+    },
+    "bff": {
+        "transformations": [
+            {
+                "urlPattern": "/banking/accounts/.*/balance",
+                "actions": [
+                    {
+                        "phase": "OriginResponse",
+                        "uses": "headers:setHeaders",
+                        "with": {
+                            "Cache-Control": "public, max-age=60, must-revalidate"
+                        }
+                    }
+                ]
+            }
+        ]
+    }
+}

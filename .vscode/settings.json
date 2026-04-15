@@ -2,7 +2,10 @@
     "yaml.schemas": {
         "https://www.artillery.io/schema.json": [
             "artillery/*.yml",
-            "3rparties/artillery/*.yml"
+            "3rparties/artillery/*.yml",
+            "file:///Users/manuel.guisado/devbox/speedis/3rparties/artillery/load-test.yml",
+            "quiet-background-file:/Users/manuel.guisado/devbox/speedis/3rparties/artillery/load-test.yml",
+            "git:/Users/manuel.guisado/devbox/speedis/3rparties/artillery/load-test.yml?%7B%22path%22%3A%22%2FUsers%2Fmanuel.guisado%2Fdevbox%2Fspeedis%2F3rparties%2Fartillery%2Fload-test.yml%22%2C%22ref%22%3A%22~%22%7D"
         ]
     }
 }

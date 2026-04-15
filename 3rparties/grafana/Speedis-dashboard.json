@@ -18,7 +18,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 2,
-  "id": 0,
+  "id": 1,
   "links": [],
   "panels": [
     {
@@ -304,7 +304,7 @@
               "options": {
                 "mode": "exclude",
                 "names": [
-                  "Total"
+                  "Mocks"
                 ],
                 "prefix": "All except:",
                 "readOnly": true
@@ -1173,5 +1173,5 @@
   "timezone": "browser",
   "title": "Speedis",
   "uid": "feamyf5ocs45ca",
-  "version": 3
+  "version": 1
 }
