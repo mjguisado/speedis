@@ -64,6 +64,13 @@
                         "with": {
                             "Cache-Control": "public, max-age=60, must-revalidate"
                         }
+                    },
+                    {
+                        "phase": "ClientResponse",
+                        "uses": "headers:setHeaders",
+                        "with": {
+                            "Cache-Control": "no-store"
+                        }
                     }
                 ]
             }

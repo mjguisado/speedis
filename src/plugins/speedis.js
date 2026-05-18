@@ -87,7 +87,10 @@ export default async function (server, opts) {
                 response.headers['x-speedis-cache-status'] = 'CACHE_STATUS_UNDEFINED from ' + os.hostname()
             }
 
-            if (opts?.bff?.enabled) bff.transform(opts, bff.CLIENT_RESPONSE, response)
+            if (opts?.bff?.enabled) {
+                if (!response.path) response.path = request.path
+                bff.transform(opts, bff.CLIENT_RESPONSE, response)
+            }
 
             return reply
                 .code(response.statusCode)

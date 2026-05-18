@@ -1,4 +1,5 @@
 import fastify from 'fastify'
+import cors from '@fastify/cors'
 import path from 'path'
 import fs from 'fs/promises'
 import speedisPlugin from './plugins/speedis.js'
@@ -14,7 +15,10 @@ export async function app(
 
     // Register the Prometheus metrics.
     const server = fastify(opts)
-
+    await server.register(cors, {
+        origin: true,
+        credentials: true
+    })
 
     /**
      * Fastify onSend hook that sanitizes HTTP/2 responses by removing

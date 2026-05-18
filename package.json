@@ -21,6 +21,7 @@
     },
     "homepage": "https://github.com/mjguisado/speedis#readme",
     "dependencies": {
+        "@fastify/cors": "^11.2.0",
         "@xmldom/xmldom": "^0.9.9",
         "fastify": "^5.8.4",
         "jose": "^6.2.2",
