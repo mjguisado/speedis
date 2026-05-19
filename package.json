@@ -21,6 +21,7 @@
     },
     "homepage": "https://github.com/mjguisado/speedis#readme",
     "dependencies": {
+        "@fastify/cors": "^11.2.0",
         "@xmldom/xmldom": "^0.9.9",
         "fastify": "^5.8.4",
         "jose": "^6.2.2",
@@ -30,6 +31,9 @@
         "redis": "^5.11.0",
         "sax": "^1.6.0",
         "xpath": "^0.0.34"
+    },
+    "overrides": {
+        "underscore": "1.13.8"
     },
     "devDependencies": {
         "@fastify/caching": "^9.0.3",

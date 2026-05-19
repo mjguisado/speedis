@@ -10,7 +10,8 @@ export async function app(
     ajv = new Ajv({ useDefaults: true }),
     localOriginsConfigs,
     configdb,
-    originsConfigsKeys) {
+    originsConfigsKeys,
+    defaultCors) {
 
     // Register the Prometheus metrics.
     const server = fastify(opts)
@@ -101,7 +102,17 @@ export async function app(
                 server.log.error(`Origin configuration is invalid. Skiping origin: ${originConfig.id}.`)
             } else {
                 server.log.info(`Loading origin configuration. Origin: ${originConfig.id}.`)
-                server.register(speedisPlugin, originConfig)
+                // Merge global default CORS with per-origin CORS settings.
+                // Per-origin values take precedence over the global defaults on a
+                // key-by-key basis (shallow merge). If neither is defined, no CORS
+                // configuration is passed to the plugin.
+                const effectiveCors = (defaultCors || originConfig.cors)
+                    ? Object.assign({}, defaultCors, originConfig.cors)
+                    : undefined
+                const pluginConfig = effectiveCors
+                    ? { ...originConfig, cors: effectiveCors }
+                    : originConfig
+                server.register(speedisPlugin, pluginConfig)
                 plugins.set(originConfig.id, originConfig.prefix)
                 server.after(err => { if (err) console.log(err) })
             }

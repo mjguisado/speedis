@@ -55,6 +55,7 @@ The following table describes the supported fields in the main configuration.
 |`metricServerLogLevel`|String|`false`|`info`|Logging level for the metric service (`trace`, `debug`, `info`, `warn`, `error`, `fatal`).|
 |`localOriginsConfigs`|String|`false`|`null`|Disk location of the origin configuration files. This setting is only used if the USE_REDIS_CONFIG environment variable is not defined. Its value can be `null`, an absolute path, or a relative path. If set to `null`, Speedis will use the conf/origin folder inside the current working directory. If a relative path is provided, Speedis will resolve it to an absolute path based on the current working directory.|
 |`originsConfigsKeys`|[String]|`true` if USE_REDIS_CONFIG|[]|List of Redis keys that store origin configurations.|
+|`cors`|Object|`false`||Default CORS settings applied to **all** origins. Each origin can selectively override individual fields via its own `cors` property. See the [CORS configuration object](#cors-configuration-object) section for the full list of supported fields.|
 
 **Note:** To enable HTTP2 support for Speedis, the setup would look something like this:
 
@@ -95,6 +96,7 @@ The following table describes the supported fields.
 |`exposeErrors`|Boolean|`false`|`false`|This parameter determines whether descriptive error messages are included in the response body (`true` or `false`).|
 |`metrics`|Boolean|`false`|`true`|This parameter determines whether the metrics for this plugin are enabled. (`true` or `false`).|
 |`origin`|Object|`true`||This object defines all the details related to the origin server. Its format is detailed below.|
+|`cors`|Object|`false`||Per-origin CORS settings. Fields defined here override the global `cors` defaults from `speedis.json` on a key-by-key basis. See the [CORS configuration object](#cors-configuration-object) section for the full list of supported fields.|
 |`bff`|Object|`false`||This object defines all the details related to the Backend-For-Frontend (BFF). Its format is detailed below.|
 |`variantsTracker`|Object|`false`||This object defines all the details related to the Variant Tracker. Its format is detailed below.|
 |`cache`|Object|`false`||This object defines all the details related to the Cache. Its format is detailed below.|
@@ -395,3 +397,161 @@ The following table describes the supported fields in the redis configuration ob
 |`redisBreaker`|Boolean|`false`|`false`|Enables (`true`) or disables (`false`) the redis's circuit breaker mechanism.|
 |`redisBreakerOptions`|Object|`true` if redisBreaker is enabled||Speedis leverages [Opossum](https://nodeshift.dev/opossum/) to implement the circuit breaker mechanism. This field is used to define the circuit braker options. Its format is almost identical to the original [options](https://nodeshift.dev/opossum/#circuitbreaker). The main difference is that, since the configuration is in JSON format, parameters defined as JavaScript entities in the original options are not supported. Additionally, options related to caching and coalescing features are also not supported.
 |`disableOriginOnRedisOutage`|Boolean|`false`|`false`|When set to `true` Speedis will not forward requests to the origin server if Redis becomes unavailable.|
+
+## CORS configuration object
+
+Speedis supports [Cross-Origin Resource Sharing (CORS)](https://developer.mozilla.org/en-US/docs/Web/HTTP/CORS) via the official [`@fastify/cors`](https://github.com/fastify/fastify-cors) plugin.
+
+CORS can be configured at two levels:
+
+1. **Global defaults** — defined in the `cors` property of `speedis.json` (or the Redis main config key). These settings apply to **all** registered origins.
+2. **Per-origin overrides** — defined in the `cors` property of each origin configuration file. Individual fields from the global defaults are overridden on a **key-by-key** basis (shallow merge). Fields not present in the per-origin configuration inherit the global value.
+
+> **Important:** Only JSON-serializable values are supported (booleans, strings, numbers, and arrays). Function-based dynamic `origin` callbacks available in `@fastify/cors` are not supported through configuration.
+
+### Merge semantics
+
+Given a global default:
+```json
+{ "origin": true, "credentials": true, "maxAge": 600 }
+```
+And a per-origin override:
+```json
+{ "origin": "https://app.example.com", "credentials": false }
+```
+The effective configuration for that origin will be:
+```json
+{ "origin": "https://app.example.com", "credentials": false, "maxAge": 600 }
+```
+
+### CORS configuration fields
+
+The following table describes all supported fields. They apply identically to both the global `cors` object in `speedis.json` and the per-origin `cors` object in each origin configuration file.
+
+|Field|Type|Mandatory|Default|Description|
+|-----|----|---------|-------|-----------|
+|`enabled`|Boolean|`false`|`true`|Enables (`true`) or disables (`false`) CORS for this scope. When `false`, `@fastify/cors` is not registered even if a `cors` object is present. This field is Speedis-specific and is not forwarded to `@fastify/cors`.|
+|`origin`|Boolean \| String \| [String]|`false`|`false`|Controls which origins are allowed. `true` reflects the request `Origin` back (allow all). `false` disables CORS. A string or array of strings restricts access to specific origins.|
+|`methods`|[String]|`false`|`['GET','HEAD','PUT','PATCH','POST','DELETE']`|HTTP methods permitted for cross-origin requests. Populates `Access-Control-Allow-Methods`.|
+|`allowedHeaders`|[String]|`false`|Reflects `Access-Control-Request-Headers`|Request headers that browsers are allowed to send. Populates `Access-Control-Allow-Headers`.|
+|`exposedHeaders`|[String]|`false`||Response headers that browsers are permitted to read beyond the [CORS-safelisted set](https://developer.mozilla.org/en-US/docs/Glossary/CORS-safelisted_response_header). Populates `Access-Control-Expose-Headers`.|
+|`credentials`|Boolean|`false`|`false`|When `true`, the `Access-Control-Allow-Credentials: true` header is sent. Requires `origin` to be a specific value (not `true`).|
+|`maxAge`|Number|`false`||Duration in seconds the browser may cache a preflight response. Populates `Access-Control-Max-Age`.|
+|`preflightContinue`|Boolean|`false`|`false`|If `true`, the preflight response is passed to the next handler instead of being sent immediately.|
+|`optionsSuccessStatus`|Number|`false`|`204`|HTTP status code returned for successful preflight responses. Use `200` for compatibility with legacy browsers.|
+|`preflight`|Boolean|`false`|`true`|If `false`, the automatic `OPTIONS *` preflight route is not added. Useful when the upstream origin already handles CORS preflight.|
+|`strictPreflight`|Boolean|`false`|`true`|If `true`, preflight requests missing an `Origin` or `Access-Control-Request-Method` header receive a `400 Bad Request` response.|
+|`hideOptionsRoute`|Boolean|`false`|`true`|If `true`, the OPTIONS preflight route is hidden from API schema generation tools (e.g., Swagger).|
+
+### Important behaviors
+
+#### 1. `enabled: false` always wins
+
+Setting `enabled: false` in a per-origin `cors` object completely disables CORS for that origin, regardless of what the global default specifies. `@fastify/cors` is simply not registered for that plugin instance.
+
+```json
+{ "cors": { "enabled": false } }
+```
+
+This is useful for internal or backend-only origins that should never be exposed to browsers.
+
+#### 2. `origin` string vs array — browser enforcement vs server enforcement
+
+This is the most important behavioral difference between the two accepted types for `origin`:
+
+| `origin` type | Who enforces the restriction | How |
+|---|---|---|
+| `true` | Browser | `Access-Control-Allow-Origin` reflects the request `Origin` back |
+| String (e.g. `"https://app.example.com"`) | **Browser only** | The header is always set to the configured string, regardless of the actual request `Origin` |
+| Array (e.g. `["https://a.com", "https://b.com"]`) | **Server + browser** | The header is only set when the request `Origin` is in the list; otherwise no header is sent |
+
+With a **string** origin, Speedis (via `@fastify/cors`) always responds with `Access-Control-Allow-Origin: <configured-value>`. If a request comes from a different origin, the browser sees that the header value doesn't match and blocks the response — but the response was still sent by the server. Non-browser clients (e.g. `curl`, server-to-server) are unaffected.
+
+With an **array** origin, `@fastify/cors` compares the request `Origin` against the list server-side. Only matching origins receive the `Access-Control-Allow-Origin` header; all others receive no CORS header at all.
+
+**Recommendation:** Prefer an array over a string when you need to restrict access to one or more specific origins and want server-side enforcement.
+
+#### 3. Preflight OPTIONS and Speedis's catch-all route
+
+Speedis registers a `server.all('/*', ...)` route that proxies every HTTP method — including `OPTIONS` — to the upstream origin. When CORS is enabled, `@fastify/cors` is registered **before** this route inside each plugin scope and adds its own `OPTIONS *` preflight handler. Because of Fastify's route registration order, the CORS preflight handler takes priority over the proxy catch-all for `OPTIONS` requests that carry the required CORS headers (`Origin` + `Access-Control-Request-Method`).
+
+Consequently:
+- **CORS preflight `OPTIONS` requests** are handled directly by Speedis and never forwarded to the upstream origin.
+- **Non-preflight `OPTIONS` requests** (i.e., without `Access-Control-Request-Method`) fall through to the proxy as normal.
+
+If your upstream origin already implements its own CORS handling and you want Speedis to forward all `OPTIONS` requests instead of intercepting them, set `"preflight": false`. In this case, Speedis still adds the `Access-Control-Allow-Origin` (and related) headers to every response via hooks, but the preflight route is not registered.
+
+### Configuration examples
+
+#### Example 1 — Global permissive CORS (all origins, specific methods)
+
+Add to `conf/speedis.json`:
+```json
+{
+  "cors": {
+    "origin": true,
+    "methods": ["GET", "HEAD", "OPTIONS"]
+  }
+}
+```
+This allows any browser origin to make `GET`, `HEAD`, and `OPTIONS` requests to all registered origins.
+
+#### Example 2 — Restrict all origins to a single domain, allow credentials
+
+Add to `conf/speedis.json`:
+```json
+{
+  "cors": {
+    "origin": "https://app.example.com",
+    "credentials": true,
+    "maxAge": 600
+  }
+}
+```
+
+#### Example 3 — Multiple allowed domains as a list
+
+```json
+{
+  "cors": {
+    "origin": ["https://app.example.com", "https://admin.example.com"],
+    "methods": ["GET", "POST", "DELETE"],
+    "exposedHeaders": ["X-Speedis-Cache-Status"]
+  }
+}
+```
+
+#### Example 4 — Per-origin override (disable CORS for one specific origin)
+
+In `conf/origins/internal.json`, add:
+```json
+{
+  "cors": {
+    "enabled": false
+  }
+}
+```
+Even if a global `cors` default is configured in `speedis.json`, this origin will not have CORS headers.
+
+#### Example 5 — Per-origin override (different allowed origin)
+
+Global config (`speedis.json`):
+```json
+{
+  "cors": {
+    "origin": "https://app.example.com",
+    "credentials": true,
+    "maxAge": 600
+  }
+}
+```
+Override for the `public-api` origin (`conf/origins/public-api.json`):
+```json
+{
+  "cors": {
+    "origin": true,
+    "credentials": false
+  }
+}
+```
+Effective CORS for `public-api`: `{ "origin": true, "credentials": false, "maxAge": 600 }` — it inherits `maxAge` from the global default but uses its own `origin` and `credentials` values.

@@ -1,5 +1,6 @@
 
 import os from 'os'
+import cors from '@fastify/cors'
 import * as bff from '../modules/bff.js'
 import * as cache from '../modules/cache.js'
 import * as utils from '../utils/utils.js'
@@ -11,6 +12,21 @@ import { initMetrics } from '../modules/metrics.js'
 import { errorHandler } from '../modules/error.js'
 
 export default async function (server, opts) {
+
+    // Register CORS support if configured.
+    //
+    // CORS is registered at the very top of the plugin so that:
+    //   1. Its onRequest hook runs before any other hook (correct header injection).
+    //   2. Its OPTIONS preflight route is added before server.all('/*'), giving it
+    //      priority in find-my-way for equal-specificity wildcard routes.
+    //
+    // The `enabled` field is Speedis-specific and must be stripped before passing
+    // the options to @fastify/cors.  When enabled is explicitly false, CORS is
+    // skipped entirely even if a cors object is present.
+    if (opts.cors && opts.cors.enabled !== false) {
+        const { enabled: _enabled, ...corsOptions } = opts.cors
+        await server.register(cors, corsOptions)
+    }
 
     // We disable all default Fastify content-type parsers and register a catch-all
     // parser that returns the request body as a raw Buffer.

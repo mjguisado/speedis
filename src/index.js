@@ -157,6 +157,45 @@ const validateSpeedis = ajv.compile({
             type: "array",
             items: { type: "string" },
             default: []
+        },
+        /**
+         * DEFAULT CORS CONFIGURATION
+         *
+         * When present, these settings are applied to all origins as a baseline.
+         * Individual origin configurations can selectively override any of these
+         * fields via their own `cors` property.  Only JSON-serializable values
+         * are supported (functions are not allowed).
+         */
+        cors: {
+            type: "object",
+            additionalProperties: false,
+            properties: {
+                enabled: { type: "boolean", default: true },
+                origin: {
+                    oneOf: [
+                        { type: "boolean" },
+                        { type: "string" },
+                        { type: "array", items: { type: "string" }, minItems: 1 }
+                    ],
+                    default: false
+                },
+                methods: {
+                    type: "array",
+                    items: {
+                        type: "string",
+                        enum: ["GET", "HEAD", "PUT", "PATCH", "POST", "DELETE", "OPTIONS"]
+                    }
+                },
+                allowedHeaders: { type: "array", items: { type: "string" } },
+                exposedHeaders: { type: "array", items: { type: "string" } },
+                credentials: { type: "boolean" },
+                maxAge: { type: "integer" },
+                preflightContinue: { type: "boolean" },
+                optionsSuccessStatus: { type: "integer", enum: [200, 204] },
+                preflight: { type: "boolean" },
+                strictPreflight: { type: "boolean" },
+                hideOptionsRoute: { type: "boolean" }
+            }
         }
     }
 })
@@ -233,7 +272,8 @@ if (cluster.isPrimary) {
         ajv,
         config.localOriginsConfigs,
         configdb,
-        config.originsConfigsKeys
+        config.originsConfigsKeys,
+        config.cors
     )
 
     // Run the server!

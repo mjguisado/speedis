@@ -681,6 +681,96 @@ export function initOriginConfigValidator(ajv) {
                     }
                 },
                 /**
+                 * CORS MODULE
+                 *
+                 * Configures Cross-Origin Resource Sharing (CORS) for this origin using @fastify/cors.
+                 * Per-origin CORS settings override the global defaults defined in speedis.json.
+                 *
+                 * Supported origin values (JSON-serializable only):
+                 *   - Boolean true/false: allow/deny all origins
+                 *   - String: allow a single specific origin
+                 *   - Array of strings: allow multiple specific origins
+                 *
+                 * Note: Function-based dynamic origin is not supported via JSON configuration.
+                 */
+                cors: {
+                    type: "object",
+                    additionalProperties: false,
+                    properties: {
+                        /**
+                         * Enables or disables CORS for this origin.
+                         * When false, @fastify/cors is not registered even if cors is defined.
+                         */
+                        enabled: { type: "boolean", default: true },
+                        /**
+                         * Allowed origins.
+                         * - true  → all origins allowed (reflects request Origin back)
+                         * - false → CORS disabled (no Access-Control-Allow-Origin set)
+                         * - string → single allowed origin
+                         * - string[] → multiple allowed origins
+                         */
+                        origin: {
+                            oneOf: [
+                                { type: "boolean" },
+                                { type: "string" },
+                                { type: "array", items: { type: "string" }, minItems: 1 }
+                            ],
+                            default: false
+                        },
+                        /** Allowed HTTP methods for CORS requests */
+                        methods: {
+                            type: "array",
+                            items: {
+                                type: "string",
+                                enum: ["GET", "HEAD", "PUT", "PATCH", "POST", "DELETE", "OPTIONS"]
+                            }
+                        },
+                        /** Allowed request headers. If not set, reflects Access-Control-Request-Headers */
+                        allowedHeaders: {
+                            type: "array",
+                            items: { type: "string" }
+                        },
+                        /** Response headers exposed to the browser (beyond the safe-listed set) */
+                        exposedHeaders: {
+                            type: "array",
+                            items: { type: "string" }
+                        },
+                        /** Whether the browser should include credentials (cookies, auth headers) */
+                        credentials: { type: "boolean" },
+                        /**
+                         * How long (in seconds) the browser may cache the preflight response.
+                         * Corresponds to Access-Control-Max-Age.
+                         */
+                        maxAge: { type: "integer" },
+                        /**
+                         * If true, passes the preflight response to the next handler
+                         * instead of replying immediately. Default: false.
+                         */
+                        preflightContinue: { type: "boolean" },
+                        /**
+                         * HTTP status code to use for successful OPTIONS preflight responses.
+                         * Use 200 for legacy browsers that choke on 204. Default: 204.
+                         */
+                        optionsSuccessStatus: { type: "integer", enum: [200, 204] },
+                        /**
+                         * If false, disables the automatic OPTIONS preflight route.
+                         * Useful when the origin server handles preflight natively.
+                         * Default: true.
+                         */
+                        preflight: { type: "boolean" },
+                        /**
+                         * If true, returns 400 for preflight requests missing Origin or
+                         * Access-Control-Request-Method. Default: true.
+                         */
+                        strictPreflight: { type: "boolean" },
+                        /**
+                         * If true, hides the OPTIONS preflight route from generated API schemas.
+                         * Default: true.
+                         */
+                        hideOptionsRoute: { type: "boolean" }
+                    }
+                },
+                /**
                  * REDIS MODULE
                  *
                  * Configures Redis connection for caching and distributed locking.
