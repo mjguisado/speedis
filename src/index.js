@@ -170,7 +170,18 @@ const validateSpeedis = ajv.compile({
             type: "object",
             additionalProperties: false,
             properties: {
+                /**
+                 * Enables or disables CORS for this origin.
+                 * When false, @fastify/cors is not registered even if cors is defined.
+                 */
                 enabled: { type: "boolean", default: true },
+                /**
+                 * Allowed origins.
+                 * - true  → all origins allowed (reflects request Origin back)
+                 * - false → CORS disabled (no Access-Control-Allow-Origin set)
+                 * - string → single allowed origin
+                 * - string[] → multiple allowed origins
+                 */
                 origin: {
                     oneOf: [
                         { type: "boolean" },
@@ -179,6 +190,7 @@ const validateSpeedis = ajv.compile({
                     ],
                     default: false
                 },
+                /** Allowed HTTP methods for CORS requests */
                 methods: {
                     type: "array",
                     items: {
@@ -186,17 +198,51 @@ const validateSpeedis = ajv.compile({
                         enum: ["GET", "HEAD", "PUT", "PATCH", "POST", "DELETE", "OPTIONS"]
                     }
                 },
-                allowedHeaders: { type: "array", items: { type: "string" } },
-                exposedHeaders: { type: "array", items: { type: "string" } },
+                /** Allowed request headers. If not set, reflects Access-Control-Request-Headers */
+                allowedHeaders: {
+                    type: "array",
+                    items: { type: "string" }
+                },
+                /** Response headers exposed to the browser (beyond the safe-listed set) */
+                exposedHeaders: {
+                    type: "array",
+                    items: { type: "string" }
+                },
+                /** Whether the browser should include credentials (cookies, auth headers) */
                 credentials: { type: "boolean" },
+                /**
+                 * How long (in seconds) the browser may cache the preflight response.
+                 * Corresponds to Access-Control-Max-Age.
+                 */
                 maxAge: { type: "integer" },
+                /**
+                 * If true, passes the preflight response to the next handler
+                 * instead of replying immediately. Default: false.
+                 */
                 preflightContinue: { type: "boolean" },
+                /**
+                 * HTTP status code to use for successful OPTIONS preflight responses.
+                 * Use 200 for legacy browsers that choke on 204. Default: 204.
+                 */
                 optionsSuccessStatus: { type: "integer", enum: [200, 204] },
+                /**
+                 * If false, disables the automatic OPTIONS preflight route.
+                 * Useful when the origin server handles preflight natively.
+                 * Default: true.
+                 */
                 preflight: { type: "boolean" },
+                /**
+                 * If true, returns 400 for preflight requests missing Origin or
+                 * Access-Control-Request-Method. Default: true.
+                 */
                 strictPreflight: { type: "boolean" },
+                /**
+                 * If true, hides the OPTIONS preflight route from generated API schemas.
+                 * Default: true.
+                 */
                 hideOptionsRoute: { type: "boolean" }
             }
-        }
+        },
     }
 })
 
@@ -247,7 +293,7 @@ if (cluster.isPrimary) {
         open(9229, '0.0.0.0')
     }
     */
-   
+
     metricsServer.listen(
         { host: '::', port: config.metricServerPort },
         (error, address) => {
