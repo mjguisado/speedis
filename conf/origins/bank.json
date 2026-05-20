@@ -19,17 +19,6 @@
         "originBreakerOptions": {
             "errorThresholdPercentage": 25,
             "resetTimeout": 2000
-        },
-        "authentication": {
-            "enabled": true,
-            "scheme": "Basic",
-            "idTransformation": {
-                "hash": {
-                    "enabled": false,
-                    "algorithm": "sha256",
-                    "hex": true
-                }
-            }
         }
     },
     "redis": {
@@ -47,32 +36,8 @@
             {
                 "urlPattern": "/banking/accounts/.*/balance",
                 "cacheSettings": {
-                    "private": true,
                     "ttl": 300
                 }
-            }
-        ]
-    },
-    "bff": {
-        "transformations": [
-            {
-                "urlPattern": "/banking/accounts/.*/balance",
-                "actions": [
-                    {
-                        "phase": "OriginResponse",
-                        "uses": "headers:setHeaders",
-                        "with": {
-                            "Cache-Control": "public, max-age=60, must-revalidate"
-                        }
-                    },
-                    {
-                        "phase": "ClientResponse",
-                        "uses": "headers:setHeaders",
-                        "with": {
-                            "Cache-Control": "no-store"
-                        }
-                    }
-                ]
             }
         ]
     }
