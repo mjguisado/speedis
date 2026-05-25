@@ -39,8 +39,14 @@ export function initCache(server, opts) {
         // Also merge default and cacheable settings
         // If cacheSettings is not provided, use defaults
         if (!cacheable.cacheSettings) { cacheable.cacheSettings = {} }
-        // Merge default and cacheable settings        
+        // Merge default and cacheable settings
         cacheable.cacheSettings = { ...opts.cache.defaultCacheSettings, ...cacheable.cacheSettings }
+        // Fallback: ensure `methods` is always defined so the runtime check
+        // `cacheable.cacheSettings.methods.includes(request.method)` never throws.
+        // Triggers when the user overrides `defaultCacheSettings` without providing `methods`.
+        if (!cacheable.cacheSettings.methods) {
+            cacheable.cacheSettings.methods = ["GET", "HEAD", "POST"]
+        }
     })
 
     // Each time a request is received, this hook checks whether it
@@ -51,10 +57,11 @@ export function initCache(server, opts) {
     server.addHook('onRequest', async (request, reply) => {
         request.cacheable = false
         request.cacheSettings = {}
-        // https://developer.mozilla.org/en-US/docs/Glossary/Safe/HTTP
         for (const cacheable of opts.cache.cacheables) {
             if (cacheable.re.test(request.raw.url)) {
-                // Only the safe methods are cacheables
+                // Only methods declared in cacheSettings.methods are cacheable for this URL.
+                // RFC 9111 §3 allows caching responses to non-safe methods (e.g. POST) when
+                // explicit freshness information is provided; SOAP/GraphQL is the main use case.
                 request.cacheable = cacheable.cacheSettings.methods.includes(request.method)
                 // Merge default and cacheable settings
                 // This settings are used to generate the cache key, also for the purging operations

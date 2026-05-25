@@ -89,17 +89,20 @@ export function initOriginConfigValidator(ajv) {
                     /**
                      * CONDITIONAL RULE #2: Authentication requirement for private caching
                      *
-                     * Logic: origin.authentication is REQUIRED when:
-                     * 1. cache module is enabled (enabled !== false)
-                     * 2. AND at least one cacheable entry has private: true
+                     * Logic: origin.authentication is REQUIRED (and must be enabled) when:
+                     *   1. cache module is enabled (enabled !== false), AND
+                     *   2. private caching is configured anywhere, that is, EITHER:
+                     *      a. cache.defaultCacheSettings.private === true, OR
+                     *      b. at least one cacheable has cacheSettings.private === true
                      *
-                     * Rationale: Private caching requires user identification to create separate
-                     * cache entries per user. The authentication configuration defines how to
-                     * extract user identifiers from requests.
+                     * Rationale: Private caching requires user identification to build per-user
+                     * cache keys. The authentication block defines how to extract that identifier.
                      *
-                     * Implementation notes:
-                     * - Uses JSON Schema "contains" to check if array has at least one matching element
-                     * - Ensures authentication is not only present but also enabled
+                     * Note: this is intentionally a "safe side" check. If defaultCacheSettings
+                     * declares private:true and every cacheable explicitly overrides it to
+                     * private:false, the rule still requires authentication. To avoid that,
+                     * leave defaultCacheSettings.private at its default (false) and opt in per
+                     * cacheable instead.
                      */
                     if: {
                         properties: {
@@ -115,21 +118,40 @@ export function initOriginConfigValidator(ajv) {
                                         }
                                     },
                                     {
-                                        // Condition 2: At least one cacheable has private: true
-                                        // Uses "contains" keyword to check array elements
-                                        properties: {
-                                            cacheables: {
-                                                type: "array",
-                                                contains: {
-                                                    type: "object",
-                                                    properties: {
-                                                        private: { const: true }
-                                                    },
-                                                    required: ["private"]
-                                                }
+                                        // Condition 2: private caching is configured somewhere
+                                        anyOf: [
+                                            {
+                                                // 2a. defaultCacheSettings.private === true
+                                                properties: {
+                                                    defaultCacheSettings: {
+                                                        type: "object",
+                                                        properties: { private: { const: true } },
+                                                        required: ["private"]
+                                                    }
+                                                },
+                                                required: ["defaultCacheSettings"]
+                                            },
+                                            {
+                                                // 2b. at least one cacheable has cacheSettings.private === true
+                                                properties: {
+                                                    cacheables: {
+                                                        type: "array",
+                                                        contains: {
+                                                            type: "object",
+                                                            properties: {
+                                                                cacheSettings: {
+                                                                    type: "object",
+                                                                    properties: { private: { const: true } },
+                                                                    required: ["private"]
+                                                                }
+                                                            },
+                                                            required: ["cacheSettings"]
+                                                        }
+                                                    }
+                                                },
+                                                required: ["cacheables"]
                                             }
-                                        },
-                                        required: ["cacheables"]
+                                        ]
                                     }
                                 ]
                             }
@@ -651,7 +673,7 @@ export function initOriginConfigValidator(ajv) {
                         defaultCacheSettings: {
                             $ref: "#/definitions/cacheSettings",
                             default: {
-                                methods: ["GET", "HEAD"],
+                                methods: ["GET", "HEAD", "POST"],
                                 private: false,
                                 ttl: -1,
                                 sortQueryParams: true,

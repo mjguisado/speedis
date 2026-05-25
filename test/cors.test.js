@@ -1,7 +1,6 @@
 import { suite, test, before, after } from 'node:test'
 import fastify from 'fastify'
 import speedisPlugin from '../src/plugins/speedis.js'
-import { app } from '../src/app.js'
 
 // ---------------------------------------------------------------------------
 // Helper – build a minimal speedisPlugin instance with optional CORS config.
@@ -269,89 +268,7 @@ suite('CORS – maxAge', () => {
 })
 
 // ---------------------------------------------------------------------------
-// Suite 9 – Global default CORS merged with per-origin override via app()
-// ---------------------------------------------------------------------------
-suite('CORS – global default merged with per-origin override', () => {
-    let server
-
-    before(async () => {
-        // Simulate app() merging: defaultCors + originConfig.cors
-        const defaultCors = {
-            origin: 'https://default.example.com',
-            credentials: true,
-            maxAge: 600
-        }
-        // Per-origin overrides origin and credentials; inherits maxAge from global.
-        const originCors = {
-            origin: 'https://per-origin.example.com',
-            credentials: false
-        }
-        const effectiveCors = Object.assign({}, defaultCors, originCors)
-
-        server = fastify({ logger: false })
-        server.register(speedisPlugin, {
-            id: 'merged',
-            prefix: '/merged',
-            metrics: false,
-            exposeErrors: true,
-            origin: {
-                http1xOptions: { protocol: 'http:', host: '127.0.0.1', port: 19999 }
-            },
-            cors: effectiveCors
-        })
-        server.decorate('plugins', new Map([['merged', '/merged']]))
-        await server.ready()
-    })
-    after(async () => server.close())
-
-    test('per-origin origin is used instead of global default', async (t) => {
-        t.plan(1)
-        const res = await server.inject({
-            method: 'GET', url: '/merged/anything',
-            headers: { origin: 'https://per-origin.example.com' }
-        })
-        t.assert.strictEqual(res.headers['access-control-allow-origin'], 'https://per-origin.example.com')
-    })
-
-    // Same string-origin behaviour as Suite 4: the header is always set to the
-    // configured (per-origin) value; browsers reject it when it doesn't match
-    // the actual request Origin.
-    test('request from global-default origin gets per-origin ACAO (browser will reject)', async (t) => {
-        t.plan(2)
-        const res = await server.inject({
-            method: 'GET', url: '/merged/anything',
-            headers: { origin: 'https://default.example.com' }
-        })
-        // ACAO is the per-origin configured value, NOT the global default …
-        t.assert.strictEqual(res.headers['access-control-allow-origin'], 'https://per-origin.example.com')
-        // … and it does not match the request origin, so browsers will block access.
-        t.assert.notStrictEqual(res.headers['access-control-allow-origin'], 'https://default.example.com')
-    })
-
-    test('inherited maxAge from global default appears in preflight', async (t) => {
-        t.plan(1)
-        const res = await server.inject({
-            method: 'OPTIONS', url: '/merged/anything',
-            headers: {
-                origin: 'https://per-origin.example.com',
-                'access-control-request-method': 'GET'
-            }
-        })
-        t.assert.strictEqual(res.headers['access-control-max-age'], '600')
-    })
-
-    test('per-origin credentials:false overrides global credentials:true', async (t) => {
-        t.plan(1)
-        const res = await server.inject({
-            method: 'GET', url: '/merged/anything',
-            headers: { origin: 'https://per-origin.example.com' }
-        })
-        t.assert.strictEqual(res.headers['access-control-allow-credentials'], undefined)
-    })
-})
-
-// ---------------------------------------------------------------------------
-// Suite 10 – optionsSuccessStatus: 200 (legacy browser compatibility)
+// Suite 9 – optionsSuccessStatus: 200 (legacy browser compatibility)
 // ---------------------------------------------------------------------------
 suite('CORS – optionsSuccessStatus: 200', () => {
     let server

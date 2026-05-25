@@ -42,6 +42,28 @@ You can customize this with:
 SPEEDIS_CONFIG_KEY="my:custom:config:key"
 ```
 
+### Loading configurations into Redis
+
+The repository includes a helper script that uploads the local `conf/` tree into Redis using the key layout expected by Speedis:
+
+| Source file | Redis key |
+|---|---|
+| `conf/speedis.json` | `speedis:config:main` |
+| `conf/origins/<name>.json` | `speedis:config:origins:<name>` |
+
+The origin key is derived from the filename (without the `.json` extension), not from the `id` field inside the JSON — so file naming matters when configuring `originsConfigsKeys`.
+
+Usage:
+```bash
+# From inside Docker Compose / Kubernetes (default REDIS_URL=redis://redis:6379)
+./conf/loadConfigsToRedis.sh
+
+# From the host machine pointing at a local Redis
+REDIS_URL=redis://localhost:6379 ./conf/loadConfigsToRedis.sh
+```
+
+The script iterates over every `*.json` file in `conf/origins/`, so adding a new origin only requires dropping its file there and re-running the script.
+
 ---
 
 The following table describes the supported fields in the main configuration.
@@ -53,9 +75,8 @@ The following table describes the supported fields in the main configuration.
 |`fastify`|Object|`false`||Options object which is used to customize the Fastify server instance. Its format is described in this [url](https://fastify.dev/docs/latest/Reference/Server/)|
 |`metricServerPort`|Number|`false`|3003|The port on which the metrics service is running.|
 |`metricServerLogLevel`|String|`false`|`info`|Logging level for the metric service (`trace`, `debug`, `info`, `warn`, `error`, `fatal`).|
-|`localOriginsConfigs`|String|`false`|`null`|Disk location of the origin configuration files. This setting is only used if the USE_REDIS_CONFIG environment variable is not defined. Its value can be `null`, an absolute path, or a relative path. If set to `null`, Speedis will use the conf/origin folder inside the current working directory. If a relative path is provided, Speedis will resolve it to an absolute path based on the current working directory.|
+|`localOriginsConfigs`|String|`false`|`null`|Disk location of the origin configuration files. This setting is only used if the USE_REDIS_CONFIG environment variable is not defined. Its value can be `null`, an absolute path, or a relative path. If set to `null`, Speedis will use the `conf/origins` folder inside the current working directory. If a relative path is provided, Speedis will resolve it to an absolute path based on the current working directory.|
 |`originsConfigsKeys`|[String]|`true` if USE_REDIS_CONFIG|[]|List of Redis keys that store origin configurations.|
-|`cors`|Object|`false`||Default CORS settings applied to **all** origins. Each origin can selectively override individual fields via its own `cors` property. See the [CORS configuration object](#cors-configuration-object) section for the full list of supported fields.|
 
 **Note:** To enable HTTP2 support for Speedis, the setup would look something like this:
 
@@ -96,7 +117,7 @@ The following table describes the supported fields.
 |`exposeErrors`|Boolean|`false`|`false`|This parameter determines whether descriptive error messages are included in the response body (`true` or `false`).|
 |`metrics`|Boolean|`false`|`true`|This parameter determines whether the metrics for this plugin are enabled. (`true` or `false`).|
 |`origin`|Object|`true`||This object defines all the details related to the origin server. Its format is detailed below.|
-|`cors`|Object|`false`||Per-origin CORS settings. Fields defined here override the global `cors` defaults from `speedis.json` on a key-by-key basis. See the [CORS configuration object](#cors-configuration-object) section for the full list of supported fields.|
+|`cors`|Object|`false`||CORS settings for this origin. If omitted, no CORS headers are added to responses for this origin. See the [CORS configuration object](#cors-configuration-object) section for the full list of supported fields.|
 |`bff`|Object|`false`||This object defines all the details related to the Backend-For-Frontend (BFF). Its format is detailed below.|
 |`variantsTracker`|Object|`false`||This object defines all the details related to the Variant Tracker. Its format is detailed below.|
 |`cache`|Object|`false`||This object defines all the details related to the Cache. Its format is detailed below.|
@@ -111,8 +132,8 @@ The agentOptions parameter is only valid when http1xOptions is used.
 |`http1xOptions`|Object|`false`||Speedis leverages Node’s native [http](https://nodejs.org/api/http.html)/[https](https://nodejs.org/api/https.html) libraries to make HTTP/1.x requests to the origin server. This field is used to define the request options. Its format is almost identical to the original [options](https://nodejs.org/api/http.html#httprequestoptions-callback). The main difference is that, since the configuration is in JSON format, parameters defined as JavaScript entities in the original options are not supported. Options in socket.connect() are not supported.|
 |`http2Options`|Object|`false`||Speedis leverages Node’s native [http2](https://nodejs.org/api/http2.html) library to make HTTP/2 requests to the origin server. This field is used to define the connection options. Its format is identical to the original [options](https://nodejs.org/api/http2.html#http2connectauthority-options-listener).
 |`agentOptions`|Object|`false`||Speedis allows to use an [Agent](https://nodejs.org/api/https.html#class-httpsagent) to manage connection persistence and reuse for HTTP clients. This field is used to configure the agent. Its format is identical to the original [https options](https://nodejs.org/api/https.html#class-httpsagent) or [http options](https://nodejs.org/api/http.html#new-agentoptions).|
-|`headersToForward`|[String]|`false`|[]|An array of HTTP header names received from the client that should be forwarded to the origin server. Only the headers listed here will be included in the upstream request.If the array contains an element with the value '*', all client headers will be forwarded to the origin.|
-|`headersToExclude`|[String]|`false`|[]|An array of HTTP header names received from the client that should be excluded when forwarding the request to the origin server. If the array contains a single element with the value '*', all client headers will be excluded and none will be forwarded.|
+|`headersToForward`|[String]|`false`|`["*"]`|An array of HTTP header names received from the client that should be forwarded to the origin server. Only the headers listed here will be included in the upstream request. If the array contains the value `"*"`, all client headers will be forwarded to the origin (this is the default).|
+|`headersToExclude`|[String]|`false`|`[]`|An array of HTTP header names received from the client that should be excluded when forwarding the request to the origin server. If the array contains the value `"*"`, all client headers will be excluded and none will be forwarded (regardless of `headersToForward`).|
 |`originTimeout`|Number|`false`||Specifies the maximum time allowed for retrieving the resource from the origin server before the request is considered a failure.|
 |`originBreaker`|Boolean|`false`|`false`|Enables (`true`) or disables (`false`) the origin's circuit breaker mechanism.|
 |`originBreakerOptions`|Object|`true` if originBreaker is `true`||Speedis leverages [Opossum](https://nodeshift.dev/opossum/) to implement the circuit breaker mechanism. This field is used to define the circuit braker options. Its format is almost identical to the original [options](https://nodeshift.dev/opossum/#circuitbreaker). The main difference is that, since the configuration is in JSON format, parameters defined as JavaScript entities in the original options are not supported. Additionally, options related to caching and coalescing features are also not supported.|
@@ -196,8 +217,8 @@ All three transformations are applied in order.
 |`ClientResponse`|Apply transformations to the response sent by Speedis to the client.|
 |`OriginRequest`|Apply transformations to the request sent by Speedis to the origin server.|
 |`OriginResponse`|Apply transformations to the response received by Speedis from the origin server.|
-|`CacheRequest`|Apply transformations to the request sent by Speedis to the cache (Redis).|
-|`CacheResponse`|Apply transformations to the response received by Speedis from the cache (Redis).|
+|`CacheRequest`|Apply transformations to the cache entry **before** Speedis stores it in Redis. Lets you strip or rewrite fields that should not be persisted (e.g. internal headers).|
+|`CacheResponse`|Apply transformations to the cache entry **immediately after** Speedis retrieves it from Redis, before any freshness/validation logic runs.|
 |`VariantsTracker`|Apply transformations to the response before calculating its fingerprinting. Theses transformations don't affect to the response sent to the client.|
 |`CacheKeyGeneration`|Apply transformations to the incoming request to compute the `bodyFingerprint` — a string derived from the request body that is included as part of the cache key. This enables caching of requests (e.g., POST-based SOAP or GraphQL) where the request body determines the response. Actions in this phase operate on the request object and must set `request.bodyFingerprint`.|
 
@@ -342,22 +363,29 @@ The following table describes the supported fields in the variant tracker config
 |`urlPatterns`|[String]|`true`||List of URL patterns to track along with their variants.|
 
 ## Cache configuration object
+
+> **Known limitation:** Speedis currently does **not** cache responses that include a `Vary` header. Such responses are forwarded to the client but never stored. Subsequent requests for the same resource will always be forwarded to the origin. Content negotiation based on request headers (`Accept-Encoding`, `Accept-Language`, `User-Agent`, etc.) is therefore not supported by the cache. See [RFC 9111 §4.1](https://www.rfc-editor.org/rfc/rfc9111.html#name-calculating-cache-keys-with) for the spec behavior.
+
 The following table describes the supported fields in the cache configuration object.
 |Field|Type|Mandatory|Default|Description|
 |-----|----|---------|-------|-----------|
 |`enabled`|Boolean|`false`|`true`|Enables (`true`) or disables (`false`) the Cache.|
-|`purgePath`|String|`false`|`/purge`|URL path prefix used to trigger cache purge requests. Any DELETE request whose path starts with this prefix will be interpreted as a cache purge operation.|
+|`purgePath`|String|`false`|`/purge`|URL path prefix used to trigger cache purge requests. The effective endpoint is `<origin.prefix><purgePath>` (e.g. with `prefix: "/cache"` and the default `purgePath`, the purge endpoint is `DELETE /cache/purge/...`). Any DELETE request whose path starts with this prefix will be interpreted as a cache purge operation.|
 |`includeOriginIdInCacheKey`|Boolean|`false`|`true`|This field determines whether the id of the origin is used to generate the url key for the entry (`true` or `false`).|
 |`defaultCacheSettings`|Object|`false`|See below|Default cache behavior for all cacheable entries. These defaults can be overridden per cacheable entry. Its format is detailed below.|
 |`localRequestsCoalescing`|Boolean|`false`|`true`|Enables (`true`) or disables (`false`) the request coalescing mechanism.|
 |`distributedRequestsCoalescing`|Boolean|`false`|`false`|Enables (`true`) or disables (`false`) the request coalescing functionality across multiple instances.|
 |`distributedRequestsCoalescingOptions`|Object|`true` if distributedRequestsCoalescing is `true`||Configure the distributed lock mechanism used to implements the requests coalescing functionality across multiple instances. Its format is detailed below.|
-|`cacheables`|[Object]|`true`||List of URL patterns that are considered cacheable. Only request with method GET or HEAD can be cached. Its format is detailed below.|
+|`cacheables`|[Object]|`true`||List of URL patterns that are considered cacheable. The methods that can be cached for each entry are controlled by the `methods` field in its `cacheSettings` (see below). Its format is detailed below.|
 
 ### Default cache settings configuration object
-The following table describes the supported fields in the `defaultCacheSettings` configuration object. If not specified, the following defaults are used: `{ private: false, ttl: -1, sortQueryParams: true, ignoredQueryParams: [] }`.
+The following table describes the supported fields in the `defaultCacheSettings` configuration object. If the property is omitted entirely, the following defaults are used: `{ methods: ["GET", "HEAD", "POST"], private: false, ttl: -1, sortQueryParams: true, ignoredQueryParams: [] }`.
+
+**Note:** these defaults are only applied when `defaultCacheSettings` is omitted. If you define `defaultCacheSettings` with any value, only the fields you provide are set. Any field not provided will be `undefined` unless overridden per cacheable entry (with the exception of `methods`, which falls back to the baseline `["GET", "HEAD", "POST"]` at runtime to keep the cache check safe).
+
 |Field|Type|Mandatory|Default|Description|
 |-----|----|---------|-------|-----------|
+|`methods`|[String]|`false`|`["GET", "HEAD", "POST"]`|Default list of HTTP methods that are eligible for caching. Allowed values: `GET`, `HEAD`, `POST`, `PUT`, `PATCH`, `DELETE`, `OPTIONS`, `TRACE`. RFC 9111 §3 permits caching responses to non-safe methods (e.g. `POST` for SOAP/GraphQL) when explicit freshness information is provided. Can be overridden per cacheable entry.|
 |`private`|Boolean|`false`|`false`|Default value for whether responses should be cached separately for each authenticated user. Can be overridden per cacheable entry.|
 |`ttl`|Number|`false`|`-1`|Default time-to-live (in seconds) for cache entries. `-1` means use HTTP cache headers. Can be overridden per cacheable entry.|
 |`sortQueryParams`|Boolean|`false`|`true`|Default behavior for sorting query string parameters alphabetically when generating cache keys. Can be overridden per cacheable entry.|
@@ -380,9 +408,11 @@ The following table describes the supported fields in the cacheable configuratio
 |`cacheSettings`|Object|`false`|Inherits from `cache.defaultCacheSettings`|Cache behavior settings for this URL pattern. Any property not specified will inherit from `cache.defaultCacheSettings`. See the cache settings object format below.|
 
 ### Cache settings object
-The following table describes the supported fields in the `cacheSettings` object (used both in `defaultCacheSettings` and within each `cacheable` entry):
+The following table describes the supported fields in the `cacheSettings` object (used both in `defaultCacheSettings` and within each `cacheable` entry). When used inside a cacheable entry, any field not provided is inherited from `cache.defaultCacheSettings`:
+
 |Field|Type|Mandatory|Default|Description|
 |-----|----|---------|-------|-----------|
+|`methods`|[String]|`false`|Inherits from `defaultCacheSettings.methods`|HTTP methods that are eligible for caching on this URL pattern. Allowed values: `GET`, `HEAD`, `POST`, `PUT`, `PATCH`, `DELETE`, `OPTIONS`, `TRACE`. Useful, for example, to enable caching of `POST` requests for SOAP or GraphQL endpoints.|
 |`private`|Boolean|`false`|`false`|Indicates whether the response for a given URL should be cached separately for each authenticated user. If `true`, `origin.authentication` must be configured.|
 |`ttl`|Number|`false`|`-1`|Time-to-live (in seconds) for this cache entry. `-1` means use HTTP cache headers.|
 |`sortQueryParams`|Boolean|`false`|`true`|Whether to sort query string parameters alphabetically when generating the cache key.|
@@ -402,58 +432,40 @@ The following table describes the supported fields in the redis configuration ob
 
 Speedis supports [Cross-Origin Resource Sharing (CORS)](https://developer.mozilla.org/en-US/docs/Web/HTTP/CORS) via the official [`@fastify/cors`](https://github.com/fastify/fastify-cors) plugin.
 
-CORS can be configured at two levels:
-
-1. **Global defaults** — defined in the `cors` property of `speedis.json` (or the Redis main config key). These settings apply to **all** registered origins.
-2. **Per-origin overrides** — defined in the `cors` property of each origin configuration file. Individual fields from the global defaults are overridden on a **key-by-key** basis (shallow merge). Fields not present in the per-origin configuration inherit the global value.
+CORS is configured **per origin** in the `cors` property of each origin configuration file. If an origin does not define a `cors` object, no CORS headers are added to its responses — `@fastify/cors` is not registered for that origin at all.
 
 > **Important:** Only JSON-serializable values are supported (booleans, strings, numbers, and arrays). Function-based dynamic `origin` callbacks available in `@fastify/cors` are not supported through configuration.
 
-### Merge semantics
-
-Given a global default:
-```json
-{ "origin": true, "credentials": true, "maxAge": 600 }
-```
-And a per-origin override:
-```json
-{ "origin": "https://app.example.com", "credentials": false }
-```
-The effective configuration for that origin will be:
-```json
-{ "origin": "https://app.example.com", "credentials": false, "maxAge": 600 }
-```
-
 ### CORS configuration fields
 
-The following table describes all supported fields. They apply identically to both the global `cors` object in `speedis.json` and the per-origin `cors` object in each origin configuration file.
+The following table describes all supported fields of the per-origin `cors` object. Defaults marked as *(from `@fastify/cors`)* are not injected by Speedis; they apply only when the field is omitted and `@fastify/cors` is registered.
 
 |Field|Type|Mandatory|Default|Description|
 |-----|----|---------|-------|-----------|
-|`enabled`|Boolean|`false`|`true`|Enables (`true`) or disables (`false`) CORS for this scope. When `false`, `@fastify/cors` is not registered even if a `cors` object is present. This field is Speedis-specific and is not forwarded to `@fastify/cors`.|
+|`enabled`|Boolean|`false`|`true`|Enables (`true`) or disables (`false`) CORS for this origin. When `false`, `@fastify/cors` is not registered even if a `cors` object is present. This field is Speedis-specific and is not forwarded to `@fastify/cors`.|
 |`origin`|Boolean \| String \| [String]|`false`|`false`|Controls which origins are allowed. `true` reflects the request `Origin` back (allow all). `false` disables CORS. A string or array of strings restricts access to specific origins.|
-|`methods`|[String]|`false`|`['GET','HEAD','PUT','PATCH','POST','DELETE']`|HTTP methods permitted for cross-origin requests. Populates `Access-Control-Allow-Methods`.|
-|`allowedHeaders`|[String]|`false`|Reflects `Access-Control-Request-Headers`|Request headers that browsers are allowed to send. Populates `Access-Control-Allow-Headers`.|
+|`methods`|[String]|`false`|`['GET','HEAD','PUT','PATCH','POST','DELETE']` *(from `@fastify/cors`)*|HTTP methods permitted for cross-origin requests. Populates `Access-Control-Allow-Methods`.|
+|`allowedHeaders`|[String]|`false`|Reflects `Access-Control-Request-Headers` *(from `@fastify/cors`)*|Request headers that browsers are allowed to send. Populates `Access-Control-Allow-Headers`.|
 |`exposedHeaders`|[String]|`false`||Response headers that browsers are permitted to read beyond the [CORS-safelisted set](https://developer.mozilla.org/en-US/docs/Glossary/CORS-safelisted_response_header). Populates `Access-Control-Expose-Headers`.|
 |`credentials`|Boolean|`false`|`false`|When `true`, the `Access-Control-Allow-Credentials: true` header is sent. Requires `origin` to be a specific value (not `true`).|
 |`maxAge`|Number|`false`||Duration in seconds the browser may cache a preflight response. Populates `Access-Control-Max-Age`.|
-|`preflightContinue`|Boolean|`false`|`false`|If `true`, the preflight response is passed to the next handler instead of being sent immediately.|
-|`optionsSuccessStatus`|Number|`false`|`204`|HTTP status code returned for successful preflight responses. Use `200` for compatibility with legacy browsers.|
-|`preflight`|Boolean|`false`|`true`|If `false`, the automatic `OPTIONS *` preflight route is not added. Useful when the upstream origin already handles CORS preflight.|
-|`strictPreflight`|Boolean|`false`|`true`|If `true`, preflight requests missing an `Origin` or `Access-Control-Request-Method` header receive a `400 Bad Request` response.|
-|`hideOptionsRoute`|Boolean|`false`|`true`|If `true`, the OPTIONS preflight route is hidden from API schema generation tools (e.g., Swagger).|
+|`preflightContinue`|Boolean|`false`|`false` *(from `@fastify/cors`)*|If `true`, the preflight response is passed to the next handler instead of being sent immediately.|
+|`optionsSuccessStatus`|Number|`false`|`204` *(from `@fastify/cors`)*|HTTP status code returned for successful preflight responses. Use `200` for compatibility with legacy browsers.|
+|`preflight`|Boolean|`false`|`true` *(from `@fastify/cors`)*|If `false`, the automatic `OPTIONS *` preflight route is not added. Useful when the upstream origin already handles CORS preflight.|
+|`strictPreflight`|Boolean|`false`|`true` *(from `@fastify/cors`)*|If `true`, preflight requests missing an `Origin` or `Access-Control-Request-Method` header receive a `400 Bad Request` response.|
+|`hideOptionsRoute`|Boolean|`false`|`true` *(from `@fastify/cors`)*|If `true`, the OPTIONS preflight route is hidden from API schema generation tools (e.g., Swagger).|
 
 ### Important behaviors
 
-#### 1. `enabled: false` always wins
+#### 1. No `cors` object → no CORS headers
 
-Setting `enabled: false` in a per-origin `cors` object completely disables CORS for that origin, regardless of what the global default specifies. `@fastify/cors` is simply not registered for that plugin instance.
+If an origin configuration does not define a `cors` object, Speedis does not register `@fastify/cors` for that origin and no `Access-Control-*` headers are added to any response. This is the default behavior and is the right choice for internal or backend-only origins that should never be exposed to browsers.
+
+The same effect can be achieved explicitly by setting `enabled: false`:
 
 ```json
 { "cors": { "enabled": false } }
 ```
-
-This is useful for internal or backend-only origins that should never be exposed to browsers.
 
 #### 2. `origin` string vs array — browser enforcement vs server enforcement
 
@@ -483,9 +495,10 @@ If your upstream origin already implements its own CORS handling and you want Sp
 
 ### Configuration examples
 
-#### Example 1 — Global permissive CORS (all origins, specific methods)
+All examples below are placed in a per-origin configuration file (e.g. `conf/origins/<origin>.json`).
 
-Add to `conf/speedis.json`:
+#### Example 1 — Permissive CORS (all origins, specific methods)
+
 ```json
 {
   "cors": {
@@ -494,11 +507,10 @@ Add to `conf/speedis.json`:
   }
 }
 ```
-This allows any browser origin to make `GET`, `HEAD`, and `OPTIONS` requests to all registered origins.
+This allows any browser origin to make `GET`, `HEAD`, and `OPTIONS` requests to this origin.
 
-#### Example 2 — Restrict all origins to a single domain, allow credentials
+#### Example 2 — Restrict to a single domain, allow credentials
 
-Add to `conf/speedis.json`:
 ```json
 {
   "cors": {
@@ -521,9 +533,8 @@ Add to `conf/speedis.json`:
 }
 ```
 
-#### Example 4 — Per-origin override (disable CORS for one specific origin)
+#### Example 4 — Explicitly disable CORS
 
-In `conf/origins/internal.json`, add:
 ```json
 {
   "cors": {
@@ -531,27 +542,4 @@ In `conf/origins/internal.json`, add:
   }
 }
 ```
-Even if a global `cors` default is configured in `speedis.json`, this origin will not have CORS headers.
-
-#### Example 5 — Per-origin override (different allowed origin)
-
-Global config (`speedis.json`):
-```json
-{
-  "cors": {
-    "origin": "https://app.example.com",
-    "credentials": true,
-    "maxAge": 600
-  }
-}
-```
-Override for the `public-api` origin (`conf/origins/public-api.json`):
-```json
-{
-  "cors": {
-    "origin": true,
-    "credentials": false
-  }
-}
-```
-Effective CORS for `public-api`: `{ "origin": true, "credentials": false, "maxAge": 600 }` — it inherits `maxAge` from the global default but uses its own `origin` and `credentials` values.
+Equivalent to omitting the `cors` object entirely. Useful as an explicit marker for internal or backend-only origins.
