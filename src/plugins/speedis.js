@@ -11,6 +11,9 @@ import { initVariantsTracker } from '../modules/variantTracker.js'
 import { initMetrics } from '../modules/metrics.js'
 import { errorHandler } from '../modules/error.js'
 
+// Cached once at module load. See cache.js for rationale.
+const HOSTNAME = os.hostname()
+
 export default async function (server, opts) {
 
     // Register CORS support if configured.
@@ -100,7 +103,7 @@ export default async function (server, opts) {
             const response = await responsePromise
             utils.ensureValidDateHeader(response, Date.now())
             if (!response.headers['x-speedis-cache-status']) {
-                response.headers['x-speedis-cache-status'] = 'CACHE_STATUS_UNDEFINED from ' + os.hostname()
+                response.headers['x-speedis-cache-status'] = 'CACHE_STATUS_UNDEFINED from ' + HOSTNAME
             }
 
             if (opts?.bff?.enabled) {

@@ -5,6 +5,9 @@ import os from 'os'
 import { initOriginBreaker } from '../modules/originBreaker.js'
 import { transform, ORIGIN_REQUEST, ORIGIN_RESPONSE } from './bff.js'
 
+// Cached once at module load. See cache.js for rationale.
+const HOSTNAME = os.hostname()
+
 export async function initOrigin(server, opts) {
 
     if (opts.origin.http2Options) {
@@ -156,7 +159,7 @@ export async function proxy(server, opts, request) {
     const response = await fetch
 
     // Unsure that we have a valid Date Header
-    response.headers['x-speedis-cache-status'] = 'CACHE_NOT_ENABLED from ' + os.hostname()
+    response.headers['x-speedis-cache-status'] = 'CACHE_NOT_ENABLED from ' + HOSTNAME
 
     // Apply transformations to the response received from the origin
     response.path = requestOptions.path

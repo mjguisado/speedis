@@ -7,6 +7,10 @@ import * as bff from './bff.js'
 import { getUserId } from './authentication.js'
 import { errorHandler } from './error.js'
 
+// Cached once at module load. os.hostname() invokes a syscall on every call,
+// and we tag every cache-status header with it on the hot path.
+const HOSTNAME = os.hostname()
+
 export function initCache(server, opts) {
     // The cache key for the request
     server.decorateRequest("cacheKey", null)
@@ -207,7 +211,7 @@ export async function getCacheable(server, opts, request) {
         response.headers = {
             date: new Date().toUTCString(),
             'content-type': 'application/json',
-            'x-speedis-cache-status': 'CACHE_REDIS_OUTAGE from ' + os.hostname()
+            'x-speedis-cache-status': 'CACHE_REDIS_OUTAGE from ' + HOSTNAME
         }
         if (opts.exposeErrors) { response.body = { msg: msg } }
         return response
@@ -238,7 +242,7 @@ export async function getCacheable(server, opts, request) {
             response.headers = {
                 date: new Date().toUTCString(),
                 'content-type': 'application/json',
-                'x-speedis-cache-status': 'CACHE_NO_LOCK from ' + os.hostname()
+                'x-speedis-cache-status': 'CACHE_NO_LOCK from ' + HOSTNAME
             }
             if (opts.exposeErrors) { response.body = { msg: msg } }
             return response
@@ -252,7 +256,7 @@ export async function getCacheable(server, opts, request) {
         response.headers = {
             date: new Date().toUTCString(),
             'content-type': 'application/json',
-            'x-speedis-cache-status': 'CACHE_ERROR_500 from ' + os.hostname()
+            'x-speedis-cache-status': 'CACHE_ERROR_500 from ' + HOSTNAME
         }
         if (opts.exposeErrors) { response.body = { msg: msg } }
         return response
@@ -304,7 +308,7 @@ export async function getCacheable(server, opts, request) {
         response.headers = {
             date: new Date().toUTCString(),
             'content-type': 'application/json',
-            'x-speedis-cache-status': 'CACHE_ERROR_400 from ' + os.hostname()
+            'x-speedis-cache-status': 'CACHE_ERROR_400 from ' + HOSTNAME
         }
         if (opts.exposeErrors) { response.body = { msg: msg } }
         return response
@@ -500,7 +504,7 @@ export async function _get(server, opts, request) {
             // A stored response with a Vary header field value containing a member "*" always fails to match
             && !fieldNames.includes('*')) {
             // The response stored in the cache is valid.
-            cachedResponse.headers['x-speedis-cache-status'] = 'CACHE_HIT from ' + os.hostname()
+            cachedResponse.headers['x-speedis-cache-status'] = 'CACHE_HIT from ' + HOSTNAME
             // The presence of an Age header field implies that the response was not generated 
             // or validated by the origin server for this request.
             cachedResponse.headers['age'] = currentAge
@@ -626,7 +630,7 @@ export async function _get(server, opts, request) {
             // There is a response stored in the cache, and we tried to refresh it  
             // using a conditional request to the origin, which failed.  
             // The stale response IS being reused.
-            cachedResponse.headers['x-speedis-cache-status'] = 'CACHE_HIT_NOT_REVALIDATED_STALE from ' + os.hostname()
+            cachedResponse.headers['x-speedis-cache-status'] = 'CACHE_HIT_NOT_REVALIDATED_STALE from ' + HOSTNAME
             cachedResponse.headers['age'] = utils.calculateAge(cachedResponse)
             return cachedResponse
         } else {
@@ -639,11 +643,11 @@ export async function _get(server, opts, request) {
                 // There is a response stored in the cache, and we tried to refresh it  
                 // using a conditional request to the origin, which failed.  
                 // The stale response IS NOT being reused.                
-                generatedResponse.headers['x-speedis-cache-status'] = 'CACHE_HIT_NOT_REVALIDATED from ' + os.hostname()
+                generatedResponse.headers['x-speedis-cache-status'] = 'CACHE_HIT_NOT_REVALIDATED from ' + HOSTNAME
             } else {
                 // There is no response stored in the cache, and we tried to request it  
                 // to the origin, which failed.  
-                generatedResponse.headers['x-speedis-cache-status'] = 'CACHE_FAILED_MISS from ' + os.hostname()
+                generatedResponse.headers['x-speedis-cache-status'] = 'CACHE_FAILED_MISS from ' + HOSTNAME
             }
             switch (error.code) {
                 case 'ETIMEDOUT':
@@ -789,7 +793,7 @@ export async function _get(server, opts, request) {
             statusCode: 504,
             headers: {
                 'date': new Date().toUTCString(),
-                'x-speedis-cache-status': 'CACHE_MISS from ' + os.hostname()
+                'x-speedis-cache-status': 'CACHE_MISS from ' + HOSTNAME
             }
         }
     }
@@ -797,16 +801,16 @@ export async function _get(server, opts, request) {
     if (originResponse.statusCode === 304) {
         // There is a response stored in the cache, and it has been refreshed 
         // using a conditional request to the origin, which replied with a 304.
-        cachedResponse.headers['x-speedis-cache-status'] = 'CACHE_HIT_REVALIDATED_304 from ' + os.hostname()
+        cachedResponse.headers['x-speedis-cache-status'] = 'CACHE_HIT_REVALIDATED_304 from ' + HOSTNAME
         return utils.cloneAndTrimResponse(cachedResponse)
     } else {
         if (cachedResponse) {
             // There is a response stored in the cache, and it has been refreshed 
             // using a conditional request to the origin, which replied with a 200.
-            originResponse.headers['x-speedis-cache-status'] = 'CACHE_HIT_REVALIDATED from ' + os.hostname()
+            originResponse.headers['x-speedis-cache-status'] = 'CACHE_HIT_REVALIDATED from ' + HOSTNAME
         } else {
             // There is no response stored in the cache.
-            originResponse.headers['x-speedis-cache-status'] = 'CACHE_MISS from ' + os.hostname()
+            originResponse.headers['x-speedis-cache-status'] = 'CACHE_MISS from ' + HOSTNAME
         }
         return utils.cloneAndTrimResponse(originResponse)
     }
