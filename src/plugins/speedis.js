@@ -58,6 +58,9 @@ export default async function (server, opts) {
 
     // The path of the request without the prefix
     server.decorateRequest("path", null)
+    // Per-plugin origin id — exposed as a request decorator so downstream hooks
+    // (metrics, logging) can look it up in O(1) without resolving it from the URL.
+    server.decorateRequest("originId", opts.id)
     server.addHook('onRequest', (request, reply, done) => {
         request.path = generatePath(request)
         done()

@@ -74,13 +74,9 @@ export function initMetrics(server, opts) {
     const xSpeedisCacheStatusHeaderRE = /^(CACHE_.+) from/
     server.addHook('onResponse', async (request, reply) => {
 
-        let origin = 'Unknown'
-        for (const [id, prefix] of server.plugins) {
-            if (request.url.startsWith(prefix)) {
-                origin = id
-                break
-            }
-        }
+        // The plugin scope decorates request.originId with its own opts.id,
+        // so no URL resolution is needed here.
+        const origin = request.originId ?? 'Unknown'
 
         let statusCode = 'Unknown'
         if (typeof reply.statusCode === 'number' && !Number.isNaN(reply.statusCode)) {

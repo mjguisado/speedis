@@ -22,7 +22,6 @@ async function buildServer(corsConfig) {
     }
     if (corsConfig !== undefined) pluginOpts.cors = corsConfig
     server.register(speedisPlugin, pluginOpts)
-    server.decorate('plugins', new Map([['test', '/test']]))
     await server.ready()
     return server
 }

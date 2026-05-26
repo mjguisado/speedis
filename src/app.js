@@ -93,7 +93,6 @@ export async function app(
 
     // For each valid origin, we register an instance of the plugin that manages it.
     const originConfigValidator = initOriginConfigValidator(ajv)
-    const plugins = new Map()
     originsConfigs.forEach((originConfig) => {
         if (undefined !== originConfig) {
             if (!originConfigValidator(originConfig, ajv)) {
@@ -102,13 +101,11 @@ export async function app(
             } else {
                 server.log.info(`Loading origin configuration. Origin: ${originConfig.id}.`)
                 server.register(speedisPlugin, originConfig)
-                plugins.set(originConfig.id, originConfig.prefix)
                 server.after(err => { if (err) console.log(err) })
             }
         }
     })
 
-    server.decorate('plugins', plugins)
     server.ready(err => { if (err) console.log(err) })
 
     return server
