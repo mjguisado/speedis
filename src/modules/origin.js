@@ -232,21 +232,24 @@ function _fetchHttp1x(originOptions, requestOptions, body) {
 
 }
 
+// Headers that are forbidden in HTTP/2 (RFC 9113 §8.2.2). Precomputed once
+// at module load — looked up for every header of every HTTP/2 request.
+const HTTP2_FORBIDDEN_HEADERS = new Set([
+    'connection',
+    'upgrade',
+    'http2-settings',
+    'keep-alive',
+    'proxy-connection',
+    'transfer-encoding'
+])
+
 export function transformHeadersForHttp2(headers, options = {}) {
 
-    const forbidden = [
-        'connection',
-        'upgrade',
-        'http2-settings',
-        'keep-alive',
-        'proxy-connection',
-        'transfer-encoding'
-    ]
     const result = {}
 
     for (const [key, value] of Object.entries(headers)) {
         const lowerKey = key.toLowerCase()
-        if (forbidden.includes(lowerKey)) continue
+        if (HTTP2_FORBIDDEN_HEADERS.has(lowerKey)) continue
         if (lowerKey === 'te' && value.trim().toLowerCase() !== 'trailers') continue
         if (lowerKey === 'host') {
             result[':authority'] = value
