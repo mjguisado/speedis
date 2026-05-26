@@ -88,7 +88,14 @@ export async function initBff(server, opts) {
 
     // Init the transformations
     // If BFF is true, then at least one transformation is enforced.
+    // Also build a per-phase action index so transform() can iterate only the
+    // actions for the requested phase instead of walking every transformation
+    // and filtering by phase on every call. Each entry pairs the compiled
+    // regex of its enclosing transformation with the action itself; insertion
+    // order across transformations is preserved so "last wins" semantics
+    // for conflicting writes still hold.
     let hasCacheKeyGenerationAction = false
+    opts.bff.actionsByPhase = Object.create(null)
     opts.bff.transformations.forEach(transformation => {
         try {
             transformation.re = new RegExp(transformation.urlPattern)
@@ -104,6 +111,10 @@ export async function initBff(server, opts) {
                 server.log.fatal(`Origin: ${opts.id}. Function ${action.uses} was not found among the available actions.`)
                 throw new Error(`Origin: ${opts.id}. The transformation configuration is invalid.`)
             }
+            if (!opts.bff.actionsByPhase[action.phase]) {
+                opts.bff.actionsByPhase[action.phase] = []
+            }
+            opts.bff.actionsByPhase[action.phase].push({ re: transformation.re, action })
         })
     })
 
@@ -115,21 +126,27 @@ export async function initBff(server, opts) {
 }
 
 export function transform(opts, type, target) {
-    let cacheDirectives = parseCacheControlHeader(target)
-    if (CACHE_KEY_GENERATION !== type &&
-        VARIANTS_TRACKER !== type &&
-        cacheDirectives['no-transform']) {
-        // The no-transform directive is present in the Cache-Control header.
-        // No transformation is applied.
-        return
+    const actions = opts.bff.actionsByPhase[type]
+    if (!actions) return
+
+    // The `no-transform` Cache-Control directive disables transformations,
+    // except for the two phases that do not produce visible mutations on
+    // the wire (cache-key derivation and variant fingerprinting). Parsing
+    // Cache-Control is only worthwhile when there is at least one action
+    // queued for the current phase, so we do it after the early return.
+    //
+    // Use hasOwnProperty rather than a truthy check: per RFC 9111 §5.2.2.4
+    // `no-transform` is a directive without value, so parseCacheControlHeader
+    // stores it as `null` (which would be falsy under a plain `cacheDirectives['no-transform']`).
+    if (CACHE_KEY_GENERATION !== type && VARIANTS_TRACKER !== type) {
+        const cacheDirectives = parseCacheControlHeader(target)
+        if (Object.prototype.hasOwnProperty.call(cacheDirectives, 'no-transform')) return
     }
-    opts.bff.transformations.forEach(transformation => {
-        if (transformation.re.test(target.path)) {
-            transformation.actions.forEach(action => {
-                if (action.phase === type) {
-                    bffActionsRepository[action.library][action.func](target, action.with ? action.with : null)
-                }
-            })
+
+    for (let i = 0; i < actions.length; i++) {
+        const { re, action } = actions[i]
+        if (re.test(target.path)) {
+            bffActionsRepository[action.library][action.func](target, action.with ? action.with : null)
         }
-    })
+    }
 }
