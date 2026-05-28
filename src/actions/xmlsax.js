@@ -18,18 +18,19 @@ import { createHash } from 'crypto'
  * @param {string}   [params.encoding="hex"]   - Hash output encoding ("hex" or "base64").
  */
 export function xmlBodyFingerprint(target, params) {
+    
     if (!params?.elements?.length || !Buffer.isBuffer(target.body)) return
 
-    const elements = params.elements
+    const elements  = params.elements
     const algorithm = params.algorithm ?? 'md5'
-    const encoding = params.encoding ?? 'hex'
+    const encoding  = params.encoding  ?? 'hex'
 
     // captureStack: array of { name: string, text: string }
     // Each entry represents an open target element currently being captured.
     const captureStack = []
 
-    // results: texts extracted from each closed target element, in document order.
-    const results = []
+    // parts: texts extracted from each closed target element, in document order.
+    const parts = []
 
     const parser = sax.parser(
         true,   // strict mode: tag names are case-sensitive and returned as-is
@@ -62,7 +63,7 @@ export function xmlBodyFingerprint(target, params) {
             // Find the most recent open capture entry for this element name.
             for (let i = captureStack.length - 1; i >= 0; i--) {
                 if (captureStack[i].name === name) {
-                    results.push(captureStack[i].text)
+                    parts.push(captureStack[i].text)
                     captureStack.splice(i, 1)
                     break
                 }
@@ -84,9 +85,13 @@ export function xmlBodyFingerprint(target, params) {
         return
     }
 
-    if (results.length === 0) return
+    if (parts.length === 0) return
 
-    target.bodyFingerprint = createHash(algorithm)
-        .update(results.join(''))
-        .digest(encoding)
+    target.bodyFingerprint = parts.join(':')
+    if (algorithm) {
+        target.bodyFingerprint = 
+            createHash(algorithm).update(target.bodyFingerprint).digest(encoding)
+    }
+
+
 }

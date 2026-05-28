@@ -26,6 +26,7 @@ import { createHash } from 'crypto'
  * @param {string}   [params.encoding="hex"]    - Hash output encoding ("hex"|"base64").
  */
 export function xpathBodyFingerprint(target, params) {
+
     if (!params?.xpaths?.length || !Buffer.isBuffer(target.body)) return
 
     const algorithm = params.algorithm ?? 'md5'
@@ -78,9 +79,13 @@ export function xpathBodyFingerprint(target, params) {
 
     if (parts.length === 0) return
 
-    target.bodyFingerprint = createHash(algorithm)
-        .update(parts.join(''))
-        .digest(encoding)
+    target.bodyFingerprint = parts.join(':')
+    if (algorithm) {
+        target.bodyFingerprint = 
+            createHash(algorithm).update(target.bodyFingerprint).digest(encoding)
+    }
+
+
 }
 
 // ---------------------------------------------------------------------------
