@@ -13,22 +13,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-## [2.2.0] - 2026-05-25
+## [2.3.0] - 2026-05-28
 
-### Added
-- Runtime fallback in `cache.js` that guarantees `cacheSettings.methods` is always defined (baseline `["GET", "HEAD", "POST"]`), even when the user overrides `defaultCacheSettings` without providing `methods`.
-- Tests covering CORS behaviour, cache `methods` default and fallback, every conditional rule of the origin validator (Redis dependency, authentication requirement, http1x/http2 exclusivity, circuit breaker options, Bearer requirements, distributed coalescing, BFF/variantsTracker requirements), CORS schema validation, and default-value application through Ajv across modules that use `oneOf`/`allOf`/`if-then`.
+Added
 
-### Changed
-- **BREAKING**: CORS configuration is now defined **exclusively per origin**. The global `cors` field in `speedis.json` (and the corresponding shallow-merge logic in `app.js`) has been removed. Migration: move any `cors` block from `speedis.json` into each origin file that needs it. If an origin omits `cors`, no CORS headers are added to its responses (this is the default).
-- `defaultCacheSettings.methods` default is now `["GET", "HEAD", "POST"]` (was `["GET", "HEAD"]`). POST is included to support caching SOAP and GraphQL endpoints out of the box, as permitted by RFC 9111 §3.
-- `conf/loadConfigsToRedis.sh` rewritten to iterate over every `*.json` file in `conf/origins/`. The Redis key for each origin is derived from the filename (`<name>.json` → `speedis:config:origins:<name>`). The script now respects `REDIS_URL` (default `redis://redis:6379`) and uses `set -euo pipefail` with progress messages.
-- `conf/speedis.json` updated: `originsConfigsKeys` now points to `speedis:config:origins:cache` (matching the actual `cache.json` file).
-- `doc/Configuration.md`: per-origin CORS section rewritten; `Vary` header limitation documented; `methods` documented in `cacheSettings`; `headersToForward`/`headersToExclude` defaults and semantics corrected; `purgePath` default and effective endpoint documented; `CacheRequest`/`CacheResponse` BFF phase descriptions clarified; `@fastify/cors` upstream defaults explicitly marked.
+  - Authenticated cache purging. Optional per-origin purgeToken (string) under cache. When configured, requests to purgePath must carry
+  X-Speedis-Purge-Token with a matching value; mismatched or missing tokens return HTTP 401. When purgeToken is absent, no token check is performed —
+  preserving the previous open-by-default behavior for backward compatibility. Network-level isolation (HAProxy ACLs, internal-only ports) is still the
+  primary defense; the token is defense in depth.
+  - Header-based user identity on purge. Routes declared cacheSettings.private: true keyed cache entries by (transformed URL, transformed userId).
+  Previously, purging such entries required an Authorization header so the userId could be derived from Basic credentials or a Bearer JWT — impractical
+  for server-to-server invalidators that cannot mint user-scoped tokens. The new X-Speedis-Purge-UserID header carries the userId in clear, and Speedis
+  re-applies the same idTransformation (hash / prefix / suffix) used at cache-write time so the resulting key matches the stored entry. If the header is
+   absent on a purge to a private route, the cache key is built without a userId component, no entry matches, and the response is 404 — making "header
+  missing" indistinguishable from "nothing was cached" at the HTTP level (the server logs disambiguate).
+  - New exported helper getPurgeUserId(opts, request) in src/modules/authentication.js. Reads X-Speedis-Purge-UserID, applies
+  origin.authentication.idTransformation when configured, returns null when the header is absent.
 
-### Fixed
-- Origin validator conditional rule #2 (authentication required for private caching) was effectively dead: it inspected `cacheable.private` while the actual field is `cacheable.cacheSettings.private`. As a result, configurations declaring `private: true` without `origin.authentication` passed validation and only failed at request time with HTTP 401/500. The rule now correctly inspects both `defaultCacheSettings.private` and every `cacheable.cacheSettings.private`.
-- Shallow merge of CORS between the (now removed) global config and per-origin config could silently override an origin's intended `origin` setting with `false`, because Ajv injected defaults into the per-origin `cors` block before the merge. Removing the global tier eliminates the merge entirely.
-- `conf/loadConfigsToRedis.sh` referenced `origins/mocks.json` which did not exist, so the script failed on its first invocation.
-- Typo `conf/origin` (singular) corrected to `conf/origins` in `doc/Configuration.md`.
+  Changed
+
+  - src/modules/cache.js preValidation hook now branches at the top on isPurgeRequest: it validates X-Speedis-Purge-Token against opts.cache.purgeToken
+  (when configured) and, for private routes, populates request.userId via getPurgeUserId. The non-purge path (reads via getUserId from Authorization) is
+   unchanged.
+  - src/modules/originConfigValidator.js: new optional property purgeToken (type string) under the cache schema, sitting next to purgePath. No default
+  value — absence means no token enforcement.
+
+  Migration / Compatibility
+
+  - Fully backward compatible. The read path is untouched.
+  - Existing deployments without purgeToken continue to accept unauthenticated purges.
+  - Existing purgers that send Authorization against private routes keep working — the new header is an additional mechanism, the only viable one for
+  callers that cannot supply user credentials (e.g. consumers of an internal event stream).
+
+  Security note
+
+  - X-Speedis-Purge-UserID is honored only on requests routed to isPurgeRequest (DELETE + purgePath prefix). It has no effect on read requests, so it
+  cannot be used to spoof identity on GET/HEAD.
+  - purgeToken is compared with a strict equality check. For real deployments consider rotating it, scoping it per origin (as the schema allows), and
+  gating /purge/* at the network layer in addition.
 
