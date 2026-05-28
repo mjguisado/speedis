@@ -4,7 +4,7 @@ import * as crypto from 'crypto'
 import { _fetch, getForwardedHeaders } from './origin.js'
 import * as utils from '../utils/utils.js'
 import * as bff from './bff.js'
-import { getUserId } from './authentication.js'
+import { getUserId, getPurgeUserId } from './authentication.js'
 import { errorHandler } from './error.js'
 
 // Cached once at module load. os.hostname() invokes a syscall on every call,
@@ -32,6 +32,7 @@ export function initCache(server, opts) {
     // expressions used to determine whether a URL is cacheable.
     // Also apply defaults to each cacheable entry.
     opts.cache.cacheables.forEach(cacheable => {
+
         try {
             cacheable.re = new RegExp(cacheable.urlPattern)
         } catch (error) {
@@ -79,6 +80,25 @@ export function initCache(server, opts) {
     // This ID is extracted from the Authorization header by the authentication module.
     server.decorateRequest('userId', null)
     server.addHook('preValidation', async (request, reply) => {
+ 
+        // Purge requests follow a different identity path: they are admin
+        // operations protected by a shared token and carry the target userId
+        // in a dedicated header (see authentication.getPurgeUserId).
+        if (isPurgeRequest(server, opts, request)) {
+            if (opts.cache.purgeToken) {
+                const provided = request.headers['x-speedis-purge-token']
+                if (provided !== opts.cache.purgeToken) {
+                    const msg = `Origin: ${opts.id}. Invalid or missing X-Speedis-Purge-Token on purge request.`
+                    server.log.warn(msg)
+                    return errorHandler(reply, 401, msg, opts.exposeErrors)
+                }
+            }
+            if (request.cacheSettings?.private) {
+                request.userId = getPurgeUserId(opts, request)
+            }
+            return
+        }
+
         if (request.cacheable && request.cacheSettings.private) {
             try {
                 request.userId = await getUserId(server, opts, request)
@@ -103,6 +123,7 @@ export function initCache(server, opts) {
                 return errorHandler(reply, 401, msg, opts.exposeErrors)
             }
         }
+        
     })
 }
 

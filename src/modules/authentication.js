@@ -153,6 +153,33 @@ async function extractUserIdFromBearer(server, opts, token) {
 }
 
 /**
+ * Extract user identifier for a purge request.
+ *
+ * Unlike the read path — where userId is derived from the Authorization header
+ * via {@link getUserId} — purges are server-to-server admin operations issued
+ * by trusted callers that may not hold user credentials (e.g. they cannot mint
+ * a Bearer JWT on the user's behalf). The caller therefore passes the userId
+ * in clear via the X-Speedis-Purge-UserID header, and Speedis applies the same
+ * idTransformation that was applied at cache-write time so the resulting key
+ * matches the stored entry.
+ *
+ * Returns null when the header is absent. Callers should not treat that as an
+ * error: with no userId set, the generated cache key won't match any private
+ * entry and the purge naturally returns 404.
+ *
+ * @param {Object} opts - Origin configuration options
+ * @param {Object} request - HTTP request
+ * @returns {string|null}
+ */
+export function getPurgeUserId(opts, request) {
+    const userId = request.headers['x-speedis-purge-userid']
+    if (!userId) return null
+    return opts.origin?.authentication?.idTransformation
+        ? transformUserId(userId, opts.origin.authentication.idTransformation)
+        : userId
+}
+
+/**
  * Transform user identifier according to configuration
  */
 function transformUserId(userId, config) {

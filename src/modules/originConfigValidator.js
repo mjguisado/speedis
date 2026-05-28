@@ -650,6 +650,7 @@ export function initOriginConfigValidator(ajv) {
                     properties: {
                         enabled: { type: "boolean", default: true },
                         purgePath: { type: "string", default: "/purge" },
+                        purgeToken: { type: "string" },
                         includeOriginIdInCacheKey: { type: "boolean", default: true },
                         localRequestsCoalescing: { type: "boolean", default: true },
                         distributedRequestsCoalescing: { type: "boolean", default: false },
