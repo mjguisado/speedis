@@ -87,7 +87,7 @@ export function xmlBodyFingerprint(target, params) {
 
     if (parts.length === 0) return
 
-    target.bodyFingerprint = parts.join(':')
+    target.bodyFingerprint = parts.join('')
     if (algorithm) {
         target.bodyFingerprint = 
             createHash(algorithm).update(target.bodyFingerprint).digest(encoding)
