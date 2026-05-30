@@ -1,0 +1,995 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "prefix",
+    "origin"
+  ],
+  "allOf": [
+    {
+      "if": {
+        "not": {
+          "allOf": [
+            {
+              "anyOf": [
+                {
+                  "not": {
+                    "required": [
+                      "variantsTracker"
+                    ]
+                  }
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "variantsTracker": {
+                      "type": "object",
+                      "properties": {
+                        "enabled": {
+                          "const": false
+                        }
+                      },
+                      "required": [
+                        "enabled"
+                      ]
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "anyOf": [
+                {
+                  "not": {
+                    "required": [
+                      "cache"
+                    ]
+                  }
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "cache": {
+                      "type": "object",
+                      "properties": {
+                        "enabled": {
+                          "const": false
+                        }
+                      },
+                      "required": [
+                        "enabled"
+                      ]
+                    }
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "then": {
+        "required": [
+          "redis"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "cache": {
+            "type": "object",
+            "allOf": [
+              {
+                "not": {
+                  "properties": {
+                    "enabled": {
+                      "const": false
+                    }
+                  },
+                  "required": [
+                    "enabled"
+                  ]
+                }
+              },
+              {
+                "anyOf": [
+                  {
+                    "properties": {
+                      "defaultCacheSettings": {
+                        "type": "object",
+                        "properties": {
+                          "private": {
+                            "const": true
+                          }
+                        },
+                        "required": [
+                          "private"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "defaultCacheSettings"
+                    ]
+                  },
+                  {
+                    "properties": {
+                      "cacheables": {
+                        "type": "array",
+                        "contains": {
+                          "type": "object",
+                          "properties": {
+                            "cacheSettings": {
+                              "type": "object",
+                              "properties": {
+                                "private": {
+                                  "const": true
+                                }
+                              },
+                              "required": [
+                                "private"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "cacheSettings"
+                          ]
+                        }
+                      }
+                    },
+                    "required": [
+                      "cacheables"
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "required": [
+          "cache"
+        ]
+      },
+      "then": {
+        "properties": {
+          "origin": {
+            "type": "object",
+            "required": [
+              "authentication"
+            ],
+            "properties": {
+              "authentication": {
+                "type": "object",
+                "not": {
+                  "properties": {
+                    "enabled": {
+                      "const": false
+                    }
+                  },
+                  "required": [
+                    "enabled"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "definitions": {
+    "circuitBreakerOptions": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "maxFailures": {
+          "type": "integer"
+        },
+        "resetTimeout": {
+          "type": "integer",
+          "default": 30000
+        },
+        "rollingCountTimeout": {
+          "type": "integer",
+          "default": 10000
+        },
+        "rollingCountBuckets": {
+          "type": "integer",
+          "default": 10
+        },
+        "rollingPercentilesEnabled": {
+          "type": "boolean",
+          "default": true
+        },
+        "capacity": {
+          "type": "integer",
+          "default": 9007199254740991
+        },
+        "errorThresholdPercentage": {
+          "type": "integer",
+          "default": 50
+        },
+        "enabled": {
+          "type": "boolean",
+          "default": true
+        },
+        "allowWarmUp": {
+          "type": "boolean",
+          "default": false
+        },
+        "volumeThreshold": {
+          "type": "integer",
+          "default": 0
+        },
+        "enableSnapshots": {
+          "type": "boolean"
+        },
+        "autoRenewAbortController": {
+          "type": "boolean",
+          "default": false
+        }
+      }
+    },
+    "cacheSettings": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "methods": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "GET",
+              "HEAD",
+              "POST",
+              "PUT",
+              "PATCH",
+              "DELETE",
+              "OPTIONS",
+              "TRACE"
+            ]
+          }
+        },
+        "private": {
+          "type": "boolean"
+        },
+        "ttl": {
+          "type": "integer"
+        },
+        "sortQueryParams": {
+          "type": "boolean"
+        },
+        "ignoredQueryParams": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "requestOptions": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "auth": {
+          "type": "string"
+        },
+        "defaultPort": {
+          "type": "integer"
+        },
+        "family": {
+          "enum": [
+            4,
+            6
+          ]
+        },
+        "headers": {
+          "type": "object",
+          "default": {}
+        },
+        "hints": {
+          "type": "integer"
+        },
+        "host": {
+          "type": "string",
+          "default": "localhost"
+        },
+        "hostname": {
+          "type": "string"
+        },
+        "insecureHTTPParser": {
+          "type": "boolean",
+          "default": false
+        },
+        "joinDuplicateHeaders": {
+          "type": "boolean",
+          "default": false
+        },
+        "localAddress": {
+          "type": "string"
+        },
+        "localPort": {
+          "type": "integer"
+        },
+        "maxHeaderSize": {
+          "type": "integer",
+          "default": 16384
+        },
+        "method": {
+          "type": "string",
+          "default": "GET"
+        },
+        "path": {
+          "type": "string",
+          "default": "/"
+        },
+        "port": {
+          "type": "integer",
+          "default": 80
+        },
+        "protocol": {
+          "type": "string",
+          "default": "http:"
+        },
+        "setDefaultHeaders": {
+          "type": "boolean",
+          "default": true
+        },
+        "setHost": {
+          "type": "boolean",
+          "default": true
+        },
+        "socketPath": {
+          "type": "string"
+        },
+        "timeout": {
+          "type": "integer"
+        },
+        "uniqueHeaders": {
+          "type": "array"
+        }
+      }
+    },
+    "agentOptions": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "keepAlive": {
+          "type": "boolean",
+          "default": false
+        },
+        "keepAliveMsecs": {
+          "type": "integer",
+          "default": 1000
+        },
+        "maxSockets": {
+          "type": "integer"
+        },
+        "maxTotalSockets": {
+          "type": "integer"
+        },
+        "maxFreeSockets": {
+          "type": "integer",
+          "default": 256
+        },
+        "scheduling": {
+          "type": "string",
+          "enum": [
+            "fifo",
+            "lifo"
+          ],
+          "default": "lifo"
+        },
+        "timeout": {
+          "type": "integer"
+        },
+        "maxCachedSessions": {
+          "type": "integer",
+          "default": 100
+        },
+        "servername": {
+          "type": "string"
+        }
+      }
+    }
+  },
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "prefix": {
+      "type": "string"
+    },
+    "logLevel": {
+      "enum": [
+        "fatal",
+        "error",
+        "warn",
+        "info",
+        "debug",
+        "trace"
+      ],
+      "default": "info"
+    },
+    "exposeErrors": {
+      "type": "boolean",
+      "default": false
+    },
+    "metrics": {
+      "type": "boolean",
+      "default": true
+    },
+    "origin": {
+      "type": "object",
+      "additionalProperties": false,
+      "oneOf": [
+        {
+          "required": [
+            "http2Options"
+          ]
+        },
+        {
+          "required": [
+            "http1xOptions"
+          ]
+        }
+      ],
+      "allOf": [
+        {
+          "if": {
+            "required": [
+              "http2Options"
+            ]
+          },
+          "then": {
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "http1xOptions"
+                  ]
+                },
+                {
+                  "required": [
+                    "agentOptions"
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "originBreaker": {
+                "const": true
+              }
+            },
+            "required": [
+              "originBreaker"
+            ]
+          },
+          "then": {
+            "required": [
+              "originBreakerOptions"
+            ]
+          }
+        }
+      ],
+      "properties": {
+        "http2Options": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "authority"
+          ],
+          "properties": {
+            "authority": {
+              "type": "string"
+            },
+            "options": {
+              "type": "object"
+            }
+          }
+        },
+        "http1xOptions": {
+          "$ref": "#/definitions/requestOptions"
+        },
+        "agentOptions": {
+          "$ref": "#/definitions/agentOptions"
+        },
+        "headersToForward": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            "*"
+          ]
+        },
+        "headersToExclude": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": []
+        },
+        "originTimeout": {
+          "type": "integer"
+        },
+        "originBreaker": {
+          "type": "boolean",
+          "default": false
+        },
+        "originBreakerOptions": {
+          "$ref": "#/definitions/circuitBreakerOptions"
+        },
+        "authentication": {
+          "type": "object",
+          "additionalProperties": false,
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "scheme": {
+                    "const": "Bearer"
+                  }
+                },
+                "required": [
+                  "scheme"
+                ]
+              },
+              "then": {
+                "required": [
+                  "bearer"
+                ]
+              }
+            }
+          ],
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": true
+            },
+            "scheme": {
+              "type": "string",
+              "enum": [
+                "Basic",
+                "Bearer"
+              ],
+              "default": "Basic"
+            },
+            "realm": {
+              "type": "string"
+            },
+            "bearer": {
+              "type": "object",
+              "additionalProperties": false,
+              "allOf": [
+                {
+                  "if": {
+                    "not": {
+                      "properties": {
+                        "verifyJwtSignature": {
+                          "const": false
+                        }
+                      },
+                      "required": [
+                        "verifyJwtSignature"
+                      ]
+                    }
+                  },
+                  "then": {
+                    "required": [
+                      "jwksUri"
+                    ]
+                  }
+                }
+              ],
+              "properties": {
+                "claim": {
+                  "type": "string",
+                  "default": "sub"
+                },
+                "decryptionKey": {
+                  "type": "string"
+                },
+                "allowUnsigned": {
+                  "type": "boolean",
+                  "default": false
+                },
+                "verifyJwtSignature": {
+                  "type": "boolean",
+                  "default": true
+                },
+                "jwksUri": {
+                  "type": "string"
+                }
+              }
+            },
+            "idTransformation": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "prefix": {
+                  "type": "string",
+                  "default": ""
+                },
+                "suffix": {
+                  "type": "string",
+                  "default": ""
+                },
+                "hash": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "enabled": {
+                      "type": "boolean",
+                      "default": true
+                    },
+                    "algorithm": {
+                      "type": "string",
+                      "default": "md5"
+                    },
+                    "hex": {
+                      "type": "boolean",
+                      "default": true
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "bff": {
+      "type": "object",
+      "additionalProperties": false,
+      "if": {
+        "not": {
+          "properties": {
+            "enabled": {
+              "const": false
+            }
+          },
+          "required": [
+            "enabled"
+          ]
+        }
+      },
+      "then": {
+        "required": [
+          "transformations"
+        ]
+      },
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": true
+        },
+        "actionsLibraries": {
+          "type": "object"
+        },
+        "transformations": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "minProperties": 2,
+            "maxProperties": 2,
+            "additionalProperties": false,
+            "required": [
+              "urlPattern",
+              "actions"
+            ],
+            "properties": {
+              "urlPattern": {
+                "type": "string"
+              },
+              "actions": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "object",
+                  "minProperties": 2,
+                  "maxProperties": 3,
+                  "required": [
+                    "phase",
+                    "uses"
+                  ],
+                  "properties": {
+                    "phase": {
+                      "enum": [
+                        "ClientRequest",
+                        "ClientResponse",
+                        "OriginRequest",
+                        "OriginResponse",
+                        "CacheRequest",
+                        "CacheResponse",
+                        "VariantsTracker",
+                        "CacheKeyGeneration"
+                      ]
+                    },
+                    "uses": {
+                      "type": "string"
+                    },
+                    "with": {
+                      "type": "object"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "variantsTracker": {
+      "type": "object",
+      "additionalProperties": false,
+      "if": {
+        "not": {
+          "properties": {
+            "enabled": {
+              "const": false
+            }
+          },
+          "required": [
+            "enabled"
+          ]
+        }
+      },
+      "then": {
+        "required": [
+          "urlPatterns"
+        ]
+      },
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": true
+        },
+        "urlPatterns": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "cache": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "cacheables"
+      ],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "distributedRequestsCoalescing": {
+                "const": true
+              }
+            },
+            "required": [
+              "distributedRequestsCoalescing"
+            ]
+          },
+          "then": {
+            "required": [
+              "distributedRequestsCoalescingOptions"
+            ]
+          }
+        }
+      ],
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": true
+        },
+        "purgePath": {
+          "type": "string",
+          "default": "/purge"
+        },
+        "purgeToken": {
+          "type": "string"
+        },
+        "includeOriginIdInCacheKey": {
+          "type": "boolean",
+          "default": true
+        },
+        "localRequestsCoalescing": {
+          "type": "boolean",
+          "default": true
+        },
+        "distributedRequestsCoalescing": {
+          "type": "boolean",
+          "default": false
+        },
+        "distributedRequestsCoalescingOptions": {
+          "type": "object",
+          "required": [
+            "lockTTL",
+            "retryCount",
+            "retryDelay",
+            "retryJitter"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "lockTTL": {
+              "type": "integer"
+            },
+            "retryCount": {
+              "type": "integer"
+            },
+            "retryDelay": {
+              "type": "integer"
+            },
+            "retryJitter": {
+              "type": "integer"
+            }
+          }
+        },
+        "defaultCacheSettings": {
+          "$ref": "#/definitions/cacheSettings",
+          "default": {
+            "methods": [
+              "GET",
+              "HEAD",
+              "POST"
+            ],
+            "private": false,
+            "ttl": -1,
+            "sortQueryParams": true,
+            "ignoredQueryParams": []
+          }
+        },
+        "cacheables": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": [
+              "urlPattern"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "urlPattern": {
+                "type": "string"
+              },
+              "cacheSettings": {
+                "$ref": "#/definitions/cacheSettings"
+              }
+            }
+          }
+        }
+      }
+    },
+    "cors": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": true
+        },
+        "origin": {
+          "oneOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "string"
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "minItems": 1
+            }
+          ],
+          "default": false
+        },
+        "methods": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "GET",
+              "HEAD",
+              "PUT",
+              "PATCH",
+              "POST",
+              "DELETE",
+              "OPTIONS"
+            ]
+          }
+        },
+        "allowedHeaders": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "exposedHeaders": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "credentials": {
+          "type": "boolean"
+        },
+        "maxAge": {
+          "type": "integer"
+        },
+        "preflightContinue": {
+          "type": "boolean"
+        },
+        "optionsSuccessStatus": {
+          "type": "integer",
+          "enum": [
+            200,
+            204
+          ]
+        },
+        "preflight": {
+          "type": "boolean"
+        },
+        "strictPreflight": {
+          "type": "boolean"
+        },
+        "hideOptionsRoute": {
+          "type": "boolean"
+        }
+      }
+    },
+    "redis": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "redisOptions"
+      ],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "redisBreaker": {
+                "const": true
+              }
+            },
+            "required": [
+              "redisBreaker"
+            ]
+          },
+          "then": {
+            "required": [
+              "redisBreakerOptions"
+            ]
+          }
+        }
+      ],
+      "properties": {
+        "redisOptions": {
+          "type": "object"
+        },
+        "redisTimeout": {
+          "type": "integer"
+        },
+        "redisBreaker": {
+          "type": "boolean",
+          "default": false
+        },
+        "redisBreakerOptions": {
+          "$ref": "#/definitions/circuitBreakerOptions"
+        },
+        "disableOriginOnRedisOutage": {
+          "type": "boolean",
+          "default": false
+        }
+      }
+    }
+  }
+}

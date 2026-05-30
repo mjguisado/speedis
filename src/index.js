@@ -8,6 +8,7 @@ import { collectDefaultMetrics, AggregatorRegistry } from 'prom-client'
 import Ajv from "ajv"
 import { open } from 'inspector'
 import { createClient } from 'redis'
+import mainSchema from '../schemas/main.schema.json' with { type: 'json' }
 
 /*
 Speedis also uses Redis as both a cache and as a background job queue via node-resque.
@@ -85,81 +86,7 @@ if (Object.keys(config).length === 0) {
 }
 
 const ajv = new Ajv({ useDefaults: true })
-const validateSpeedis = ajv.compile({
-    type: "object",
-    additionalProperties: false,
-    definitions: {
-        // https://fastify.dev/docs/latest/Reference/Server/#factory      
-        fastifyOptions: {
-            type: "object",
-            additionalProperties: true,
-            properties: {
-                http: { type: "object", nullable: true, default: null },
-                http2: { type: "boolean", default: false },
-                https: { type: "object", nullable: true, default: null },
-                connectionTimeout: { type: "integer", default: 0 },
-                keepAliveTimeout: { type: "integer", default: 72000 },
-                // forceCloseConnections: {},
-                maxRequestsPerSocket: { type: "integer", default: 0 },
-                requestTimeout: { type: "integer", default: 0 },
-                bodyLimit: { type: "integer", default: 1048576 },
-                onProtoPoisoning: { enum: ["error", "remove", "ignore"], default: "error" },
-                onConstructorPoisoning: { enum: ["error", "remove", "ignore"], default: "error" },
-                // logger: {},
-                // loggerInstance: {
-                // serverFactory: {},
-                requestIdHeader: { type: "boolean", default: false },
-                requestIdLogLabel: { type: "string", default: "reqId" },
-                // genReqId: {},
-                // trustProxy: { default: false },
-                pluginTimeout: { type: "integer", default: 10000 },
-                // querystringParser: {},
-                exposeHeadRoutes: { type: "boolean", default: true },
-                return503OnClosing: { type: "boolean", default: true },
-                ajv: { type: "object" },
-                serializerOpts: { type: "object" },
-                http2SessionTimeout: { type: "integer", default: 72000 },
-                // frameworkErrors: {},
-                // clientErrorHandler: {},
-                // rewriteUrl: {},
-                allowErrorHandlerOverride: { type: "boolean", default: false },
-                routerOptions: {
-                    type: "object",
-                    additionalProperties: true,
-                    properties: {
-                        allowUnsafeRegex: { type: "boolean", default: false },
-                        buildPrettyMeta: { type: "object" },
-                        caseSensitive: { type: "boolean", default: true },
-                        constraints: { type: "object" },
-                        // defaultRoute: {},
-                        ignoreDuplicateSlashes: { type: "boolean", default: false },
-                        ignoreTrailingSlash: { type: "boolean", default: false },
-                        maxParamLength: { type: "integer", default: 100 },
-                        // onBadUrl: {},
-                        // querystringParser: {},
-                        useSemicolonDelimiter: { type: "boolean", default: false }
-                    }
-                }
-            }
-        }
-    },
-    properties: {
-        maxNumberOfWorkers: { type: "number", default: os.availableParallelism() },
-        fastify: { $ref: "#/definitions/fastifyOptions" },
-        port: { type: "number", default: 3001 },
-        metricServerPort: { type: "number", default: 3003 },
-        metricServerLogLevel: {
-            enum: ["fatal", "error", "warn", "info", "debug", "trace"],
-            default: "info"
-        },
-        localOriginsConfigs: { type: "string", nullable: true, default: null },
-        originsConfigsKeys: {
-            type: "array",
-            items: { type: "string" },
-            default: []
-        }
-    }
-})
+const validateSpeedis = ajv.compile(mainSchema)
 
 if (!validateSpeedis(config)) {
     if (process.env.USE_REDIS_CONFIG) {
@@ -170,6 +97,9 @@ if (!validateSpeedis(config)) {
     console.error(validateSpeedis.errors)
     process.exit(1)
 }
+
+// Dynamic default (cannot be expressed in JSON schema).
+config.maxNumberOfWorkers ??= os.availableParallelism()
 
 const aggregatorRegistry = new AggregatorRegistry()
 collectDefaultMetrics()

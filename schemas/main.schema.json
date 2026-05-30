@@ -1,0 +1,171 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "definitions": {
+    "fastifyOptions": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "http": {
+          "type": "object",
+          "nullable": true,
+          "default": null
+        },
+        "http2": {
+          "type": "boolean",
+          "default": false
+        },
+        "https": {
+          "type": "object",
+          "nullable": true,
+          "default": null
+        },
+        "connectionTimeout": {
+          "type": "integer",
+          "default": 0
+        },
+        "keepAliveTimeout": {
+          "type": "integer",
+          "default": 72000
+        },
+        "maxRequestsPerSocket": {
+          "type": "integer",
+          "default": 0
+        },
+        "requestTimeout": {
+          "type": "integer",
+          "default": 0
+        },
+        "bodyLimit": {
+          "type": "integer",
+          "default": 1048576
+        },
+        "onProtoPoisoning": {
+          "enum": [
+            "error",
+            "remove",
+            "ignore"
+          ],
+          "default": "error"
+        },
+        "onConstructorPoisoning": {
+          "enum": [
+            "error",
+            "remove",
+            "ignore"
+          ],
+          "default": "error"
+        },
+        "requestIdHeader": {
+          "type": "boolean",
+          "default": false
+        },
+        "requestIdLogLabel": {
+          "type": "string",
+          "default": "reqId"
+        },
+        "pluginTimeout": {
+          "type": "integer",
+          "default": 10000
+        },
+        "exposeHeadRoutes": {
+          "type": "boolean",
+          "default": true
+        },
+        "return503OnClosing": {
+          "type": "boolean",
+          "default": true
+        },
+        "ajv": {
+          "type": "object"
+        },
+        "serializerOpts": {
+          "type": "object"
+        },
+        "http2SessionTimeout": {
+          "type": "integer",
+          "default": 72000
+        },
+        "allowErrorHandlerOverride": {
+          "type": "boolean",
+          "default": false
+        },
+        "routerOptions": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "allowUnsafeRegex": {
+              "type": "boolean",
+              "default": false
+            },
+            "buildPrettyMeta": {
+              "type": "object"
+            },
+            "caseSensitive": {
+              "type": "boolean",
+              "default": true
+            },
+            "constraints": {
+              "type": "object"
+            },
+            "ignoreDuplicateSlashes": {
+              "type": "boolean",
+              "default": false
+            },
+            "ignoreTrailingSlash": {
+              "type": "boolean",
+              "default": false
+            },
+            "maxParamLength": {
+              "type": "integer",
+              "default": 100
+            },
+            "useSemicolonDelimiter": {
+              "type": "boolean",
+              "default": false
+            }
+          }
+        }
+      }
+    }
+  },
+  "properties": {
+    "maxNumberOfWorkers": {
+      "type": "number"
+    },
+    "fastify": {
+      "$ref": "#/definitions/fastifyOptions"
+    },
+    "port": {
+      "type": "number",
+      "default": 3001
+    },
+    "metricServerPort": {
+      "type": "number",
+      "default": 3003
+    },
+    "metricServerLogLevel": {
+      "enum": [
+        "fatal",
+        "error",
+        "warn",
+        "info",
+        "debug",
+        "trace"
+      ],
+      "default": "info"
+    },
+    "localOriginsConfigs": {
+      "type": "string",
+      "nullable": true,
+      "default": null
+    },
+    "originsConfigsKeys": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": []
+    }
+  }
+}
