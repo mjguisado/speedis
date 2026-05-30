@@ -1,4 +1,4 @@
-ARG NODE_VERSION=25
+ARG NODE_VERSION=26
 FROM node:${NODE_VERSION}-alpine
 WORKDIR /usr/src/app
 ENV NODE_ENV=development

@@ -1,5 +1,6 @@
-ARG NODE_VERSION=25
+ARG NODE_VERSION=26
 FROM node:${NODE_VERSION}-alpine AS base
+
 RUN apk add --no-cache curl
 WORKDIR /usr/src/app
 
