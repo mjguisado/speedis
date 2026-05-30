@@ -1,5 +1,5 @@
 # Getting Started
-This repository includes a Docker Compose configuration file to easy the deploy and test of Redis.
+This repository includes a Docker Compose configuration file to ease the deployment and testing of Speedis end-to-end (Redis, the mock origin servers, HAProxy as reverse proxy, Prometheus and Grafana).
 ## **Prerequisites**  
 Ensure you have the following installed:
 - [Docker](https://docs.docker.com/get-docker/)  
@@ -47,17 +47,15 @@ The supported domains are: speedis, speedis.localhost, mocks, mocks.localhost, m
 ## **Start the environment**
 Run the following command to start all services:  
 ```sh
-docker compose --profile develop up --watch --build
+docker compose up --watch --build
 ```
 This will start:
-- **Redis**: In-memory shared data storage
-- **HAProxy**: Reverse Proxy
-- **Speedis**: The main caching service
-- **Mocks**: Mocked origin server (HTTP/1)
-- **Mocks2**: Mocked origin server (HTTP/2)
-- **Keycloack**: Identity and Access Management (IAM)
-- **Prometheus**: Monitoring system
-- **Grafana**: Visualization tool
+- **Redis**: in-memory shared data storage.
+- **HAProxy**: reverse proxy (TLS termination, domain-to-origin routing).
+- **Speedis**: the main caching service.
+- **Mocks**: mocked origin server that can be reached over HTTP/1.1 and (with `MOCKS_HTTP2=true`) HTTP/2.
+- **Prometheus**: scrapes Speedis metrics from `http://speedis:3003/metrics`.
+- **Grafana**: visualizes the Prometheus metrics (see [Grafana.md](./Grafana.md)).
 ## **Verify the setup**  
 Check the running containers:  
 ```sh
@@ -87,6 +85,13 @@ These URLs provide access to the consoles of certain tools and their associated 
 - **Prometheus** → `http://prometheus.localhost:9090`
 
 You can find examples of request to the different services in [./Requests.md](./Requests.md)
+
+## **Environment variables**
+
+Speedis is configured through the JSON files described in [Configuration.md](./Configuration.md), but a small set of environment variables controls how Speedis bootstraps and connects to its dependencies (`USE_REDIS_CONFIG`, `SPEEDIS_CONFIG_KEY`, the `REDIS_*` connection variables, `NODE_ENV`, `NODE_TLS_REJECT_UNAUTHORIZED`). They are documented in [EnvironmentVariables.md](./EnvironmentVariables.md).
+
+The bundled `compose.yml` already exports `NODE_TLS_REJECT_UNAUTHORIZED=0` for the `speedis` service so it can talk to the self-signed HTTPS endpoints used by the mocks.
+
 ## **Load origin configuration**  
 Speedis can load origin configurations from either local files or a Redis database.
 If the database is used, the origin configuration must be inserted into it before running Speedis.
@@ -117,7 +122,7 @@ The project includes configurations that allow you to debug Speedis while it run
 However, in some cases, it can be useful to run Speedis locally while keeping the rest of the components running in Docker.
 To do this, you need to stop the Speedis instance running in Docker.
 ```sh
-docker down speedis
+docker compose stop speedis
 ```
 and sart Speedis locally. 
 If you make requests to the mock server using HTTP/2, note that because self-signed certificates are used, you must start Speedis with an option that tells it to trust those certificates.

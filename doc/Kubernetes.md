@@ -79,5 +79,7 @@ To test the deployment, you can use the examples of request found in [./Requests
 
 **HTTP Request to Speedis via HAProxy**
 ```sh
-curl -vkXGET -H 'Host: mocks.localhost' 'https://127.0.0.1:51785/mocks/items/public-real-betis?delay=300&cc=public,max-age=10'
+curl -vkXGET -H 'Host: mocks.localhost' 'https://127.0.0.1:51785/cache/mocks/public/items/real-betis?delay=300&cc=public,max-age=10'
 ```
+
+The `/cache` prefix matches the `prefix` field of `conf/origins/cache.json`, which is the origin loaded by default. See [Requests.md](./Requests.md) for the full catalog of example requests.

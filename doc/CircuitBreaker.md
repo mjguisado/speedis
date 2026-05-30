@@ -2,7 +2,7 @@
 We are going to run some tests to observe the effects of the circuit breaker mechanism on the origin server.
 Please ensure that you follow the steps described in [Docker.md](./Docker.md)
 ## Without circuit breaker
-First, we modify the configuration file for the mocks origin, located at ./conf/origins/mocks.json, to ensure that the circuit breaker mechanisms is disabled (originBreaker = false) and the coalescing mechanisms are enabled—both for requests arriving at the same instance (localRequestsCoalescing = true) and across different instances (distributedRequestsCoalescing = true).
+First, we modify the configuration file for the cache origin, located at ./conf/origins/cache.json, to ensure that the circuit breaker mechanism is disabled (`originBreaker = false`) and the coalescing mechanisms are enabled — both for requests arriving at the same instance (`localRequestsCoalescing = true`) and across different instances (`distributedRequestsCoalescing = true`).
 
 Once modified, we proceed to start the environment:
 ```sh
@@ -43,7 +43,7 @@ In both cases, the reponse times exceed one second.
 Once the origin is restored, the system returns to normal.  
 <img src="./img/after_without_cb.png" />
 
-Finally, we modify the configuration file for the mocks origin to ensure that the circuit breaker mechanisms is enabled (originBreaker = true) and restart the environment.
+Finally, we modify the configuration file for the cache origin (`./conf/origins/cache.json`) to ensure that the circuit breaker mechanism is enabled (`originBreaker = true`) and restart the environment.
 ```sh
 docker compose up --build -d
 ```
@@ -52,7 +52,5 @@ In this case, we observe that during the origin server outage, the circuit break
 As a result, the system returns the existing data from the cache without refreshing (**CACHE_HIT_NOT_REVALIDATED_STALE**), while keeping the response time within the millisecond range.  
 <img src="./img/after_with_cb.png" />
 
-
-
-
+The values that appear inside the `x-speedis-cache-status` header on every response — `CACHE_HIT`, `CACHE_HIT_NOT_REVALIDATED_STALE`, `CACHE_NO_LOCK` and the rest — are documented in [CacheStatus.md](./CacheStatus.md).
 

@@ -51,6 +51,36 @@ curl -vXDELETE --resolve speedis.localhost:3001:127.0.0.1 'http://speedis.localh
 curl -vkXDELETE --resolve mocks.localhost:443:127.0.0.1 'https://mocks.localhost/purge/*'
 ```
 
+## **Authenticated purges (`X-Speedis-Purge-Token`)**
+
+When an origin sets `cache.purgeToken`, every purge request must carry that secret in the `X-Speedis-Purge-Token` header; otherwise Speedis responds with `401 Unauthorized`. The repository ships an example origin (`conf/origins/bank-demo.json`) with `"purgeToken": "changeme-shared-secret"` so you can reproduce the flow end-to-end.
+
+```sh
+# Purge an entry on the bank origin, providing the shared secret
+curl -vXDELETE \
+  --resolve speedis.localhost:3001:127.0.0.1 \
+  -H 'X-Speedis-Purge-Token: changeme-shared-secret' \
+  'http://speedis.localhost:3001/bank/purge/banking/accounts/12345/balance'
+
+# Without the token Speedis returns 401
+curl -vXDELETE \
+  --resolve speedis.localhost:3001:127.0.0.1 \
+  'http://speedis.localhost:3001/bank/purge/banking/accounts/12345/balance'
+```
+
+## **Purging private (per-user) entries (`X-Speedis-Purge-UserID`)**
+
+Cacheables marked as `private` include the user identifier as part of the cache key. Purge requests are admin operations issued by trusted callers that typically do not hold user credentials, so the user identifier travels in clear text via the `X-Speedis-Purge-UserID` header. Speedis applies the same `idTransformation` pipeline (prefix, hashing, suffix) that was applied at write time, so the regenerated key matches the stored entry. If the header is omitted, no private entry will match and Speedis responds with `404`.
+
+```sh
+# Purge the balance entry cached for the user 'speedis_user'
+curl -vXDELETE \
+  --resolve speedis.localhost:3001:127.0.0.1 \
+  -H 'X-Speedis-Purge-Token: changeme-shared-secret' \
+  -H 'X-Speedis-Purge-UserID: speedis_user' \
+  'http://speedis.localhost:3001/bank/purge/banking/accounts/12345/balance'
+```
+
 ```sh
 curl -vk --http2 -X POST \
 --resolve mocks.localhost:3030:127.0.0.1 'https://mocks.localhost:3030/mocks/public/soap/sax?delay=300&cc=public,max-age=10' \
