@@ -13,25 +13,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-## [2.4.0] - 2026-05-28
+## [2.5.0] - 2026-06-03
 
-### Added
+**Commit title:**
+```
+Add cache hit ratio metrics by URL pattern with Grafana dashboard
+```
 
-  - Plain-text fingerprint mode for BFF cache-key actions. Both
-    `xmlsax:xmlBodyFingerprint` and `xmlxpath:xpathBodyFingerprint` now
-    accept `algorithm: false` in their `with` block. When set, the extracted
-    element values are joined with `:` and stored verbatim in
-    `target.bodyFingerprint` (no hashing). Useful for readable cache keys
-    while debugging or when the discriminator is already low-cardinality
-    and the hash adds no value.
+---
 
-  ### Changed
+**Release note:**
 
-  - Fingerprint composition now joins extracted values with `:` instead of
-    concatenating them without a separator. Applies to both hashed and
-    plain modes. **Cache-key impact**: previously hashed entries do not
-    collide with newly generated keys — expect a one-time miss wave after
-    upgrade on origins using `xmlBodyFingerprint` or `xpathBodyFingerprint`.
-  - `src/actions/xmlsax.js`: internal `results` array renamed to `parts`,
-    matching the naming already used in `xmlxpath.js`. No behavioral change.
+### Cache Hit Ratio Metrics by URL Pattern
+
+Added support for measuring cache performance with granularity by `urlPattern` and origin.
+
+**New metrics**
+- New Prometheus counter `speedis_cacheable_requests_total` with labels `origin`, `urlPattern` and `cacheStatus`, enabling calculation of hit ratio, offload and traffic distribution per URL pattern.
+
+**Internal changes**
+- Requests are now decorated with `cacheableUrlPattern` in the `onRequest` hook in `cache.js`, capturing the matching pattern from the `cacheable` configuration entry.
+
+**Grafana dashboard**
+- New **urlPattern** tab with a summary table per pattern showing: number of requests, percentage of total origin traffic and offload (hit ratio).
+- Two time series charts: number of requests and offload per `urlPattern`.
+- Filter variables `origin` and `urlpattern` to explore data by origin and URL pattern.
 
