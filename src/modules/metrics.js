@@ -44,7 +44,17 @@ export function initMetrics(server, opts) {
         })
     }
 
-    let speedisHttpResponsesDuration = 
+    let speedisCacheableRequestsTotal =
+        register.getSingleMetric('speedis_cacheable_requests_total')
+    if (!speedisCacheableRequestsTotal) {
+        speedisCacheableRequestsTotal = new Counter({
+            name: 'speedis_cacheable_requests_total',
+            help: 'Total number of cacheable requests by URL pattern and cache status',
+            labelNames: ['origin', 'urlPattern', 'cacheStatus']
+        })
+    }
+
+    let speedisHttpResponsesDuration =
         register.getSingleMetric('speedis_http_responses_duration')
     if (!speedisHttpResponsesDuration) {
         speedisHttpResponsesDuration = new Histogram({
@@ -98,6 +108,15 @@ export function initMetrics(server, opts) {
                 statusCode: statusCode,
                 cacheStatus: cacheStatus
             }).inc()
+
+        if ('cache' === request.target && request.cacheableUrlPattern) {
+            speedisCacheableRequestsTotal
+                .labels({
+                    origin: origin,
+                    urlPattern: request.cacheableUrlPattern,
+                    cacheStatus: cacheStatus
+                }).inc()
+        }
 
         if (typeof reply.elapsedTime === 'number' && !Number.isNaN(reply.elapsedTime)) {
             speedisHttpResponsesDuration.labels({

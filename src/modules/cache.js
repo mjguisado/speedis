@@ -58,10 +58,12 @@ export function initCache(server, opts) {
     // is cacheable and, if so, extracts the cache configuration for that URL.
     server.decorateRequest('cacheable')
     server.decorateRequest('cacheSettings')
+    server.decorateRequest('cacheableUrlPattern')
 
     server.addHook('onRequest', async (request, reply) => {
         request.cacheable = false
         request.cacheSettings = {}
+        request.cacheableUrlPattern = null
         for (const cacheable of opts.cache.cacheables) {
             if (cacheable.re.test(request.raw.url)) {
                 // Only methods declared in cacheSettings.methods are cacheable for this URL.
@@ -71,6 +73,7 @@ export function initCache(server, opts) {
                 // Merge default and cacheable settings
                 // This settings are used to generate the cache key, also for the purging operations
                 request.cacheSettings = cacheable.cacheSettings
+                request.cacheableUrlPattern = cacheable.urlPattern
                 break
             }
         }
