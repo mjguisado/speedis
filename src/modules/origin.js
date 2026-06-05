@@ -2,6 +2,7 @@ import http from 'http'
 import https from 'https'
 import http2 from 'node:http2'
 import os from 'os'
+import { performance } from 'node:perf_hooks'
 import { initOriginBreaker } from '../modules/originBreaker.js'
 import { transform, ORIGIN_REQUEST, ORIGIN_RESPONSE } from './bff.js'
 
@@ -180,9 +181,26 @@ export function _fetch(server, originOptions, requestOptions, body) {
         requestOptions.headers['content-length'] = bodyLength
     }
 
-    return originOptions.origin.http2Options
+    const start = performance.now()
+    const fetchPromise = originOptions.origin.http2Options
         ? _fetchHttp2(server, originOptions, requestOptions, body)
         : _fetchHttp1x(originOptions, requestOptions, body)
+
+    // recordUpstreamRequest is only decorated when metrics are enabled.
+    if (!server.recordUpstreamRequest) return fetchPromise
+
+    return fetchPromise.then(
+        (response) => {
+            server.recordUpstreamRequest(
+                requestOptions.method, response.statusCode, performance.now() - start, null)
+            return response
+        },
+        (err) => {
+            server.recordUpstreamRequest(
+                requestOptions.method, null, performance.now() - start, err?.code ?? 'UNKNOWN')
+            throw err
+        }
+    )
 }
 
 function _fetchHttp1x(originOptions, requestOptions, body) {

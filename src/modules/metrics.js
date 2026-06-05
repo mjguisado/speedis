@@ -64,6 +64,27 @@ export function initMetrics(server, opts) {
         })
     }
 
+    let speedisUpstreamRequestsDuration =
+        register.getSingleMetric('speedis_upstream_requests_duration')
+    if (!speedisUpstreamRequestsDuration) {
+        speedisUpstreamRequestsDuration = new Histogram({
+            name: 'speedis_upstream_requests_duration',
+            help: 'Duration (ms) of requests made to the upstream/origin servers',
+            labelNames: ['origin', 'method', 'statusCode'],
+            buckets: [1, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000]
+        })
+    }
+
+    let speedisUpstreamRequestsErrorsTotal =
+        register.getSingleMetric('speedis_upstream_requests_errors_total')
+    if (!speedisUpstreamRequestsErrorsTotal) {
+        speedisUpstreamRequestsErrorsTotal = new Counter({
+            name: 'speedis_upstream_requests_errors_total',
+            help: 'Total number of failed upstream requests with no HTTP response (timeouts, connection errors)',
+            labelNames: ['origin', 'method', 'code']
+        })
+    }
+
     server.decorateRequest('target', null)
     server.addHook('onRequest', async (request, reply) => {
         if (isPurgeRequest(server, opts, request)) {
@@ -129,6 +150,21 @@ export function initMetrics(server, opts) {
             server.log.warn(`The duration value ${reply.elapsedTime} is not valid.`)
         }
 
+    })
+
+    // Recorder for upstream/origin calls, invoked from _fetch in origin.js.
+    // Decorated on the server (instead of imported) to avoid the import cycle
+    // origin.js -> metrics.js -> cache.js -> origin.js. opts.id is the origin label.
+    server.decorate('recordUpstreamRequest', (method, statusCode, durationMs, errorCode) => {
+        if (errorCode) {
+            speedisUpstreamRequestsErrorsTotal
+                .labels({ origin: opts.id, method, code: errorCode })
+                .inc()
+        } else {
+            speedisUpstreamRequestsDuration
+                .labels({ origin: opts.id, method, statusCode })
+                .observe(durationMs)
+        }
     })
 
 }
