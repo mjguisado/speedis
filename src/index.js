@@ -11,14 +11,23 @@ import { createClient } from 'redis'
 import mainSchema from '../schemas/main.schema.json' with { type: 'json' }
 
 /*
-Speedis also uses Redis as both a cache and as a background job queue via node-resque.
-You can customize how this are used via your environment variables.
+In Speedis, Redis is used to store cache entries.
+Additionally, it can be used to store configuration information in a 
+centralized way. The following environment variable configures the 
+connection to the Redis instance that holds the centralized configuration:
 
-REDIS_URL="redis://localhost:6379/0"
+REDIS_URL=“redis://{user}:{password}@{host}:{port}/{database}”
 
-The full set of options you can provide to REDIS_URL is: REDIS_URL="redis://{user}:{password}@{host}:{port}/{database}".
-Note that you cannot use an @ or : in your username or password when using REDIS_URL.
-Alternatively to REDIS_URL, you can set the following environment variables directly: REDIS_HOST, REDIS_PORT, REDIS_DB, and REDIS_USER, REDIS_PASS which do allow all special characters.
+The default value is REDIS_URL=“redis://127.0.0.1:6379/”
+
+Note: When using REDIS_URL, the username and password cannot contain
+“@” or “:” characters.
+
+Alternatively, instead of REDIS_URL, you can configure the connection using
+the following environment variables: 
+REDIS_HOST, REDIS_PORT, REDIS_DB, REDIS_USER, REDIS_PASS
+
+These variables allow all special characters in the username and password.
 */
 
 let config = {}

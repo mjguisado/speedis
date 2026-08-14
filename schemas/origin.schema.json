@@ -393,6 +393,12 @@
     }
   },
   "properties": {
+    "configVersion": {
+      "type": "integer",
+      "minimum": 1,
+      "default": 1,
+      "description": "Format version of this origin configuration document. When absent it is treated as 1. Reserved for managing future configuration migrations."
+    },
     "id": {
       "type": "string"
     },

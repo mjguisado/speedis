@@ -5,3 +5,4 @@ conf/certs/*
 mocks/certs/*
 3rparties/haproxy/certs/*
 3rparties/keycloak/certs/*
+.mockups
