@@ -86,6 +86,15 @@ export default async function (server, opts) {
 
         try {
 
+            const incomingRequestMsg = `Origin: ${opts.id}. Incoming request. ` +
+                `RID: ${request.id}. Method: ${request.method}. URL: ${request.raw.url}`
+            server.log.trace({
+                headers: request.headers,
+                params: request.params,
+                query: request.query,
+                body: request.body
+            }, incomingRequestMsg)
+
             if (opts?.bff?.enabled) {
                 bff.transform(opts, bff.CLIENT_REQUEST, request)
             }

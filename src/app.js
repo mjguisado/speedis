@@ -1,4 +1,4 @@
-import fastify from 'fastify'
+import fastify, { LogController } from 'fastify'
 import path from 'path'
 import fs from 'fs/promises'
 import speedisPlugin from './plugins/speedis.js'
@@ -11,6 +11,17 @@ export async function app(
     localOriginsConfigs,
     configdb,
     originsConfigsKeys) {
+
+    // schemas/main.schema.json still exposes requestIdLogLabel at the top level
+    // of the fastify options for backwards compatibility with existing configs,
+    // but Fastify 5 deprecated that top-level option (FSTDEP024) in favor of
+    // logController. We translate it here so the option keeps working without
+    // triggering the deprecation warning.
+    if (opts.requestIdLogLabel !== undefined) {
+        const { requestIdLogLabel, ...rest } = opts
+        opts = rest
+        opts.logController = new LogController({ requestIdLogLabel })
+    }
 
     // Register the Prometheus metrics.
     const server = fastify(opts)
